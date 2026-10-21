@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "iKF Audio Center",
+  "outputfilename": "iKF-Audio-Center",
+  "frontend:install": "",
+  "frontend:build": "python ../tools/build_frontend.py",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "iKF Audio Center",
+    "email": ""
+  },
+  "info": {
+    "companyName": "iKF",
+    "productName": "iKF Audio Center",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright (C) 2026 iKF",
+    "comments": "iKF headset 驱动控制面板（Wails 2 / Go 版）"
+  }
+}
