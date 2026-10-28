@@ -9,6 +9,7 @@ __pycache__/
 *.DO-NOT-SHIP
 *.log
 *.zip
+log/
 
 # ---- local / runtime ----
 .workbuddy/
