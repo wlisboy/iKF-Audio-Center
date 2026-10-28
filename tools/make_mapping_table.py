@@ -222,7 +222,7 @@ def main():
     A("（反汇编 + 实机往返 + 官方 lang 资源三方交叉印证），")
     A("未确认的不臆造，显式标为「未恢复」。")
     A("")
-    A("**页面名对照（以设计稿 `design/iKF-Audio-Center-1610.html` 为准）**")
+    A("**页面名对照（以设计稿 `design/audio-center.html` 为准）**")
     A("")
     A("- 声音（第 31 轮前叫「声场」）· 均衡器（前「均衡」）· 麦克风")
     A("- 律动空间 · 自定义场景 · 设备")
@@ -430,7 +430,7 @@ def main():
     A("- **形状自洽校验**：索引 7=高音（强提高频）、8=低音（强提低频）、11=预设（全 0）、"
       "5=摇滚（V 型）、10=声乐（中频 +14），与听感预期一致。")
     A("")
-    A("提取结果（单位 dB，官方真值）已落入 `design/iKF-Audio-Center-1610.html` 的 "
+    A("提取结果（单位 dB，官方真值）已落入 `design/audio-center.html` 的 "
       "`HZ` 与 `PRE` 两个常量，并经 `tools/build_center.py` / "
       "`iKF-Audio-Center-Wails/tools/build.py` 同步进两条交付线。")
     A("")

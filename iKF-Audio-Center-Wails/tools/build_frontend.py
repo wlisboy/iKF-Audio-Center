@@ -7,7 +7,7 @@
 供 main.go 的 `//go:embed all:frontend/dist` 内联进 exe。
 
 输入：
-  design/iKF-Audio-Center-1610.html   已完成的设计稿（含内联产品图与 Logo 遮罩）
+  design/audio-center.html   已完成的设计稿（含内联产品图与 Logo 遮罩）
   tools/build_center.py                      其中的 BRIDGE_JS / FAVICON（与 Python 版共用同一份，不复制）
 
 输出：
@@ -29,7 +29,7 @@ APP = os.path.dirname(HERE)                       # iKF-Audio-Center-Wails/
 ROOT = os.path.dirname(APP)                       # 工作区根
 
 BUILD_CENTER = os.path.join(ROOT, "tools", "build_center.py")
-DESIGN = os.path.join(ROOT, "design", "iKF-Audio-Center-1610.html")
+DESIGN = os.path.join(ROOT, "design", "audio-center.html")
 OUT = os.path.join(APP, "frontend", "dist", "index.html")
 
 MARK = "/* ============================================================\n   驱动桥接层"
