@@ -1,37 +1,38 @@
-# 构建产物
+# ---- build outputs ----
 dist/
 build/
-**/build/bin/
 __pycache__/
 *.pyc
 *.exe
 *.dll
 *.sys
-
-# 运行时生成
-工具/.profile-stash/
-工具/fx_enum_out.txt
+*.DO-NOT-SHIP
 *.log
+*.zip
 
-# 前端
-node_modules/
-宣传视频/out/
-宣传视频/public/
-宣传视频/audio/
-
-# 本地/私密
+# ---- local / runtime ----
 .workbuddy/
 .workbuddy-ai/
-工具/*.md
-工具/propnames.json
-工具/official_catalog.json
-工具/截图/
-工具/opencode会话导出/
-宣传视频/
-
-# 构建生成物
+tools/archive/
+tools/diag/
+release/
 iKF-Audio-Center.py
 
-# 预览页生成产物
+# ---- docs: local only, not distributed ----
+docs/
+
+# ---- legacy mirror (superseded by repo-at-root; pending deletion) ----
+github-repo/
+
+# ---- frontend ----
+node_modules/
+iKF-Audio-Center-Wails/frontend/dist/
+
+# ---- promo: generated assets only (src is tracked) ----
+promo/public/
+promo/out/
+promo/audio/
+
+# ---- design generated previews ----
 design/scene-preview.html
 design/viz-preview.html
