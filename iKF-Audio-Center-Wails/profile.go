@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -37,7 +38,7 @@ import (
 // 因此用户自建组态写入 %APPDATA%\iKF Audio Center\profile\；
 // 读取时两处都扫，驱动自带的内置档照常列出。
 //
-// 本文件与 Python 版（tools/src/center_src.py 的「组态」一节）逐字段一致。
+// 本文件与 Python 版（工具/src/center_src.py 的「组态」一节）逐字段一致。
 
 const (
 	profileFactory  = "预设" // 对应 FactoryDefault.xml
@@ -61,101 +62,29 @@ var profileEndpoints = []string{EpRender, EpCapture}
 // 「端点族前缀 + 页名」命名。旧表的 Volume / Environment / Karaoke / … 出自
 // C-Media 的**人读显示名**（CMCplExt_108B.dll 0x08DB28 的 "Full Name" 列表），
 // 官方面板读不出归属 —— 用旧名导出的场景在官方面板里点了没反应。
-// 已存旧档由 groupAlias 兜底。逐字段对应 Python 版 center_src.py 的 PROFILE_GROUPS。
-var profileGroups = map[string]map[string]string{
-	EpRender: {
-		// apoSpeakerVol / apoSpeakerEQ / apoSpeakerEM
-		"MuteControl": "SpeakerVolume", "VolumeControl": "SpeakerVolume",
-		"VolumeScalarControl": "SpeakerVolume",
-		"Enable_EQ_GFX":       "SpeakerEQ", "EQ_Slider": "SpeakerEQ",
-		"Enable_RFX_GFX":  "SpeakerEM",
-		"RFX_ENVIRONMENT": "SpeakerEM",
-		"RFX_ROOMSIZE":    "SpeakerEM",
-		// apoSpeakerKaraoke（人声消除 + 升降调同页）
-		"Enable_VOCALCANCEL_GFX": "SpeakerKaraoke",
-		"VOCALCANCEL_LEVEL":      "SpeakerKaraoke",
-		"Enable_KEYSHIFT_GFX":    "SpeakerKaraoke",
-		"KEYSHIFT_LEVEL":         "SpeakerKaraoke",
-		// apoSpeakerSamplingRate / apoSpeakerSetting（声道复制也在这张页）
-		"DevSampleRateControl":    "SpeakerSamplingRate",
-		"Enable_Channel_COPY_LFX": "SpeakerSetting",
-		// 设备控制，无页面
-		"GFSControl": "GFS",
-		// A 档（第 46 轮）
-		"Enable_AUDIOBRILLIANT_LFX":    "SpeakerXearAudioBrilliant",
-		"AUDIOBRILLIANT_LEVEL":         "SpeakerXearAudioBrilliant",
-		"Enable_BM_GFX":                "SpeakerXearDynamicBass",
-		"BM_Slider_BassLevel":          "SpeakerXearDynamicBass",
-		"BM_Slider_Frequency":          "SpeakerXearDynamicBass",
-		"Enable_SMART_VOLUME_GFX":      "SpeakerXearSmartVolume",
-		"Enable_VOICECLARITY_LFX":      "SpeakerXearVoiceClarity",
-		"VOICECLARITY_LEVEL":           "SpeakerXearVoiceClarity",
-		"VOICECLARITY_NOISESUPP_LEVEL": "SpeakerXearVoiceClarity",
-		// B 档（第 47 轮）
-		"Enable_CONLAB_HPSPK_LFX": "SpeakerXearSurroundHeadPhone",
-		"CONLAB_HPSPK_MODE":       "SpeakerXearSurroundHeadPhone",
-		"CONLAB_HPSPK_ROOMSIZE":   "SpeakerXearSurroundHeadPhone",
-		"CONLAB_HPSPK_SFX":        "SpeakerXearSurroundSpeakers",
-		"CONLAB_HPSPK_SPKANGLE":   "SpeakerXearSurroundSpeakers",
-		"Enable_SURRSENS_LFX":     "SpeakerSurroundMax",
-		// C 档（第 48 轮）
-		"Enable_DHDVS_LFX": "SpeakerDolbyHPVS",
-		"DHDVS_USEDH":      "SpeakerDolbyHPVS",
-		"DVS_Mode":         "SpeakerDolbyHPVS",
-		"DH_Mode":          "SpeakerDolbyHPVS",
-		// D 档（第 49 轮）：SS_*_ANGLE / SS_*_DIST 走 groupOf 的前缀规则
-		"Enable_SS_LFX": "SpeakerVirtual",
-		// E 档（第 50 轮）
-		"Speaker_Channel_Setting": "SpeakerSetting",
-		"Enable_SwapLfeCn_LFX":    "SpeakerSetting",
-		"Enable_SwapSrBk_LFX":     "SpeakerSetting",
-	},
-	EpCapture: {
-		"VolumeControl":       "MicInVolume",
-		"VolumeScalarControl": "MicInVolume",
-		"MuteControl":         "MicInVolume",
-		// AA（模拟功放）控件就在 apoMicInVol.cml 上
-		"AAVolumeControl":           "MicInVolume",
-		"Enable_NOISEREDUCTION_LFX": "MicInNoiseReduction",
-		"NoiseReduction_Level":      "MicInNoiseReduction",
-		"Enable_MAGICVOICE":         "MicInXearMagicVoice",
-		"MagicVoice_Selection":      "MicInXearMagicVoice",
-		"AGCControl":                "MicInAGC",
-		"DevSampleRateControl":      "MicInSamplingRate",
-		// 无官方页，保留旧名
-		"Enable_MICECHO": "MicEcho", "MICECHO_Level": "MicEcho",
-		// 第 62 轮 · 麦克风专项三开关（组名 = 官方 Canvas 名，场景存档分组用）
-		"Enable_AEC_LFX":      "MicInAEC",
-		"Enable_ENC_LFX":      "MicInENC",
-		"Enable_MICARRAY_LFX": "MicInBeamForming",
-	},
-}
+// profileGroups 属性名 → 官方 ApoEffect 分组名（= 页面 Canvas 名）。
+//
+// ★ S4 起真源 = model/device-model.toml [profile_groups]（53 条含 EQ_Slider
+// 前缀键，装载时自校验）。组名出处与「EQ_Slider 前缀键、SS_* 前缀规则」
+// 见 groupOf 与 TOML 注释。已存旧档由 groupAlias 兜底。
+var profileGroups = modelData.ProfileGroups
 
 // groupAlias 旧版工具写出过的分组名 → 归一到现在的 Canvas 名。
 // **只用于读**：用户已存下来的场景不该因这次改名而显示成「其他」。
-var groupAlias = map[string]string{
-	"Volume":               "SpeakerVolume",
-	"Environment":          "SpeakerEM",
-	"Karaoke":              "SpeakerKaraoke",
-	"KeyShift":             "SpeakerKaraoke",
-	"SamplingRate":         "SpeakerSamplingRate",
-	"ChannelCopy":          "SpeakerSetting",
-	"XearSurroundSpeakers": "SpeakerVirtual",
-	"NoiseReduction":       "MicInNoiseReduction",
-	"XearMagicVoice":       "MicInXearMagicVoice",
-	"AAVolume":             "MicInVolume",
-}
+// ★ S1 起真源 = model/device-model.toml [group_alias]（10 条，装载时自校验）。
+var groupAlias = modelData.GroupAlias
 
-// profileEndpoint 端点 → 官方 Endpoint 名 / DataFlow
-var profileEndpoint = map[string][2]string{
-	EpRender:  {"Speakers", "Out"},
-	EpCapture: {"Mic", "In"},
-}
+// profileEndpoint 端点 → 官方 Endpoint 名 / DataFlow（S4 起真源 = TOML）。
+var profileEndpoint = func() map[string][2]string {
+	out := make(map[string][2]string, len(modelData.ProfileEndpoint))
+	for ep, v := range modelData.ProfileEndpoint {
+		out[ep] = [2]string{v[0], v[1]}
+	}
+	return out
+}()
 
-// profileValueType 数值类型 → ValueType 文本（官方用 .NET 类型名）
-var profileValueType = map[string]string{
-	"bool": "System.UInt32", "int": "System.Int32", "float": "System.Single",
-}
+// profileValueType 数值类型 → ValueType 文本（官方用 .NET 类型名；S4 真源 = TOML）。
+var profileValueType = modelData.ProfileValueType
 
 // ProfileEntry 列表里的一项
 type ProfileEntry struct {
@@ -211,15 +140,8 @@ func profileDirs(d *Driver) [][2]interface{} {
 // CPL\profile（profileWriteDir 就返回这里），按目录一刀切会把用户场景
 // 也标成内置 —— 前端场景墙 filter(!builtin) 直接被滤空，表现为
 // 「自定义场景不见了、官方场景也没了应用入口」（2026-10-19 真机确认）。
-var builtinScenes = map[string]bool{
-	profileFactoryScene:  true, // 默认（原「原厂默认」，2026-10-20 改名）
-	"游戏":                 true,
-	"音乐":                 true,
-	"电影":                 true,
-	"UserDefine":         true,
-	"UserDefineFormwork": true,
-	"HiFi":               true,
-}
+// ★ S1 起名单真源 = model/device-model.toml [scene].builtin（7 项，含 HiFi）。
+var builtinScenes = strSet(modelData.Scene.Builtin)
 
 // builtinMark 目录自带标记 × 内置名单 —— 两者同时成立才算内置档。
 func builtinMark(dirBuiltin bool, stem string) bool {
@@ -239,14 +161,8 @@ func builtinMark(dirBuiltin bool, stem string) bool {
 //
 // 三个收口：ProfileSave（用户自建）、fullSnapshot（播种补齐）、
 // ProfileApply（兜底旧档里已有的这类项，跳过不写）。
-var sceneExclude = map[string]bool{
-	"VolumeControl":           true,
-	"VolumeScalarControl":     true,
-	"MuteControl":             true,
-	"AAVolumeControl":         true,
-	"DevSampleRateControl":    true,
-	"Speaker_Channel_Setting": true,
-}
+// ★ S1 起真源 = model/device-model.toml [scene].exclude（6 项）。
+var sceneExclude = strSet(modelData.Scene.Exclude)
 
 // excludedFromScene 场景排除判定（统一入口）。
 // 除两张名单（sceneExclude 设备级 + sceneUnproven APO 未实现）外，还要挡
@@ -260,7 +176,7 @@ func excludedFromScene(name string) bool {
 // sceneUnproven APO 未实现的效果家族，不进场景（2026-10-19 用户拍板：
 // 「自定义场景按照那些生效去调整就好，不需要把 APO 未实现的加进去」）。
 //
-// 判据链（内部取证报告 + 回环 A/B 实测 + REA-OUT 字符串
+// 判据链（工具/K档取证-LFX与采集侧位表.md + 回环 A/B 实测 + REA-OUT 字符串
 // 取证。★ 2026-10-19 深夜按反编译产物复核修正：此前「bit2/13/14 是空壳」
 // 是前端注释笔误 —— K 档 §2.2 原文：GFX 只有 bit3/4/20 是空桩，bit1/2/13/14
 // 四个都是真模块）：
@@ -284,48 +200,13 @@ func excludedFromScene(name string) bool {
 // 总开关与从属参数一起排除 —— 总开关无效时子参数必然无效。
 // 界面上这些控件照常显示可交互（UNPROVEN 口径：不置灰、写驱动、如实标注），
 // 只是场景不再管理它们；驱动收写入的（ret=0）手动拨动仍即时生效。
-var sceneUnproven = map[string]bool{
-	// SS 虚拟环绕家族（总开关 + 8 方位角/距）
-	"Enable_SS_LFX": true,
-	"SS_C_ANGLE":    true,
-	"SS_LF_ANGLE":   true,
-	"SS_RF_ANGLE":   true,
-	"SS_LS_ANGLE":   true,
-	"SS_RS_ANGLE":   true,
-	"SS_LB_ANGLE":   true,
-	"SS_RB_ANGLE":   true,
-	"SS_LFE_ANGLE":  true,
-	"SS_C_DIST":     true,
-	"SS_LF_DIST":    true,
-	"SS_RF_DIST":    true,
-	"SS_LS_DIST":    true,
-	"SS_RS_DIST":    true,
-	"SS_LB_DIST":    true,
-	"SS_RB_DIST":    true,
-	"SS_LFE_DIST":   true,
-	// Dolby 家族
-	"Enable_DHDVS_LFX": true,
-	"DHDVS_USEDH":      true,
-	"DH_Mode":          true,
-	"DVS_Mode":         true,
-	// 动态低音 / 音频增艳 / 语音清晰度
-	"Enable_BM_GFX":                 true,
-	"BM_Slider_BassLevel":           true,
-	"BM_Slider_Frequency":           true,
-	"Enable_AUDIOBRILLIANT_LFX":     true,
-	"AUDIOBRILLIANT_LEVEL":          true,
-	"Enable_VOICECLARITY_LFX":       true,
-	"VOICECLARITY_LEVEL":            true,
-	"VOICECLARITY_NOISESUPPRESSION": true,
-	// 环绕增强：CXearSurrMaxLib 有实体但 A/B 未测到生效（前置条件依赖）
-	"Enable_SURRSENS_LFX": true,
-	// 虚拟低音 / SonicMapper / DDL / PLIIX / NeoPC
-	"Enable_VIRTUALBASS_LFX": true,
-	"Enable_SonicMapper":     true,
-	"Enable_DDL_GFX":         true,
-	"Enable_PLIIX_LFX":       true,
-	"Enable_NEOPC_LFX":       true,
-}
+//
+// ★ 2026-10-22 修正拼写：语音降噪的真名是 `VOICECLARITY_NOISESUPP_LEVEL`
+// （driver.go 白名单里就是它）。旧写法 `VOICECLARITY_NOISESUPPRESSION` 在
+// 208 项里根本不存在 ⟹ 死条目，「语音降噪强度」实际从未被排除，
+// 会跟着场景一起存、一起写。
+// ★ S1 起真源 = model/device-model.toml [scene].unproven（35 项，装载时自校验）。
+var sceneUnproven = strSet(modelData.Scene.Unproven)
 
 // hasExcludedItem 档里是否混有排除项 —— 是就说明这份档是排除名单出现
 // 之前生成的，播种升级时整档重建。
@@ -483,63 +364,13 @@ func groupOf(ep, name string) string {
 	return "General"
 }
 
-// groupLabel 官方 ApoEffect 分组名（= 页面 Canvas 名）→ 界面上显示的短标签。
-// 场景详情只列分组，不逐个铺属性名 —— 一份场景动辄十几项，
-// 全铺出来右侧面板撑不下，也没有可读性。
-// 一张官方页住着多个模块时（Karaoke 页=人声消除+升降调、Setting 页=声道
-// 配置/互换/复制、MicInVol 页=麦克风音量+模拟功放）写成合并描述：官方本来就
-// 按「页」归属，拆开反而与官方 .profile 对不上。
-var groupLabel = map[string]string{
-	"SpeakerVolume":                "音量",
-	"SpeakerEQ":                    "EQ",
-	"SpeakerEM":                    "环境声",
-	"SpeakerKaraoke":               "人声消除与变调",
-	"SpeakerSamplingRate":          "采样率",
-	"SpeakerSetting":               "声道设定",
-	"SpeakerVirtual":               "虚拟环绕",
-	"SpeakerXearSurroundHeadPhone": "耳机环绕",
-	"SpeakerXearSurroundSpeakers":  "环绕扬声器",
-	"SpeakerSurroundMax":           "环绕增强",
-	"SpeakerDolbyHPVS":             "Dolby 环绕",
-	"SpeakerXearAudioBrilliant":    "音频增艳",
-	"SpeakerXearDynamicBass":       "动态低音",
-	"SpeakerXearSmartVolume":       "智能音量",
-	"SpeakerXearVoiceClarity":      "语音清晰度",
-	"GFS":                          "GFS",
-	"MicInVolume":                  "麦克风音量",
-	"MicInNoiseReduction":          "降噪",
-	"MicInXearMagicVoice":          "魔音",
-	"MicEcho":                      "回音",
-	"MicInAGC":                     "自动增益",
-	// 第 62 轮 · 麦克风专项三组（组名 = 官方 Canvas 名；中文名照官方 zh-CN 词条，
-	// ENC 官方未译，定「通话降噪」与既有「环境降噪」区分）
-	"MicInAEC":          "回音消除",
-	"MicInENC":          "通话降噪",
-	"MicInBeamForming":  "麦克风收音",
-	"MicInSamplingRate": "麦克风采样率",
-	// 这两组我们**不写**，只用来把官方 FactoryDefault.xml（「原厂默认」场景）
-	// 读好看 —— 它用的是 SpeakerQuarter / DesktopMic 两个族。
-	"SpeakerQuarterSetting":  "四声道设定",
-	"DesktopMicSamplingRate": "桌面麦克风采样率",
-	"General":                "其他",
-}
+// groupLabel 组名 → 界面短标签（场景详情副行）。S4 起真源 = TOML [group_label]
+// （28 项；合并页描述口径与只读两组的用途见 TOML 注释）。
+var groupLabel = modelData.GroupLabel
 
-// groupOrder 渲染端点的分组展示顺序（照官方面板菜单：音量→EQ→环境→环绕一族→
-// 人声→Xear 音效族→设定/采样率；采集端点整体排在后面 —— 场景的主体是听感，
-// 麦克风是附加）。
-var groupOrder = []string{
-	"SpeakerVolume", "SpeakerEQ", "SpeakerEM", "SpeakerVirtual",
-	"SpeakerXearSurroundHeadPhone", "SpeakerXearSurroundSpeakers",
-	"SpeakerSurroundMax", "SpeakerDolbyHPVS", "SpeakerKaraoke",
-	"SpeakerXearAudioBrilliant", "SpeakerXearDynamicBass",
-	"SpeakerXearSmartVolume", "SpeakerXearVoiceClarity",
-	"SpeakerSetting", "SpeakerSamplingRate", "GFS",
-	"MicInVolume", "MicInNoiseReduction", "MicInAGC",
-	"MicInXearMagicVoice", "MicEcho",
-	"MicInAEC", "MicInENC", "MicInBeamForming",
-	"MicInSamplingRate",
-	"SpeakerQuarterSetting", "DesktopMicSamplingRate",
-}
+// groupOrder 分组展示顺序（S4 起真源 = TOML [display].group_order，27 项；
+// 采集端 rank+1000、表外组 rank=base+500 的规则在 groupRank）。
+var groupOrder = modelData.Display.GroupOrder
 
 func groupRank(ep, key string) int {
 	base := 0
@@ -785,10 +616,20 @@ func (d *Driver) Profiles() map[string]interface{} {
 		}
 		return 2
 	}
+	// builtin 内的出厂顺序（2026-10-24 用户拍板：移除「游戏」后重排——
+	// 默认 → 音乐 → 电影；自建场景仍按字母序排其后）。
+	seedRank := map[string]int{"音乐": 0, "电影": 1}
 	sort.SliceStable(list, func(i, j int) bool {
 		ri, rj := rank(list[i]), rank(list[j])
 		if ri != rj {
 			return ri < rj
+		}
+		if ri == 1 {
+			oi, oki := seedRank[list[i].Name]
+			oj, okj := seedRank[list[j].Name]
+			if oki && okj && oi != oj {
+				return oi < oj
+			}
 		}
 		return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name)
 	})
@@ -1320,23 +1161,40 @@ var seedScenes = []struct {
 }{
 	{
 		Name: "游戏",
-		Desc: "游戏场景 · 听声辨位（虚拟环绕 + 语音清晰）",
+		// ★ 2026-10-24：移出 builtin 名单 —— 作为**普通场景**播种重建
+		//   （用户可改可删，列在自定义场景区；出厂默认区只剩默认/音乐/电影）。
+		// 竞技取向：削弱低频遮蔽，2–16 kHz 适度提升；只用已验证的耳机环绕，
+		// 不叠加 RFX 混响或未验证的 SS 家族。麦克风只保留单路轻度降噪。
+		Desc: "竞技 / FPS：低频遮蔽控制 + 中高频定位，耳机环绕（游戏 · 小房间 · 扩展 2）+ 轻度麦克风降噪",
 		Items: []seedItem{
 			{EpRender, "Enable_EQ_GFX", "1"},
-			{EpRender, "EQ_Slider1", "4"}, {EpRender, "EQ_Slider2", "3"},
-			{EpRender, "EQ_Slider3", "1"}, {EpRender, "EQ_Slider4", "-1"},
-			{EpRender, "EQ_Slider5", "-3"}, {EpRender, "EQ_Slider6", "-2"},
-			{EpRender, "EQ_Slider7", "1"}, {EpRender, "EQ_Slider8", "4"},
-			{EpRender, "EQ_Slider9", "6"}, {EpRender, "EQ_Slider10", "7"},
-			{EpRender, "Enable_SS_LFX", "1"},
+			{EpRender, "EQ_Slider1", "-2"}, {EpRender, "EQ_Slider2", "-1"},
+			{EpRender, "EQ_Slider3", "0"}, {EpRender, "EQ_Slider4", "-1"},
+			{EpRender, "EQ_Slider5", "-2"}, {EpRender, "EQ_Slider6", "-1"},
+			{EpRender, "EQ_Slider7", "1"}, {EpRender, "EQ_Slider8", "3"},
+			{EpRender, "EQ_Slider9", "4"}, {EpRender, "EQ_Slider10", "3"},
 			{EpRender, "Enable_RFX_GFX", "0"},
+			{EpRender, "RFX_ENVIRONMENT", "0"}, {EpRender, "RFX_ROOMSIZE", "0"},
 			{EpRender, "Enable_VOCALCANCEL_GFX", "0"},
 			{EpRender, "Enable_KEYSHIFT_GFX", "0"},
 			{EpRender, "Enable_Channel_COPY_LFX", "0"},
+			{EpRender, "Enable_SwapLfeCn_LFX", "0"},
+			{EpRender, "Enable_SwapSrBk_LFX", "0"},
+			{EpRender, "Enable_CONLAB_HPSPK_LFX", "1"},
+			{EpRender, "CONLAB_HPSPK_MODE", "0"},
+			{EpRender, "CONLAB_HPSPK_ROOMSIZE", "2"},
+			{EpRender, "CONLAB_HPSPK_SFX", "2"},
+			{EpRender, "CONLAB_HPSPK_SPKANGLE", "30"},
+			{EpRender, "Enable_SMART_VOLUME_GFX", "0"},
+			{EpRender, "GFSControl", "1"},
 			{EpCapture, "Enable_NOISEREDUCTION_LFX", "1"},
+			{EpCapture, "NoiseReduction_Level", "12"},
 			{EpCapture, "Enable_MAGICVOICE", "0"},
 			{EpCapture, "Enable_MICECHO", "0"},
 			{EpCapture, "AGCControl", "1"},
+			{EpCapture, "Enable_AEC_LFX", "0"},
+			{EpCapture, "Enable_ENC_LFX", "0"},
+			{EpCapture, "Enable_MICARRAY_LFX", "0"},
 		},
 	},
 	{
@@ -1349,7 +1207,6 @@ var seedScenes = []struct {
 			{EpRender, "EQ_Slider5", "-12"}, {EpRender, "EQ_Slider6", "-8"},
 			{EpRender, "EQ_Slider7", "0"}, {EpRender, "EQ_Slider8", "10"},
 			{EpRender, "EQ_Slider9", "4"}, {EpRender, "EQ_Slider10", "-5"},
-			{EpRender, "Enable_SS_LFX", "0"},
 			{EpRender, "Enable_RFX_GFX", "0"},
 			{EpRender, "Enable_VOCALCANCEL_GFX", "0"},
 			{EpRender, "Enable_KEYSHIFT_GFX", "0"},
@@ -1360,7 +1217,9 @@ var seedScenes = []struct {
 	},
 	{
 		Name: "电影",
-		Desc: "电影场景 · 包围感（虚拟环绕 + 观众席环境声）",
+		// RFX_ENVIRONMENT=7 按 ENV_FALLBACK 是「观众席」，这一句是真的；
+		// 「虚拟环绕」同样是空头（见游戏卡注释），改掉。
+		Desc: "电影场景 · 包围感（观众席环境声 + 低频震撼）",
 		Items: []seedItem{
 			{EpRender, "Enable_EQ_GFX", "1"},
 			{EpRender, "EQ_Slider1", "5"}, {EpRender, "EQ_Slider2", "4"},
@@ -1368,7 +1227,6 @@ var seedScenes = []struct {
 			{EpRender, "EQ_Slider5", "-1"}, {EpRender, "EQ_Slider6", "0"},
 			{EpRender, "EQ_Slider7", "1"}, {EpRender, "EQ_Slider8", "2"},
 			{EpRender, "EQ_Slider9", "3"}, {EpRender, "EQ_Slider10", "4"},
-			{EpRender, "Enable_SS_LFX", "1"},
 			{EpRender, "Enable_RFX_GFX", "1"},
 			{EpRender, "RFX_ENVIRONMENT", "7"},
 			{EpRender, "Enable_VOCALCANCEL_GFX", "0"},
@@ -1383,72 +1241,16 @@ var seedScenes = []struct {
 
 // factoryDefaults 出厂默认值表 —— 设备侧自愈（HealMissingParams）的依据。
 //
-// 这 42 项（渲染 36 + 采集 6）属于「写后即可读」型：设备里没值时读回 ret=2
-// （存在但无值），写过一次才变 ret=0 并跨进程持久。官方程序在位时，官方面板
-// （安装时的 `/h /i` + 每次开机的 `/h /d`）会把它们维持在设备里；官方卸载器跑
-// `XearAudioCenter /u /q` 会清掉设备侧的值，于是全部退回 ret=2，
-// UI 按「本机驱动未开放」把开关灰掉 —— 看起来像「虚拟环绕 / 升降 Key 丢了」，
-// 其实没丢，缺的只是值。
-//
-// 值取自官方安装状态的实测快照（2026-10-14 `--dump`，当时两端点合计
-// ret=0 有 104 项）：设备 USB\VID_0D8C&PID_0012&MI_00 · 驱动 108B（WHQL）·
-// 能力掩码 16801926 / 采集 164352。
-// 与 seedScenes 一样硬编码：它必须不可篡改 —— 一旦允许被「存为新场景」
-// 覆盖，自愈就会拿一份被改过的值去补设备。
-var factoryDefaults = []seedItem{
-	// SpeakerEQ —— 均衡器（11 项）
-	{EpRender, "Enable_EQ_GFX", "1"},
-	{EpRender, "EQ_Slider1", "0"},
-	{EpRender, "EQ_Slider2", "7"},
-	{EpRender, "EQ_Slider3", "-1"},
-	{EpRender, "EQ_Slider4", "-7"},
-	{EpRender, "EQ_Slider5", "-12"},
-	{EpRender, "EQ_Slider6", "-8"},
-	{EpRender, "EQ_Slider7", "0"},
-	{EpRender, "EQ_Slider8", "10"},
-	{EpRender, "EQ_Slider9", "4"},
-	{EpRender, "EQ_Slider10", "-5"},
-	// General —— Xear Surround 音箱方位（16 项）
-	{EpRender, "SS_C_ANGLE", "0"},
-	{EpRender, "SS_C_DIST", "0"},
-	{EpRender, "SS_LF_ANGLE", "-32"},
-	{EpRender, "SS_LF_DIST", "0"},
-	{EpRender, "SS_RF_ANGLE", "32"},
-	{EpRender, "SS_RF_DIST", "0"},
-	{EpRender, "SS_LS_ANGLE", "-90"},
-	{EpRender, "SS_LS_DIST", "0"},
-	{EpRender, "SS_RS_ANGLE", "90"},
-	{EpRender, "SS_RS_DIST", "0"},
-	{EpRender, "SS_LB_ANGLE", "-148"},
-	{EpRender, "SS_LB_DIST", "0"},
-	{EpRender, "SS_RB_ANGLE", "148"},
-	{EpRender, "SS_RB_DIST", "0"},
-	{EpRender, "SS_LFE_ANGLE", "180"},
-	{EpRender, "SS_LFE_DIST", "0"},
-	// XearSurroundSpeakers —— 虚拟环绕总开关（1 项）
-	{EpRender, "Enable_SS_LFX", "0"},
-	// KeyShift —— 升降 Key（2 项）
-	{EpRender, "Enable_KEYSHIFT_GFX", "0"},
-	{EpRender, "KEYSHIFT_LEVEL", "0"},
-	// Karaoke —— 人声消除（2 项）
-	{EpRender, "Enable_VOCALCANCEL_GFX", "0"},
-	{EpRender, "VOCALCANCEL_LEVEL", "50"},
-	// Environment —— 环境音效（3 项）
-	{EpRender, "Enable_RFX_GFX", "0"},
-	{EpRender, "RFX_ENVIRONMENT", "7"},
-	{EpRender, "RFX_ROOMSIZE", "0"},
-	// ChannelCopy —— 声道复制（1 项）
-	{EpRender, "Enable_Channel_COPY_LFX", "0"},
-	// 采集端点（麦克风）—— 6 项
-	// 官方卸载后同样退回 ret=2，界面把麦克风页的降噪 / 魔音 / 回音
-	// 三个开关及两个滑杆一并灰掉。值取自官方在位时的采集端快照。
-	{EpCapture, "Enable_NOISEREDUCTION_LFX", "0"},
-	{EpCapture, "NoiseReduction_Level", "14"},
-	{EpCapture, "Enable_MAGICVOICE", "0"},
-	{EpCapture, "MagicVoice_Selection", "1"},
-	{EpCapture, "Enable_MICECHO", "0"},
-	{EpCapture, "MICECHO_Level", "0"},
-}
+// ★ S2 起真源 = model/device-model.toml [[factory]]（42 项 = 渲染 36 + 采集 6，
+// 装载时自校验）。历史真值注释随数据走（EQ 全 0 = 官方预设索引 11、
+// RFX_ENVIRONMENT=0 = 官方预设口径等，见 TOML 与当日日志）。
+var factoryDefaults = func() []seedItem {
+	out := make([]seedItem, 0, len(modelData.Factory))
+	for _, kv := range modelData.Factory {
+		out = append(out, seedItem{Ep: kv.Ep, Name: kv.Name, Val: kv.Val})
+	}
+	return out
+}()
 
 // fullSnapshot 把场景快照补成全量（2026-10-19，回应「恢复后场景缺参数」）：
 // 特征项之外，先按 factoryDefaults 补默认值，再用设备实读补齐剩余可写项
@@ -1515,21 +1317,17 @@ func HealMissingParams(d *Driver) int {
 	if d == nil || !d.ready {
 		return 0
 	}
-	healed := 0
-	for _, it := range factoryDefaults {
-		if ret, _ := d.ReadEp(it.Ep, it.Name); ret != 2 {
-			continue
-		}
-		sp, known := spec(it.Ep, it.Name)
-		kind := ""
-		if known {
-			kind = kindName(sp.kind)
-		}
-		if res := d.WriteAuto(it.Ep, it.Name, it.Val, kind); res["ok"] == true {
-			healed++
-		}
-	}
-	return healed
+	/*
+		★ 2026-10-22 第二版：补的范围从「出厂表 42 项」扩到**初始化清单**
+		（55 项 = 出厂表 ∪ 「默认」档 ∪ 设备级）。以前那 12 项采集/新参数
+		只能靠 applySceneExtras 补第二次，两套遍历各写各的；现在同一个执行器，
+		strong=false 就是「只补 ret==2」，有值一个字不动。
+		设备级（拓扑）由 ensureChannelTopology 负责，这里跳过。
+	*/
+	return func() int {
+		applied, _, _ := applyInitManifest(d, BuildInitManifest(d), false)
+		return applied
+	}()
 }
 
 // reApoName 匹配 <ApoEffect Name="…"> 的“前缀 + 值 + 收尾引号”三段。
@@ -1615,6 +1413,9 @@ func EnsureSeedScenes(d *Driver) {
 	if err := os.MkdirAll(wdir, 0o755); err != nil {
 		return
 	}
+	// ★ 2026-10-24（用户拍板修正）：「游戏」移出 builtin 名单（TOML
+	//   Scene.Builtin），但**保留**为普通场景 —— 档缺失时由下方 seed 循环
+	//   按原 Items 重建（非 builtin：用户可改可删，列在自定义场景区）。
 	for _, s := range seedScenes {
 		p := filepath.Join(wdir, s.Name+".profile")
 		var snap []snapRow
@@ -1632,6 +1433,9 @@ func EnsureSeedScenes(d *Driver) {
 			snap = append(snap, snapRow{it.Ep, it.Name, kindName(sp.kind), it.Val})
 		}
 		if !okAll || len(snap) == 0 {
+			// ★ 2026-10-24：播种跳过要有痕迹——排查"场景卡没出来"时日志可见
+			log.Printf("[播种] 跳过「%s」（能力面缺失=%v / 快照空=%v）",
+				s.Name, !okAll, len(snap) == 0)
 			continue
 		}
 		snap = fullSnapshot(d, snap)
@@ -1651,6 +1455,7 @@ func EnsureSeedScenes(d *Driver) {
 		}
 		os.WriteFile(filepath.Join(wdir, s.Name+".cml"),
 			[]byte(buildCML(s.Name, s.Desc)), 0o644)
+		log.Printf("[播种] 已写入「%s」", s.Name)
 	}
 	// 原厂默认：直接落出厂值表，不再快照当前驱动状态。
 	//

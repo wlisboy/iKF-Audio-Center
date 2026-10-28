@@ -225,7 +225,7 @@ func probe() *drvState {
 
 // probeOldPanel 检测旧版官方面板是否还在（P3 顺序保护）。
 //
-// 背景（内部取证报告 §1.6）：旧卸载器 [POSTDELFILE_REMOVE_64]
+// 背景（工具/CPL与WHQL包对照-下一步.md §1.6）：旧卸载器 [POSTDELFILE_REMOVE_64]
 // 按**文件名**删文件、不认路径归属 —— System32\Drivers\108B.sys、
 // CMEffectAPO_108B.dll、CMCplExt_108B.dll 都在删除清单里。谁先卸旧版谁就把
 // 驱动文件删了（耳机静音，直到重新 --install）。所以必须引导用户按
@@ -296,7 +296,7 @@ func (s *drvState) install() (string, bool) {
 func (s *drvState) uninstall() (string, bool) {
 	got := probeStore()
 	if len(got) == 0 {
-		return "系统里没有该驱动组件，无需卸载。", true
+		return "系统里没有该驱动组件，无需卸载", true
 	}
 	var lines []string
 	ok := true

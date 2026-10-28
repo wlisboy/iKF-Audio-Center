@@ -2,8 +2,8 @@
 """生成离线交互预览（评审道具）。
 
 用法：
-    python tools/build_preview.py            → design/scene-preview.html
-    python tools/build_preview.py --viz      → design/viz-preview.html
+    python tools/build_preview.py            → design/自定义场景-预览.html
+    python tools/build_preview.py --viz      → design/律动空间-预览.html
 
 产物 = frontend/dist/index.html + 一层假后端（拦 fetch），
 不需要装驱动、不需要起服务，双击就能点：
@@ -25,8 +25,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "iKF-Audio-Center-Wails", "frontend", "dist", "index.html")
-OUT_PROFILE = os.path.join(ROOT, "design", "scene-preview.html")
-OUT_VIZ = os.path.join(ROOT, "design", "viz-preview.html")
+OUT_PROFILE = os.path.join(ROOT, "design", "自定义场景-预览.html")
+OUT_VIZ = os.path.join(ROOT, "design", "律动空间-预览.html")
 
 MOCK = r"""<script>
 /* ---------------- 假后端：只为把界面跑起来看 ---------------- */

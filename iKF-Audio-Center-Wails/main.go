@@ -51,7 +51,9 @@
 //	                                  （--hidden / --tray 同义；接管后的 Run 项用）
 package main
 
-import (
+import ("path/filepath"
+"io"
+
 	"context"
 	"embed"
 	"fmt"
@@ -59,6 +61,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -85,22 +88,17 @@ var assets embed.FS
 // 钉住的 goroutine —— DLL 的设备上下文带线程局部状态，初始化与后续调用必须同线程。
 var drv = NewDriver()
 
-// correctChannelTopology 启动期声道拓扑纠正（2026-10-20 用户拍板）。
-//
-// 背景：声道拓扑（Speaker_Channel_Setting）是驱动服务级状态——电脑重启 /
-// 驱动重装 / 耳机重新枚举时，驱动会把它写成自己的默认 5.1（实测 2026-10-20：
-// 场景应用与端点重建都不会动它，场景文件也早不含这项，但用户早上仍发现
-// 设备被复位成 5.1）。而本机耳机硬件就是立体声，4/6/8 拓扑纯属驱动默认值
-// 作祟、没有任何使用价值，用户明确同意启动时自动纠正回 2。
-//
-// 口径：只在启动时做一次；读不到（ret≠0，设备不在/不支持）就静默跳过——
-// 不替驱动下结论的老规矩。用户在设备页的手动选择仍然生效（本函数只在
-// 拓扑为非 2 时纠正，运行期不再管）。
+// ensureChannelTopology 已迁到 initstate.go —— 声道拓扑纠正不再只是
+// 「启动期一次性」的事：装完驱动点「重新检测」连上后同样要补（2026-10-22
+// 用户虚拟机实测：首次启动声道组不是立体声、重启主程序才对，就是因为它
+// 当时只挂在启动路径上，而那次写入落在端点重建窗口里被丢弃了）。
+// 现在由 EnsureInitialState 统一调用，写后回读确认 + 最多重试 3 次。
+
 // seedSceneDefaults 驱动重装/参数存储清空后，把「默认」场景整体应用一次
 // （2026-10-20 用户拍板：重装后所有参数按自定义场景默认来设置）。
 // 判据：3 个哨兵参数（EQ 开关 / 房间大小 / AGC——「默认」场景必写的三处）
 // 全部读不到（ret=2/空）才动手 —— 只要有记忆值就视为已有状态，绝不动用户
-// 当前的调音。场景不含声道参数，拓扑播种由随后的 correctChannelTopology
+// 当前的调音。场景不含声道参数，拓扑播种由随后的 EnsureInitialState
 // 照常兜底。「默认」场景被删/改名时 ProfileApply 报失败，静默跳过。
 func seedSceneDefaults() {
 	sentinels := []string{"Enable_EQ_GFX", "RFX_ROOMSIZE", "AGCControl"}
@@ -120,28 +118,74 @@ func seedSceneDefaults() {
 		int(applied), int(failed))
 }
 
-func correctChannelTopology() {
-	ret, v := drv.Read("Speaker_Channel_Setting")
-	if ret != 0 {
-		// 2026-10-20（用户拍板）：驱动重装/参数存储清空后读不到值（ret=2），
-		// 播种默认立体声 2 —— 设备页声道组不再「四个 chip 全灭」，UI 默认
-		// 选中态与实际拓扑一致。设备不在/参数不支持时 WriteAuto 会失败，
-		// 静默跳过，不替驱动下结论的老规矩不破。
-		if r := drv.WriteAuto(EpRender, "Speaker_Channel_Setting", 2, ""); r["ret"] == 0 {
-			log.Println("[启动] 声道拓扑无记忆值（驱动重装/存储清空），播种默认立体声 2")
+// openAttempts 返回启动时 drv.Open() 的总尝试次数。
+//
+// ★ 2026-10-21（用户拍板）：Open 以前只试一次。iKF-驱动管理装完驱动后
+// 会 `pnputil /restart-device` 重建音频端点，用户在「已安装完成」上点
+// 确定就立刻打开主程序，很容易正好撞在重建窗口期里 —— 一次失败界面就
+// 永久停在「未连接驱动」，以前只能彻底关掉重开。
+//
+// 无界面子命令只给 1 次：失败本身就是它们要观测的结果，多等 7 秒只会
+// 拖慢闸脚本与排障。GUI 启动（含 --serve）才容忍这个窗口期：1+3 次。
+func openAttempts() int {
+	for _, a := range []string{
+		"--self-test", "--selftest", "--roundtrip", "--dump", "--heal", "--init-check", "--init-fp",
+		"--channel-test", "--play", "--loopback-devices", "--loopback-fft",
+		"--loopback-test", "--restore-scene",
+		// ★ 2026-10-22：--serve 也是无界面模式，必须单次。以前漏了它，
+		//   服务启动要白等 1+2+4=7 秒，闸脚本按 sleep 5 起就撞「页面没就绪」。
+		"--serve",
+	} {
+		if hasArg(a) {
+			return 1
 		}
+	}
+	return 4
+}
+
+// openWithRetry 按 1s / 2s / 4s 退避重试 openAttempts() 次。
+func openWithRetry() bool {
+	n := openAttempts()
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			wait := time.Duration(1<<uint(i-1)) * time.Second
+			log.Printf("[启动] 驱动未就绪（%s），%v 后重试 %d/%d",
+				drv.errMsg, wait, i, n-1)
+			time.Sleep(wait)
+		}
+		if drv.Open() {
+			if i > 0 {
+				log.Printf("[启动] 第 %d 次重连成功 —— 端点重建窗口期已过", i)
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// setupFileLog 把标准日志落到 exe 旁的 log/yyyy-mm-dd.txt（追加）。
+// ★ 2026-10-24（用户要求）：GUI 模式没有 stdout，此前 log.Printf 的输出
+// 全部丢失（破坏性检测报告也点名"panic 无日志"）；现在同时写文件与
+// stderr（serve 模式两者都能看）。按天分文件，多实例追加写安全。
+func setupFileLog() {
+	dir := filepath.Join(appDir(), "log")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}
-	switch v {
-	case "4", "6", "8":
-		if r := drv.WriteAuto(EpRender, "Speaker_Channel_Setting", 2, ""); r["ret"] == 0 {
-			log.Printf("[启动] 声道拓扑纠正：%s → 2（立体声）。驱动服务级状态"+
-				"在重启/重枚举后会复位成 5.1，属驱动默认值，见 2026-10-20 排查记录。", v)
-		}
+	f, err := os.OpenFile(filepath.Join(dir, time.Now().Format("2006-01-02")+".txt"),
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return
 	}
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.SetOutput(io.MultiWriter(f, os.Stderr))
+	log.Printf("==== iKF Audio Center 启动（PID %d，%s）====", os.Getpid(),
+		strings.Join(os.Args[1:], " "))
 }
 
 func main() {
+	setupFileLog() // 日志最先挂上：之后任何阶段的输出都有据可查
+
 	// ---- 入口管理族 CLI：必须先于单实例守卫与 drv.Open ----
 	// ★ 2026-10-20 排障发现：--takeover 的提权子进程（--takeover-admin）
 	//   起来时，父进程还活着并握着 singleguard 的 Local\ 互斥锁 —— 子进程
@@ -173,6 +217,20 @@ func main() {
 		return
 	}
 
+	// ★破坏性检测 P1-2：入口族分发结束后仍带未识别参数 → 打印用法退出。
+	// 原实现直接落进 GUI 常驻：自动化脚本写错参数时看到的是「进程不退出」
+	// 而不是参数错误，还会抢走单实例锁与托盘。已知带参入口全部在上面
+	// 分发（含 cli.go 的 serve/dump/play 等与 --takeover 管理族），
+	// 走到这里还拿着参数 = 全都不认识。
+	if extra := unknownFlags(); len(extra) > 0 {
+		fmt.Fprintf(os.Stderr, "未知参数：%s\n\n用法：iKF-Audio-Center.exe [无参数=打开面板]\n"+
+			"  --serve <addr>            无界面 HTTP 服务（如 127.0.0.1:18500）\n"+
+			"  --self-test               自检\n"+
+			"  --dump [capture]          参数转储\n"+
+			"  其余诊断入口见 --help 文档\n", strings.Join(extra, " "))
+		os.Exit(2)
+	}
+
 	// 单实例守卫必须在最前：第二实例在打开驱动/建 WebView2 之前就退出，
 	// 避免两套驱动上下文与 WebView2 用户数据目录互杀。
 	if guardSingleInstance() {
@@ -180,10 +238,9 @@ func main() {
 		return
 	}
 
-	if ok := drv.Open(); ok {
+	if ok := openWithRetry(); ok {
 		log.Printf("驱动已就绪：%s（%d 个设备端点）", drv.dll, drv.devCnt)
 		seedSceneDefaults() // 参数存储为空（驱动重装）→ 应用「默认」场景
-		correctChannelTopology()
 		go startParamWatch() // 外部音量/静音变化（系统音量键等）→ 通知主界面
 	} else {
 		log.Printf("驱动未就绪：%s", drv.errMsg)
@@ -269,6 +326,48 @@ func main() {
 			HealMissingParams(drv))
 		return
 	}
+	// --init-fp：只读查看「安装指纹」—— 端点 GUID / 采集端点 / 驱动版本 /
+	// 设备实例，以及它相对上次记录有没有变。
+	//
+	// 这是「初始化什么时候该全量写」的可观察面（initfp.go）：变了 ⟹ 下次
+	// 初始化按清单全量写；没变 ⟹ 只补空缺。装上驱动后跑一条命令就能确认
+	// 「这次重装会被认出来」，不用等界面表现。**只读，不写设备、不落盘。**
+	if hasArg("--init-fp") {
+		if !drv.ready {
+			fmt.Printf("驱动未就绪，无法读取指纹：%s\n", drv.errMsg)
+			os.Exit(3)
+		}
+		fmt.Print(initFpReport(drv))
+		return
+	}
+	// --init-check：把「初始化清单」逐项对一遍设备，只读不写。
+	//
+	// 这是「初始化」从口头约定变成可验收的关键一步：以前判断「装完驱动是不是
+	// 真回到默认」只能拿界面肉眼看（一片「未设置」还是不是），现在一条命令
+	// 给出「应有 55 · 达标 a · 未设置 b · 偏离 c」。退出码 1 = 不达标，
+	// 可直接当安装后的验收闸（2026-10-22 用户要求"确保每一项按既定执行"）。
+	if hasArg("--init-check") {
+		if !drv.ready {
+			fmt.Printf("驱动未就绪，无法核对：%s\n", drv.errMsg)
+			os.Exit(3)
+		}
+		r, lines := CheckInitManifest(drv)
+		fmt.Printf("初始化清单核对（只读，不写设备）\n")
+		fmt.Printf("----------------------------------------------------------------\n")
+		for _, ln := range lines {
+			fmt.Println(ln)
+		}
+		fmt.Printf("----------------------------------------------------------------\n")
+		fmt.Printf("应有 %d 项（参数 %d + 设备级 %d） · 达标 %d · 未设置 %d · 偏离 %d · 不支持 %d\n",
+			r.Total, r.Total-len(initDeviceItems), len(initDeviceItems),
+			r.OK, r.Missing, r.Drift, r.Unsupported)
+		if r.Missing+r.Drift > 0 {
+			fmt.Printf("结论：不达标（未设置/偏离 = %d 项）\n", r.Missing+r.Drift)
+			os.Exit(1)
+		}
+		fmt.Printf("结论：达标 —— 设备已是初始化定义的默认状态\n")
+		return
+	}
 	// --takeover / --takeover-undo / --entry-delete / --entry-status 这族
 	// 已移到 main() 最前（先于单实例守卫），见文件开头注释 —— 否则提权
 	// 子进程会被守卫挡死、父进程误报成功（2026-10-20 实测回归）。
@@ -281,25 +380,9 @@ func main() {
 	//   「端点被重置」的指纹就测不出来了（2026-10-20，lastscene.go）。
 	//   恢复目标 = 「默认」场景状态（2026-10-20 用户拍板：重装/重置后
 	//   自动回到默认，之后自己点场景卡换）。
-	cleanupLegacyLastApplied(drv)
-	if triggered, msg := RestoreDefaultScene(drv, false); triggered {
-		log.Printf("[启动] 场景自动恢复：%s", msg)
-	}
-	if n := HealMissingParams(drv); n > 0 {
-		log.Printf("[启动] 设备侧自愈：补写了 %d 项出厂默认值", n)
-	}
-
-	// ---- 预置场景（游戏/音乐/电影 + 原厂默认） ----
-	// 放在所有诊断分支之后：--selftest/--dump 等纯诊断不落盘，
-	// 窗口模式与 --serve 模式都会经过这里。
-	EnsureSeedScenes(drv)
-
-	// 存量场景文件的旧分组名就地升级（第 51 轮，见 MigrateProfileGroups）。
-	// 只改 <ApoEffect Name> 的值，命中才写，且先留 .bak。
-	if mf, mt := MigrateProfileGroups(drv); mf > 0 {
-		log.Printf("[启动] 场景分组名升级：%d 个文件的 %d 个 <ApoEffect> 换成官方页名",
-			mf, mt)
-	}
+	// ★ 2026-10-22：整条链收进 EnsureInitialState —— 「重新检测」和装驱动
+	//   重连也要跑同一套（以前只在这里跑，用户装完驱动点重新检测就错过了）。
+	EnsureInitialState(drv, true)
 
 	if i := argIndex("--serve"); i >= 0 && i+1 < len(os.Args) {
 		serveHTTP(os.Args[i+1])
@@ -369,12 +452,10 @@ func main() {
 		OnStartup: func(ctx context.Context) {
 			log.Println("[启动] 窗口对象已创建")
 			startTray(ctx)
-			// 入口自检（P5-1'）：便携包被拷到别处后，把开机自启与控制面板项
-			// 跟着改到新位置。只在「用户主动打开界面」时问；/h /d 隐藏启动
-			// 不弹（开机弹 UAC 不可接受），改由托盘菜单兜底。
-			if !startHidden {
-				go maybePromptEntryFix()
-			}
+			// 2026-10-23（用户定稿）：启动不再做入口询问 —— 那条链要提权，
+			// 体感是「装完驱动还弹一个替代官方面板的 UAC」。入口改写收口两处：
+			// 装驱动时安装器已提权顺带写好（setup.go --takeover）、
+			// 托盘菜单「修复/删除开机入口」用户主动点才提权（entry.go）。
 		},
 		OnDomReady: func(ctx context.Context) { log.Println("[启动] 界面已加载解析完成（OnDomReady）") },
 		// 返回 true = 拦截本次关闭。托盘「退出」已置 quitRequested 时放行。
@@ -399,6 +480,33 @@ func main() {
 }
 
 func hasArg(a string) bool { return argIndex(a) >= 0 }
+
+// knownFlags 全部已支持的命令行参数（入口族 + 诊断族 + 面板开关）。
+// ★破坏性检测 P1-2：入口族分发结束后逐一比对，未识别的打回 2。
+var knownFlags = map[string]bool{
+	"--serve": true, "--self-test": true, "--selftest": true, "--roundtrip": true,
+	"--dump": true, "--play": true, "--secs": true, "--tone": true, "--wav": true,
+	"--loop": true, "--loopback-test": true, "--loopback-devices": true,
+	"--loopback-fft": true, "--heal": true, "--restore-scene": true, "--force": true,
+	"--init-check": true, "--init-fp": true, "--device": true,
+	"--takeover": true, "--takeover-admin": true, "--takeover-undo": true,
+	"--takeover-undo-admin": true, "--entry-delete": true,
+	"--entry-delete-admin": true, "--entry-status": true,
+	"--hidden": true, "--tray": true, "--no-gpu": true, "--webview-compat": true,
+}
+
+// unknownFlags 返回 os.Args 里未识别的 -- 开头参数（值参数的值不算 flag，
+// 由调用方白名单处理；裸非 -- 参数是历史兼容的位置参数，不拦）。
+func unknownFlags() []string {
+	var out []string
+	for i, a := range os.Args {
+		if i == 0 || !strings.HasPrefix(a, "--") || knownFlags[a] {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
 
 func argIndex(a string) int {
 	for i, v := range os.Args {

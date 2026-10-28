@@ -14,7 +14,7 @@ package main
 // 惯例 —— 主程序恒定 asInvoker 不弹 UAC，只有 --takeover 明确触发时才
 // ShellExecuteEx(runas) 重拉自己一个 --takeover-admin 子进程。
 //
-// 验收：跑完后核对注册表三项 + 开机启动行为（见内部取证报告）。
+// 验收：跑完后核对注册表三项 + 开机启动行为（见 工具/P0断依赖验收报告.md §五）。
 
 import (
 	"fmt"

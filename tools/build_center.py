@@ -5,7 +5,7 @@
 
 把三样东西合成一个单文件程序：
   1. tools/src/center_src.py   —— Python 主体（驱动桥接 + HTTP 服务）
-  2. design/iKF-Audio-Center.html —— 已完成的设计稿
+  2. design/iKF-Audio-Center-1610.html —— 已完成的设计稿
   3. 本文件里的 BRIDGE_JS      —— 注入设计稿的驱动桥接层
 
 用法：
@@ -20,11 +20,9 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "src", "center_src.py")
-DESIGN = os.path.join(ROOT, "design", "iKF-Audio-Center.html")
-# 属性名清单是**构建输入**，和本脚本放在一起。
-# 原先它在 .workbuddy-ai/tmp/ 下 —— 那是临时目录，清一次缓存这个构建就断了，
-# 而且断在「找不到文件」上，看不出是缓存被清掉的。
-NAMES = os.path.join(HERE, "propnames.json")
+DESIGN = os.path.join(ROOT, "design", "iKF-Audio-Center-1610.html")
+# ★ S3 起属性名清单改由 device-model.toml [names] 承载（源文件运行时装载），
+# propnames.json 退役 —— 构建不再注入 __GENERIC__/__OEM__。
 OUT = os.path.join(ROOT, "iKF-Audio-Center.py")
 
 # 内联 favicon：避免浏览器自动请求 /favicon.ico 产生 404
@@ -57,7 +55,7 @@ BRIDGE_JS = r"""
   var CUR_EP = 'render';       /* 参数映射页当前端点 */
 
   /* ---------------- 回环 A/B「没测到变化」的参数 ----------------
-     来源：内部取证报告（回环 A/B + 反编译双证据）
+     来源：docs/APO开关实测-写活不等于生效.md（回环 A/B + 反编译双证据）
 
      ★★ 这张表**不是「本机不支持」名单**。它记的只是**测量结果**：
         信号经驱动推入耳机端点 → 回环采 512 bin 频谱 → 与基线逐 bin 相减，
@@ -135,7 +133,7 @@ BRIDGE_JS = r"""
   };
 
   /* ★ 第 56 轮（L 档）：本机「主机侧真的有实现」的 APO 模块表。
-     来源 = 内部取证报告：逐位反编译 APO 的模块
+     来源 = K 档取证（docs/K档取证-LFX与采集侧位表.md）：逐位反编译 APO 的模块
      构造器、读完对象 vftable 才写进这里 —— 不靠猜，也不靠「参数名字像」。
        GFX 侧：bit1 CReverbLib(环境音效) · bit2 CEQ15BandLib(均衡) ·
                bit13 CKeyShifterLib(变调) · bit14 CVocalCancellationLib(消人声)
@@ -247,7 +245,76 @@ BRIDGE_JS = r"""
     parts.push(text);
     if (detail) parts.push(detail);
     if (p) p.title = parts.join(' · ');
+    /* ★ 2026-10-21：未连接/异常时把胶囊变成「重新检测」的入口（markDown
+       负责光标与 data-reconnect）。「正在连接 …」也是 ok=false，但那不是
+       可点的失败态，所以按文案判，不按 ok 判。 */
+    markDown((text === '未连接驱动' || text === '连接异常') && !RECONNECTING);
   }
+
+  /* ---------------- 驱动重连 ----------------
+     ★ 2026-10-21（用户拍板）：Open 只在进程启动时试一次。iKF-驱动管理
+     装完驱动会 pnputil /restart-device 重建音频端点，用户点完「已安装
+     完成」立刻打开主程序，很容易撞在重建窗口期里 —— 一次失败界面就
+     永久停在「未连接驱动」，以前唯一的出路是彻底关掉重开。
+     现在给一条自恢复路径：点右上角设备胶囊的状态，或场景页那句「点此
+     重新检测」→ 后端 POST /api/driver/reopen 松开旧上下文重枚举端点。
+     成功后整页 reload：面板本来就还没绑定（未连接时提前 return），
+     reload 让所有读数按新设备重新初始化，也不会重复绑事件
+     （重复绑定的滑杆一次拖动会写两次，见 D 档「一个交互只能有一个写回主人」）。 */
+  var DRV_DOWN = false, RECONNECTING = false;
+
+  function markDown(on){
+    DRV_DOWN = !!on;
+    var s = $('devState');
+    var pill = s ? s.parentNode : null;
+    if (!pill) return;
+    pill.style.cursor = on ? 'pointer' : '';
+    if (on){
+      pill.setAttribute('data-reconnect', '1');
+      pill.title = '驱动未连接 · 点此重新检测';
+    } else {
+      pill.removeAttribute('data-reconnect');
+    }
+  }
+
+  function reconnect(){
+    if (RECONNECTING) return;
+    RECONNECTING = true;
+    badge('正在重新检测 …', false);
+    markDown(false);
+    postRaw('/api/driver/reopen', {}).then(function(o){
+      RECONNECTING = false;
+      if (o && o.ready){
+        /* ★ 2026-10-22：后端已经把「采集端点没起来」重试到 4.4 秒，走到
+           这里通常两者都齐了。万一麦克风端点确实还没回来，先给一句提示
+           再刷新（刷新会盖掉 toast，所以延迟 1.5 秒），否则用户只会看到
+           麦克风页整页不可用，不知道还能再点一次。 */
+        if (o.capture === 0){
+          badge('已连接（麦克风未就绪）', false);
+          toast('已连接，但麦克风端点还没就绪，稍候可再点一次「重新检测」', false);
+          setTimeout(function(){ location.reload(); }, 1500);
+          return;
+        }
+        location.reload();
+        return;
+      }
+      badge('未连接驱动', false);
+      markDown(true);
+      toast('仍未检测到驱动：' + ((o && o.error) || '请确认耳机已插入电脑'), true);
+    }).catch(function(e){
+      RECONNECTING = false;
+      badge('连接异常', false);
+      markDown(true);
+      toast('重新检测失败：' + e, true);
+    });
+  }
+
+  /* 一处委托覆盖两个入口：设备胶囊（markDown 动态加属性）与场景页提示
+     （设计稿里写死 data-reconnect）。捕获阶段，避免被面板的 stopPropagation 吞掉。 */
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (t && t.closest && t.closest('[data-reconnect]')) reconnect();
+  }, true);
 
   /* ---------------- 未开放参数置灰 ----------------
      只把控件调暗是不够的：旋钮上仍显示 45 / 30 这样的数字，
@@ -362,8 +429,17 @@ BRIDGE_JS = r"""
 
   /* 开关状态 → 中文；读不到返回 null（区别于「关」） */
   function onoff(d){
-    if (!d || d.r !== 0) return null;
-    return d.v === '1' ? '开' : '关';
+    if (!d) return null;
+    if (d.r === 0) return d.v === '1' ? '开' : '关';
+    /* ★ 2026-10-22：ret=2 是「存在但从未写过」，不是「本机不支持」——
+       铁律第 2 条。这里原来判 `d.r !== 0` 就返回 null，于是**刚装完驱动、
+       一次都没设置过**时，麦克风页右上四行全显示「设备不支持」，用户看到
+       的就是「麦克风功能整个废了」；可下面四个开关其实都能点（w=true 走
+       白名单）。值也猜不得：读缓冲区零初始化，驱动返回 2 时不填，
+       _u16 遇 NUL 截断 → v 恒为空串，若照 `v === '1'` 判会谎报「关」。
+       所以只能如实标「未设置」。 */
+    if (d.r === 2) return '未设置';
+    return null;
   }
 
   /* ---------------- 1. 拉取设备状态 ---------------- */
@@ -1087,15 +1163,28 @@ BRIDGE_JS = r"""
       var dialTail = DIAL_NOTE[dial.dataset.dial]
         ? ' · ' + (UNPROVEN_NOTE[DIAL_NOTE_P[dial.dataset.dial]] || UNPROVEN_TEXT)
         : '';
+      /* ★ 2026-10-22：有 data-tiers 的旋钮（动态低音 11 个位置、
+         语音清晰 7 个位置）在操作提示后标出真实档数 —— 拖一格跳 10 是
+         驱动量程决定的，不写清楚会以为是滑杆坏了。 */
+      var tierNote = dial.dataset.tiers
+        ? ' · 共 ' + (+dial.dataset.tiers + 1) + ' 档' : '';
       if (isFinite(tick)){
         tick = Math.max(0, Math.min(100, tick));
         dial.dataset.val = tick;
-        dial.title = cfg.p + ' · 上下拖拽或滚轮调节' + dialTail;
+        dial.title = cfg.p + ' · 上下拖拽或滚轮调节' + tierNote + dialTail;
       } else {
         /* 2026-10-20（用户拍板）：动态低音/语音清晰读不到驱动记忆值时
-           默认刻度 45（两参数 r=2 读不回，设计稿刻度就是初始位置）。 */
-        if (key === 'bass' || key === 'clear') dial.dataset.val = 45;
-        dial.title = cfg.p + ' · 默认值（驱动暂无记忆值，调节后生效）' + dialTail;
+           给一个可交互的初始刻度。
+           ★ 2026-10-22 修正：兜底值必须落在**驱动真实档位**上（原来写死
+           45，而 bass 只有 0..10、clear 只有 0..6，45 写进去会被四舍五入
+           成 5/3，回读再换算就成 50 —— 首次进入界面时数字会「自己跳」）。
+           50 是两档中点，两个量程都能精确表示（5/10、3/6）。 */
+        if (key === 'bass' || key === 'clear'){
+          dial.dataset.val = (typeof dialSnap === 'function')
+            ? dialSnap(dial, 50) : 50;
+        }
+        dial.title = cfg.p + ' · 默认值（驱动暂无记忆值，调节后生效）'
+          + tierNote + dialTail;
       }
       if (typeof paintDial === 'function') paintDial(dial);
       if (cfg.en){
@@ -1463,9 +1552,12 @@ BRIDGE_JS = r"""
 
     /* 麦克风监听：2026-10-20 起为内嵌 WASAPI 监听（POST /api/listen
        {on}）。旧的 RunListen2Device 官方路径依赖的 COM 服务器驱动包里
-       没有（官方原版同样开不了），取证见内部报告（未随仓库分发） */
+       没有（官方原版同样开不了），取证见 docs/监听取证-监听COM组件缺失.md */
     var ls = $('listenSw');
     if (ls){
+      var lgr = $('listenGainRow');
+      var lgi = $('listenGain');
+      var lgv = $('listenGainVal');
       ls.addEventListener('click', function(){
         if (ls.style.pointerEvents === 'none') return;
         var on = !ls.classList.contains('on');
@@ -1473,12 +1565,21 @@ BRIDGE_JS = r"""
         postRaw('/api/listen', {on: on}).then(function(r){
           if (r.ok){
             toast('麦克风监听' + (on ? ' 已开启' : ' 已关闭'));
+            /* ★ 2026-10-24：监听增益滑杆随开关显隐（1.0-4.0×，实时） */
+            if (lgr) lgr.hidden = !on;
           } else {
             ls.classList.toggle('on', !on);
             toast('麦克风监听设置失败，请稍后重试', true);
           }
         });
       });
+      if (lgi){
+        lgi.addEventListener('input', function(){
+          var g = (+lgi.value) / 100;
+          if (lgv) lgv.textContent = (g % 1 === 0 ? String(g) : g.toFixed(1));
+          postRaw('/api/listen', {on: true, gain: g}).catch(function(){});
+        });
+      }
     }
   }
 
@@ -1814,7 +1915,7 @@ BRIDGE_JS = r"""
   }
 
   /* ---------------- 读取 ---------------- */
-  function loadProfiles(){
+  function loadProfiles(retry){
     return fetch('/api/profiles').then(function(r){ return r.json(); })
       .then(function(p){
         /* 场景墙显示全部场景：官方档（游戏/音乐/电影/原厂默认…）由
@@ -1842,6 +1943,19 @@ BRIDGE_JS = r"""
         paintProfPanel();
         profRefreshWall();
         return p;
+      })
+      .catch(function(e){
+        /* ★ 2026-10-22：点「重新检测」成功后页面 reload，这时后端刚做完
+           close→open，多个请求挤在一起。以前这里没有 catch —— 一次网络
+           抖动就变成 unhandled rejection，paintProfPanel() 根本不执行，
+           场景墙停在空态，用户看到的就是「自定义场景全没了」。
+           重试一次，仍失败才提示。 */
+        if (!retry){
+          return new Promise(function(res){ setTimeout(res, 600); })
+            .then(function(){ return loadProfiles(true); });
+        }
+        toast('场景列表读取失败：' + e + '（点「重新检测」可重试）', true);
+        return null;
       });
   }
 
@@ -2190,11 +2304,16 @@ BRIDGE_JS = r"""
 
   /* 通用「滑杆 → 驱动」绑定：input 只刷读数，change（松手）才写。
      麦克风侧的四根滑杆与渲染端点的两根共用这一段。 */
+  var BIND_REG = [];
   function bindSlider(id, labId, param, ep, fmt, lo, hi, scale){
     var el = $(id);
     if (!el) return null;
     var fmtv = fmt || function(v){ return v; };
     var k = scale || 1;              /* 滑杆刻度 → 参数值 的换算（标量音量是 100:1） */
+    /* ★ 2026-10-24：注册到统一重同步表 —— 场景 apply 后 applyParams 按表
+       回填（此前 capture 端滑杆不在任何同步路径，应用含麦克风参数的
+       自定义场景后页面停在旧值）。新控件走 bindSlider 自动获得同步。 */
+    BIND_REG.push({id:id, labId:labId, param:param, ep:ep, fmt:fmtv, k:k});
     el.addEventListener('input', function(){
       var l = $(labId);
       if (l) l.textContent = fmtv(+el.value / k);
@@ -2220,6 +2339,7 @@ BRIDGE_JS = r"""
   function bindSelect(id, param, ep, names, label){
     var el = $(id);
     if (!el) return null;
+    BIND_REG.push({id:id, param:param, ep:ep, names:names});
     el.addEventListener('change', function(){
       var v = +el.value;
       var body = {name:param, value:v};
@@ -2341,7 +2461,17 @@ BRIDGE_JS = r"""
         anyEq = true;
       } else { eq.push(0); }
     }
-    if (anyEq){ S.eq = eq; LAST.eq = eq.slice(); EQ_W = true; }
+    if (anyEq){
+      S.eq = eq; LAST.eq = eq.slice(); EQ_W = true;
+      /* ★ 2026-10-24：驱动 EQ 已被场景改写，本地 EQ 预设选择器不得再
+         显示旧选择（否则读数撒谎）——清空并重渲染下拉。 */
+      var eps = $('eqProfSel');
+      if (eps && eps.value !== ''){ eps.value = ''; }
+      /* ★ 2026-10-22：读回 10 段值后必须反查预设，芯片与 S.pre 跟着走。
+         旧实现只更新 S.eq，芯片停在初始化时硬编码的第 0 个「舞曲」上 ——
+         默认场景（全 0 = 官方索引 11「预设」）因此在均衡页显示「舞曲」。 */
+      if (typeof syncEqChips === 'function') syncEqChips();
+    }
 
     /* 均衡器开关 */
     var eqs = document.querySelector('button.sw[data-p="Enable_EQ_GFX"]');
@@ -2361,6 +2491,23 @@ BRIDGE_JS = r"""
     syncDials(pm);
     /* ★ 第 49 轮：把驱动读回的 8 角度 + 8 距离刷到声场图与读数区 */
     syncSpk(pm);
+
+    /* ★ 2026-10-24：bindSlider/bindSelect 注册表统一重同步 —— 麦克风页
+       （capture 端）的滑杆/下拉此前不在任何同步路径：应用含麦克风参数
+       （降噪/回声/AGC/魔音/采集采样率/麦克风音量）的自定义场景后，
+       页面停在旧值。r!==0（未写过/不可读）跳过 —— 不替驱动下结论。 */
+    BIND_REG.forEach(function(r){
+      var el = $(r.id); if (!el) return;
+      var d = (r.ep === 'capture' ? (pmc || {}) : pm)[r.param];
+      if (!d || d.r !== 0 || d.v === '') return;
+      var n = +d.v;
+      if (r.names){
+        if (n <= el.options.length - 1) el.value = n;
+      } else {
+        el.value = n * r.k;
+        if (r.labId){ var l = $(r.labId); if (l) l.textContent = r.fmt(n); }
+      }
+    });
 
     /* 统一同步所有带 data-p 的开关：按 data-ep 选表，可写即接线，
        不可写即置灰并标注 —— 而不是整块隐藏。 */
@@ -2626,12 +2773,12 @@ BRIDGE_JS = r"""
       btns[1].addEventListener('click', function(){
         S.eq = [0,0,0,0,0,0,0,0,0,0];
         LAST.eq = null;
-        S.pre = '平直';
-        document.querySelectorAll('#eqChips .chip').forEach(function(x){
-          x.classList.toggle('on', x.textContent === '平直');
-        });
+        /* ★ 2026-10-22：归零 = 官方索引 11「预设」，不是当年那个不存在的
+           「平直」（PRE 里没有这个键，芯片一个都点不亮）。统一走反查。 */
+        if (typeof syncEqChips === 'function') syncEqChips();
+        else { S.pre = '预设'; }
         render(); hud();
-        toast('10 段 EQ 已归零');
+        toast('10 段 EQ 已归零（预设）');
       });
     }
   }
@@ -2797,7 +2944,11 @@ BRIDGE_JS = r"""
     if (!d) return { t:'未识别', c:'no' };
     if (UNPROVEN[n]) return { t:'未验证', c:'no' };
     if (d.r === 0) return { t:'支持', c:'ok' };
-    if (d.r === 2) return { t:'不支持', c:'no' };
+    /* ★ 2026-10-22：ret=2 = 「存在但从未写过」，不是「本机不支持」。
+       上面这段注释本来就写着「徽章只说我们验过没有，不下本机不支持的
+       结论」—— ret=2 这一支一直在违反它。名字在 208 表里、PropertyControl
+       能返回，说明本机就是有这个参数，只是值还没落盘。 */
+    if (d.r === 2) return { t:'未设置', c:'no' };
     return { t:'异常', c:'no' };
   }
 
@@ -2848,7 +2999,8 @@ BRIDGE_JS = r"""
       var desc;
       if (UNPROVEN[n]) desc = '可读可写；' + unprovenNote(n);
       else if (d.r === 0) desc = '当前设备可用';
-      else if (d.r === 2) desc = '当前设备不支持';
+      /* ★ 2026-10-22：同 rstate —— ret=2 不是「不支持」，是值还没写过。 */
+      else if (d.r === 2) desc = '未写入过（出厂默认）';
       else if (d.r === -1) desc = '暂无信息';
       else desc = '读取异常';
       if (CUR_EP === 'capture' && d.w) desc += ' · 麦克风侧可设置';
@@ -3047,14 +3199,13 @@ BRIDGE_JS = r"""
 
 
 def main():
-    for p in (SRC, DESIGN, NAMES):
+    for p in (SRC, DESIGN):
         if not os.path.isfile(p):
             print("缺少文件：%s" % p)
             return 1
 
     src = open(SRC, encoding="utf-8").read()
     html = open(DESIGN, encoding="utf-8").read()
-    names = json.load(open(NAMES, encoding="utf-8"))
 
     # ---- 1. 注入桥接层 ----
     if "</body>" not in html:
@@ -3082,8 +3233,6 @@ def main():
         return "[\n" + "\n".join(out) + "\n]"
 
     out = src
-    out = out.replace("__GENERIC__", fmt_list(names["generic"]))
-    out = out.replace("__OEM__", fmt_list(names["oem"]))
     out = out.replace("__HTML__", html)
 
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
@@ -3091,8 +3240,7 @@ def main():
 
     print("已生成：%s" % OUT)
     print("  体积   : %.1f KB" % (os.path.getsize(OUT) / 1024.0))
-    print("  通用参数: %d 项" % len(names["generic"]))
-    print("  OEM 参数: %d 项" % len(names["oem"]))
+    print("  构建完成（名字表/白名单已由 TOML 承载，构建零注入）")
     print("  界面    : %.1f KB" % (len(html) / 1024.0))
     return 0
 

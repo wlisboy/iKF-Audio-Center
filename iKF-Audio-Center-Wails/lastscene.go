@@ -9,7 +9,7 @@ package main
 // localStorage（与设备无关、跨重装残留），形成「显示在用、实际被清」
 // 的假象 —— 现改为后端按设备真值识别（identifyActiveScene）。
 //
-// 与 Python 版（tools/src/center_src.py 的 restore_default_scene /
+// 与 Python 版（工具/src/center_src.py 的 restore_default_scene /
 // identify_active_scene）逐字段对应。
 
 import (
@@ -51,28 +51,24 @@ func RestoreDefaultScene(d *Driver, force bool) (bool, string) {
 		return false, fmt.Sprintf("设备参数在位（出厂默认表缺省仅 %d/%d 项），无需恢复",
 			missing, len(factoryDefaults))
 	}
-	// 全量重写（不只补 ret==2 —— force 路径可能有残留的错误值），
-	// 与 HealMissingParams 相同的值表，语义 = 自动应用「默认」场景。
-	applied, failed := 0, 0
-	for _, it := range factoryDefaults {
-		sp, known := spec(it.Ep, it.Name)
-		kind := ""
-		if known {
-			kind = kindName(sp.kind)
-		}
-		res := d.WriteAuto(it.Ep, it.Name, it.Val, kind)
-		if ok, _ := res["ok"].(bool); ok {
-			applied++
-		} else {
-			failed++
-		}
-	}
+	/*
+		★ 2026-10-22 第二版：执行体不再「遍历出厂表 + 补一次场景档」，
+		而是**按初始化清单**一次写完。
+
+		清单 = 出厂表 42 ∪ 「默认」档 37 ∪ 设备级 1 = 55 项
+		（见 initmanifest.go）。这里只做 param 项，拓扑交给
+		ensureChannelTopology —— 它才有「写后回读 + 重试」的抗重建窗口能力。
+
+		strong=true：全量写，不看当前值。语义 = 自动应用「默认」场景，
+		所以 force 路径上残留的错误值也会被纠正。
+	*/
+	items := BuildInitManifest(d)
+	applied, failed, _ := applyInitManifest(d, items, true)
 	if failed == 0 {
-		return true, fmt.Sprintf("检测到参数被驱动重置（缺省 %d/%d 项），已自动恢复出厂默认参数（写入 %d 项）",
-			missing, len(factoryDefaults), applied)
+		return true, fmt.Sprintf("检测到参数被驱动重置（缺省 %d/%d 项），已按初始化清单恢复（写入 %d/%d 项）",
+			missing, len(factoryDefaults), applied, len(items)-len(initDeviceItems))
 	}
-	return true, fmt.Sprintf("尝试恢复出厂默认参数未完全成功（成功 %d / 失败 %d）",
-		applied, failed)
+	return true, fmt.Sprintf("按初始化清单恢复未完全成功（成功 %d / 失败 %d）", applied, failed)
 }
 
 // identifyActiveScene 设备真值场景识别：当前设备参数与哪个场景快照
@@ -151,6 +147,35 @@ func profileNamesForIdentify(d *Driver) []string {
 		}
 		sort.Strings(here)
 		names = append(names, here...)
+	}
+	/*
+		★ 2026-10-22：多个场景内容相同时，识别必须先判「默认」。
+
+		当时 `音乐.profile` 与 `默认.profile` 逐项完全相同（默认就是古典乐曲线），
+		sort.Strings 按 UTF-8 字节序排，「音」(E9 9F B3) 在「默」(E9 BB 98)
+		之前，于是识别一命中就返回「音乐」，场景墙标成「音乐 · 使用中」。
+
+		★ 同日改判：默认档的 EQ 换成**官方预设 Default 的平直曲线**（全 0），
+		音乐仍是古典乐（索引 9）⟹ 两档不再同分，下面的 factoryFirst 只是兜底：
+		用户自己把别的档调得跟默认一模一样时，仍然归到「默认」这个出厂态名字下，
+		而不是随机落到某个名字上。
+	*/
+	return factoryFirst(names)
+}
+
+// factoryFirst 把「默认」提到识别候选的第一位（其余保持原序）。
+func factoryFirst(names []string) []string {
+	for i, n := range names {
+		if n != profileFactoryScene {
+			continue
+		}
+		if i == 0 {
+			return names
+		}
+		out := make([]string, 0, len(names))
+		out = append(out, n)
+		out = append(out, names[:i]...)
+		return append(out, names[i+1:]...)
 	}
 	return names
 }

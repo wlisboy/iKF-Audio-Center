@@ -44,6 +44,7 @@ var (
 	pBeginPaint            = user32.NewProc("BeginPaint")
 	pEndPaint              = user32.NewProc("EndPaint")
 	pGetClientRect         = user32.NewProc("GetClientRect")
+	pGetWindowRect         = user32.NewProc("GetWindowRect")
 	pAdjustWindowRectEx    = user32.NewProc("AdjustWindowRectEx")
 	pGetSystemMetrics      = user32.NewProc("GetSystemMetrics")
 	pSetTimer              = user32.NewProc("SetTimer")
@@ -79,18 +80,22 @@ const (
 	wsSysmenu    = 0x00080000
 	wsVisible    = 0x10000000
 	wsExDlgFrame = 0x00000001 // WS_EX_DLGMODALFRAME：细边框、无最大化
-	swShow       = 5
-	pmRemove     = 1
+	csVRedraw    = 0x0001     // ★类级重画标记：尺寸一变就整体失效客户区。
+	csHRedraw    = 0x0002     //   不加的话缩小窗口时系统 blit 保留旧位图，
+	//   切进度态后残留选择态画面（2026-10-23 用户截图实锤）。
+	swShow   = 5
+	pmRemove = 1
 
-	wmDestroy    = 0x0002
-	wmPaint      = 0x000F
-	wmClose      = 0x0010
-	wmEraseBkgnd = 0x0014
-	wmSetCursor  = 0x0020
-	wmKeyDown    = 0x0100
-	wmTimer      = 0x0113
-	wmMouseMove  = 0x0200
-	wmLBtnDown   = 0x0201
+	wmDestroy     = 0x0002
+	wmPaint       = 0x000F
+	wmClose       = 0x0010
+	wmEraseBkgnd  = 0x0014
+	wmSetCursor   = 0x0020
+	wmKeyDown     = 0x0100
+	wmTimer       = 0x0113
+	wmPrintClient = 0x0318
+	wmMouseMove   = 0x0200
+	wmLBtnDown    = 0x0201
 
 	htClient = 1
 	idcArrow = 32512
@@ -159,8 +164,10 @@ const (
 
 	// 进度态高度固定（paintProgress 的版面按这个高度排）。
 	// 选择态高度随可见行数走 —— 见 choiceH/statusY/btnYOf。
+	// 2026-10-23：内容块垂直居中重排（原 title=76/sub=104/bar=160/foot=176
+	// 上方留白 76、下方只有 38，看起来像版面错位 —— 用户报「安装时界面问题」）。
 	lgProgressH = 258.0
-	lgBarY      = 160.0
+	lgBarY      = 138.0
 	lgBarH      = 4.0
 
 	btnW = 80.0
@@ -189,16 +196,24 @@ func btnYOf(uninst bool) float64 { return statusY(uninst) + 52 }
 // choiceH 选择态窗口逻辑高度。
 func choiceH(uninst bool) float64 { return btnYOf(uninst) + btnH + 14 }
 
-// uiResizeTo 按新的逻辑高度缩放窗口（保持位置）。切模式/切相位时调用。
+// uiResizeTo 按新的逻辑高度缩放窗口，保持**垂直中心**与水平位置。
+// 切模式/切相位时调用 —— 高度变化时窗口绕中心缩放，不会视觉上向上跳。
 func uiResizeTo(h float64) {
 	if uiHwnd == 0 {
 		return
 	}
+	var old rectT
+	pGetWindowRect.Call(uintptr(uiHwnd), uintptr(unsafe.Pointer(&old)))
 	rc := rectT{0, 0, px(lgW), px(h)}
 	pAdjustWindowRectEx.Call(uintptr(unsafe.Pointer(&rc)),
 		uintptr(wsPopup|wsCaption|wsSysmenu|wsVisible), 0, uintptr(wsExDlgFrame))
-	pSetWindowPos.Call(uintptr(uiHwnd), 0, 0, 0,
-		uintptr(rc.right-rc.left), uintptr(rc.bottom-rc.top), 0x2|0x4) // SWP_NOMOVE|SWP_NOZORDER
+	cw, ch := rc.right-rc.left, rc.bottom-rc.top
+	cy := (int(old.top) + int(old.bottom)) / 2
+	pSetWindowPos.Call(uintptr(uiHwnd), 0,
+		uintptr(int(old.left)), uintptr(cy-int(ch)/2), uintptr(cw), uintptr(ch), 0x4) // SWP_NOZORDER
+	// 缩小不触发整体失效（类标记之外的双保险）：切相态立刻全量重画一帧，
+	// 不留任何选择态残留位图。
+	pInvalidateRect.Call(uintptr(uiHwnd), 0, 0)
 }
 
 // ---- 选择态：清单内容 ----
@@ -416,6 +431,15 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 	case wmPaint:
 		paint(hwnd)
 		return 0
+	case wmPrintClient:
+		// DWM / PrintWindow 索要整幅内容时不画就会把残留位图交出去
+		//（用户截图里那种「选择态清单叠着进度文字」由此而来）。
+		hdc, _, _ := pGetDC.Call(hwnd)
+		if hdc != 0 {
+			paintInto(hwnd, hdc)
+			pReleaseDC.Call(hwnd, hdc)
+		}
+		return 0
 	case wmTimer:
 		// ★ 界面闪烁修复（2026-10-19）：
 		//   1. 选择态是**完全静态**的 —— 不失效任何区域，一颗像素都不重画
@@ -518,7 +542,11 @@ func paint(hwnd uintptr) {
 		return
 	}
 	defer pEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+	paintInto(hwnd, hdc)
+}
 
+// paintInto 画完整一帧客户区（含底色），WM_PAINT 与 WM_PRINTCLIENT 共用。
+func paintInto(hwnd, hdc uintptr) {
 	var rc rectT
 	pGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
 	fill(hdc, 0, 0, rc.right, rc.bottom, uiBrushes[brBg])
@@ -647,9 +675,11 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 }
 
 func paintProgress(hdc uintptr, title, sub, foot string, pos, trackW float64) {
-	put(hdc, title, 24, 76, lgW-48, 24, 16, 600, colTitle, uiFonts[fBig],
+	// 纵向版面（与 lgBarY 同批调过，上下留白 ~52/58 基本对称）：
+	// title 52..76 · sub 82..126 · bar 138..142 · foot 156..200
+	put(hdc, title, 24, 52, lgW-48, 24, 16, 600, colTitle, uiFonts[fBig],
 		dtLeft|dtVCenter|dtSingleLine)
-	put(hdc, sub, 24, 104, lgW-48, 44, 13, 400, colBody, uiFonts[fBody], dtLeft|dtWordBreak)
+	put(hdc, sub, 24, 82, lgW-48, 44, 13, 400, colBody, uiFonts[fBody], dtLeft|dtWordBreak)
 
 	// 进度条：底槽 + 一段来回滚的亮条（自己裁剪到槽内）
 	// 几何与 wmTimer 的失效区共用 lgBarY/lgBarH（两处不一致会漏画）。
@@ -670,7 +700,7 @@ func paintProgress(hdc uintptr, title, sub, foot string, pos, trackW float64) {
 	if x1 > x0 {
 		fill(hdc, x0, barY, x1, barY+barH, uiBrushes[brBrand])
 	}
-	put(hdc, foot, 24, 176, lgW-48, 44, 11, 400, colHint, uiFonts[fHint], dtLeft|dtWordBreak)
+	put(hdc, foot, 24, 156, lgW-48, 44, 11, 400, colHint, uiFonts[fHint], dtLeft|dtWordBreak)
 }
 
 // statusLine 是选择态底部那行现状。2026-10-19 用户定稿：极简 + 官方语气，
@@ -768,6 +798,7 @@ func uiRun(cfg uiRunCfg) uiOut {
 	ex, _, _ := pGetModuleHandleW.Call(0)
 	wc := wndClassExW{
 		cbSize:        uint32(unsafe.Sizeof(wndClassExW{})),
+		style:         csVRedraw | csHRedraw,
 		lpfnWndProc:   syscall.NewCallback(wndProc),
 		hInstance:     syscall.Handle(ex),
 		hCursor:       loadCursor(idcArrow),

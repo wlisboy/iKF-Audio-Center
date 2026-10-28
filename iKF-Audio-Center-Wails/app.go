@@ -111,6 +111,10 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.json(w, http.StatusOK, drv.Profiles())
 	case r.Method == http.MethodGet && r.URL.Path == "/api/driver":
 		a.json(w, http.StatusOK, drv.DriverInfo())
+	// ★ 2026-10-21：界面上「重新检测」的后端入口（与 Python 线同契约）。
+	//   松开旧上下文 → 重新枚举端点，返回的就是 DriverInfo，ready 即结果。
+	case r.Method == http.MethodPost && r.URL.Path == "/api/driver/reopen":
+		a.json(w, http.StatusOK, drv.ReopenInfo())
 	case r.Method == http.MethodPost && r.URL.Path == "/api/driver/setup":
 		a.driverSetup(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/openurl":
@@ -141,7 +145,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.json(w, http.StatusOK, resp)
 	// ★ 2026-10-20 内嵌录音机（recorder.go）：官方捆绑 Recorder.exe 是
 	//   依附官方面板 COM 环境的死件（脱离面板拉起必退 241，取证见
-	//   内部取证报告），旧 POST /api/recorder
+	//   工具/录音机取证-Recorder.exe死件.md），旧 POST /api/recorder
 	//   「拉起官方 exe」语义废弃，改为 start/stop/status 三端点。
 	//   晚间用户拍板迁移：声音页「耳机录音」=渲染端点 loopback，
 	//   WAV 落「音乐\iKF Audio Center\」（原麦克风录音废弃）。
@@ -240,7 +244,10 @@ func (a *API) driverSetup(w http.ResponseWriter, r *http.Request) {
 		}
 		action = req.Action
 	}
-	if action != "" && action != "install" && action != "uninstall" {
+	// ★破坏性检测 P1-1：空 action 此前被放行 → RunSetup("") 走默认分支
+	// = 主动关驱动上下文 + 弹提权安装器并阻塞 —— 一条误调用就能断驱动。
+	// 非法值一律 400，驱动管理只允许显式调用。
+	if action != "install" && action != "uninstall" {
 		a.json(w, http.StatusBadRequest, map[string]interface{}{
 			"ok": false, "error": "action 只能是 install 或 uninstall",
 		})
@@ -327,7 +334,8 @@ func (a *API) test(w http.ResponseWriter, r *http.Request) {
 func (a *API) listen(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
 	var req struct {
-		On bool `json:"on"`
+		On   bool     `json:"on"`
+		Gain *float64 `json:"gain"` // 可选：监听增益 1.0-8.0（滑杆实时调）
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
 		a.json(w, http.StatusBadRequest, map[string]interface{}{
@@ -336,8 +344,12 @@ func (a *API) listen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 2026-10-20：官方 RunListen2Device 依赖的 COM 服务器在驱动包里
-	// 不存在（见内部取证报告），改内嵌 WASAPI
+	// 不存在（见 工具/监听取证-监听COM组件缺失.md），改内嵌 WASAPI
 	// 监听（listen.go）。响应保留 {ok, on, error} 形状，前端零改动。
+	if req.Gain != nil {
+		a.json(w, http.StatusOK, lis.SetGain(*req.Gain))
+		return
+	}
 	out := map[string]interface{}{"on": req.On}
 	if req.On {
 		out = lis.Start()
@@ -376,5 +388,5 @@ func (a *API) profileOp(w http.ResponseWriter, r *http.Request, op string) {
 }
 
 // ★ 2026-10-20：recorderPath / launchRecorder 已删除 —— 官方捆绑
-// Recorder.exe 是死件（见内部取证报告），
+// Recorder.exe 是死件（见 工具/录音机取证-Recorder.exe死件.md），
 // 录音机改为内嵌实现（recorder.go 的 rec 实例，三端点见上方路由）。

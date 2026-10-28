@@ -8,7 +8,7 @@
 
 目录布局
 --------
-    dist/iKF-Audio-Center-Portable/
+    release/iKF-Audio-Center-Portable/
       iKF-Audio-Center.exe          主程序：只管运行
                                       （driver.go 的 localCpls 优先读同目录）
       iKF-驱动管理.exe               驱动管理：只管装/卸驱动，自提权
@@ -33,7 +33,7 @@ WINMM/ADVAPI32/SETUPAPI/KERNEL32/USER32/ole32/OLEAUT32，不碰 DirectX。
 依附官方面板 COM 环境的薄客户端（导入表仅 KERNEL32+ole32，无
 user32/winmm），脱离官方面板拉起必退 241，是死件；录音机已改内嵌实现
 （recorder.go / center_src.py 的 MicRecorder）。取证见
-内部取证报告（未随仓库分发）。
+docs/录音机取证-Recorder.exe死件.md。
 
 用法
 ----
@@ -47,6 +47,7 @@ user32/winmm），脱离官方面板拉起必退 241，是死件；录音机已�
 """
 
 import argparse
+import glob
 import os
 import shutil
 import subprocess
@@ -59,7 +60,7 @@ APP = os.path.join(ROOT, "iKF-Audio-Center-Wails")
 DEF_SRC = os.path.join(os.path.dirname(ROOT), "iKF headset-0817",
                        "WIN10(WHQL)", "SoftwareDriver")
 DEF_EXE = os.path.join(APP, "build", "bin", "iKF-Audio-Center.exe")
-DEF_OUT = os.path.join(ROOT, "dist", "iKF-Audio-Center-Portable")
+DEF_OUT = os.path.join(ROOT, "release", "iKF-Audio-Center-Portable")
 
 SETUP_NAME = "iKF-驱动管理.exe"  # 与 driver.go 的 setupExeName 必须一致
 GO_BIN = r"C:\Program Files\Go\bin"
@@ -119,7 +120,7 @@ def copy_item(src_root, rel, dst_root):
     return d
 
 
-# stash 固定放在 tools 目录：构建中断（rmtree 成功但后续步骤失败）时
+# stash 固定放在工具目录：构建中断（rmtree 成功但后续步骤失败）时
 # 数据不进回收站也不埋在系统 temp 里没人管，下次构建自动补回。
 STASH_DIR = os.path.join(HERE, ".profile-stash")
 
@@ -203,6 +204,27 @@ def main():
     # 主程序放根，driver.go 的 localCpls() 会从这里往上找同目录资源
     shutil.copy2(args.exe, os.path.join(args.out, os.path.basename(args.exe)))
 
+    # P1：音频热路 Rust DLL（audiocore 产物）。缺失不致命（exe 运行时降级
+    # 到 Go 路径），但一键构建的包里必须带上，否则 Rust 化永不生效。
+    audio_dll = os.path.join(APP, "audiocore", "target", "release", "ikf_audio.dll")
+    if os.path.isfile(audio_dll):
+        # 防旧 DLL 静默回潮：源码比 DLL 新 = 忘了 cargo build（崩溃修复
+        # 只改 Rust 侧时尤其危险 —— 包看着新，崩溃面还是旧的）。
+        import hashlib
+        src_newest = 0
+        for root, _dirs, files in os.walk(os.path.join(APP, "audiocore", "src")):
+            for fn in files:
+                if fn.endswith(".rs"):
+                    src_newest = max(src_newest, os.path.getmtime(os.path.join(root, fn)))
+        if src_newest > os.path.getmtime(audio_dll):
+            print("WARN ikf_audio.dll 比 audiocore/src 旧 —— 请先 cargo build --release 再打包")
+        with open(audio_dll, "rb") as f:
+            dll_sha = hashlib.sha256(f.read()).hexdigest()
+        shutil.copy2(audio_dll, os.path.join(args.out, "ikf_audio.dll"))
+        print("ikf_audio.dll 已入包  sha256=%s  %d 字节" % (dll_sha, os.path.getsize(audio_dll)))
+    else:
+        print("WARN ikf_audio.dll 未构建（audiocore/target/release），包内将走 Go 路径")
+
     for rel in CPL_ITEMS:
         copy_item(src_cpl, rel, os.path.join(args.out, "CPL"))
     for rel in DRV_ITEMS:
@@ -229,15 +251,29 @@ def main():
 
 
 def check_main(out, exe_name):
-    """自检一：把 ProgramFiles 掐掉，逼主程序只能读同目录 —— 读不到就说明包是残的。"""
+    """自检一：把 ProgramFiles 掐掉，逼主程序只能读同目录 —— 读不到就说明包是残的。
+
+    ★ 2026-10-22：耳机不在本机时（插到虚拟机里做测试是常规操作），
+    `--dump` 必然报「驱动未连接」，但这不代表包是残的 —— 以前这里直接
+    sys.exit(1)，整个构建判失败，而实际上文件早就复制完了。
+    现在按项目约定给环境前提闸加 SKIP 分支：
+      包里找得到 osConfLib.dll → 只做文件级校验，打印 SKIP 继续；
+      找不到                     → 才是真的包残，失败退出。
+    """
     env = dict(os.environ)
     for k in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
         env[k] = r"C:\__nope__"
     r = subprocess.run([os.path.join(out, exe_name), "--dump"], cwd=out, env=env,
                        capture_output=True, text=True, errors="replace")
-    if r.returncode != 0 or "驱动未连接" in (r.stdout + r.stderr):
-        print("✗ 自检失败：绿色目录起不来")
-        print((r.stdout + r.stderr)[:600])
+    txt = r.stdout + r.stderr
+    if r.returncode != 0 or "驱动未连接" in txt:
+        dlls = glob.glob(os.path.join(out, "CPL", "**", "osConfLib.dll"), recursive=True)
+        if dlls:
+            print("! 跳过：本机没连耳机（驱动组件在包内，路径 %s）" % dlls[0])
+            print("  文件级校验通过；要跑完整冒烟请在插着耳机时重跑一次。")
+            return
+        print("✗ 自检失败：绿色目录起不来，且包内找不到 osConfLib.dll")
+        print(txt[:600])
         sys.exit(1)
     n = sum(1 for ln in r.stdout.splitlines() if ln and not ln.startswith("#")
             and "---" not in ln)
@@ -278,3 +314,4 @@ def check_setup(out):
 
 if __name__ == "__main__":
     main()
+

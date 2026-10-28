@@ -102,12 +102,89 @@ from urllib.parse import parse_qs
 APP_NAME = "iKF Audio Center"
 APP_VER = "1.0.0"
 
+def _load_device_model():
+    """装载 device-model.toml（数据即真源）—— S1 场景 / S2 出厂 / S3 名字表+白名单。
+
+    查找顺序：IKF_MODEL_TOML 环境变量 → 构建产物位置（仓库根）→ 源码位置
+    （tools/src 向上两级）。失败 = 拒绝启动，绝不内置兜底 —— 兜底就是真源
+    漂移复发（与 Go 侧 model.go 同一纪律）。tomllib 需 3.11+。
+    """
+    import tomllib
+    here = os.path.dirname(os.path.abspath(__file__))
+    cands = [os.environ.get("IKF_MODEL_TOML"),
+             os.path.join(here, "iKF-Audio-Center-Wails", "model", "device-model.toml"),
+             os.path.join(here, os.pardir, os.pardir,
+                          "iKF-Audio-Center-Wails", "model", "device-model.toml")]
+    path = next((c for c in cands if c and os.path.isfile(c)), None)
+    if path is None:
+        raise SystemExit("[model] 找不到 device-model.toml（可用 IKF_MODEL_TOML 指定）")
+    try:
+        with open(path, "rb") as f:
+            m = tomllib.load(f)
+        scene = m["scene"]
+        out = {
+            "exclude": frozenset(scene["exclude"]),
+            "unproven": frozenset(scene["unproven"]),
+            "builtin": set(scene["builtin"]),
+            "alias": dict(m.get("group_alias", {})),
+            "factory_profile": scene["factory_profile"],
+            "factory_scene": scene["factory_scene"],
+            # S2：出厂表 42 + 初始化设备级 1（保序）
+            "factory": [(kv["ep"], kv["name"], kv["val"]) for kv in m.get("factory", [])],
+            "init_device": [(kv["ep"], kv["name"], kv["val"]) for kv in m.get("init_device", [])],
+        }
+        assert m["meta"]["schema_version"] == 1, "schema_version != 1"
+        assert (len(out["exclude"]), len(out["unproven"])) == (6, 35), \
+            "排除名单规模漂移: %d/%d != 6/35" % (len(out["exclude"]), len(out["unproven"]))
+        assert len(out["builtin"]) == 6, "内置场景漂移: %d != 6" % len(out["builtin"])
+        assert len(out["alias"]) == 10, "分组别名漂移: %d != 10" % len(out["alias"])
+        assert len(out["factory"]) == 42, "出厂表漂移: %d != 42" % len(out["factory"])
+        assert len(out["init_device"]) == 1, "设备级漂移: %d != 1" % len(out["init_device"])
+        # S3：名字表 208（112+96，顺序即下标）+ 白名单 80（65/15 自检口径）
+        out["names_generic"] = list(m["names"]["generic"])
+        out["names_oem"] = list(m["names"]["oem"])
+        out["writable"] = [dict(kv) for kv in m["writable"]]
+        assert (len(out["names_generic"]), len(out["names_oem"])) == (112, 96), \
+            "名字表漂移: %d/%d != 112/96" % (len(out["names_generic"]), len(out["names_oem"]))
+        assert len(out["writable"]) == 80, "白名单漂移: %d != 80" % len(out["writable"])
+        _rc = {"render": 0, "capture": 0}
+        for _w in out["writable"]:
+            assert _w["t"] in ("bool", "int", "float"), "非法 kind: %r" % _w
+            assert ("lo" in _w) == ("hi" in _w), "lo/hi 必须成对: " + _w["name"]
+            _rc[_w["ep"]] += 1
+        assert (_rc["render"], _rc["capture"]) == (65, 15), \
+            "白名单端点分布漂移: %r != 65/15" % _rc
+        # S4：分组映射 53 / 标签 28 / 顺序 27 / 端点元数据 / ValueType
+        out["profile_groups"] = {ep: dict(tbl) for ep, tbl in m.get("profile_groups", {}).items()}
+        out["group_label"] = dict(m.get("group_label", {}))
+        out["display"] = dict(m.get("display", {}))
+        out["profile_endpoint"] = dict(m.get("profile_endpoint", {}))
+        out["profile_value_type"] = dict(m.get("profile_value_type", {}))
+        _gn = sum(len(t) for t in out["profile_groups"].values())
+        assert _gn == 53, "分组映射漂移: %d != 53" % _gn
+        assert len(out["group_label"]) == 28, "标签漂移: %d != 28" % len(out["group_label"])
+        assert len(out["display"].get("group_order", ())) == 27, "展示顺序漂移"
+        for _g in out["display"]["group_order"]:
+            assert _g in out["group_label"], "顺序里有组没有标签: " + _g
+        assert len(out["profile_endpoint"]) == 2 and len(out["profile_value_type"]) == 3, "端点元数据漂移"
+    except SystemExit:
+        raise
+    except Exception as e:
+        raise SystemExit("[model] device-model.toml 校验失败 (%s): %s" % (path, e))
+    return out
+
+
+_MODEL = _load_device_model()
+
+
 # ====================================================================
 # 一、属性名表（从 osConfLib.dll 的字符串表实测导出）
 # ====================================================================
 
-GENERIC_NAMES = __GENERIC__
-OEM_NAMES = __OEM__
+# ★ S3 起真源 = model/device-model.toml [names]（208 = 112+96，装载时自校验）。
+# 构建注入 __GENERIC__/__OEM__ 与 tools/propnames.json 同步退役。
+GENERIC_NAMES = list(_MODEL["names_generic"])
+OEM_NAMES = list(_MODEL["names_oem"])
 
 GENERIC_SET = frozenset(GENERIC_NAMES)
 ALL_NAMES = list(GENERIC_NAMES) + list(OEM_NAMES)
@@ -132,122 +209,38 @@ ENDPOINTS = (EP_RENDER, EP_CAPTURE)
 # 按端点分表。VolumeControl / VolumeScalarControl / MuteControl
 # 在**两个端点上都有**，语义分别是扬声器音量与麦克风音量，必须分开登记。
 # --------------------------------------------------------------------
-WRITABLE = {
-    EP_RENDER: {
-        "Enable_EQ_GFX": "bool",           # 均衡器总开关
-        "Enable_SS_LFX": "bool",           # 虚拟环绕（声场扩展）
-        "Enable_RFX_GFX": "bool",          # 环境音效
-        "Enable_VOCALCANCEL_GFX": "bool",  # 人声消除
-        "Enable_KEYSHIFT_GFX": "bool",     # 升降 Key
-        "MuteControl": "bool",             # 扬声器静音
-        "GFSControl": "int",               # GFS 控制（注册表开关）
-        "VOCALCANCEL_LEVEL": "int",        # 人声消除强度
-        "KEYSHIFT_LEVEL": "int",           # 升降 Key 档位
-        "RFX_ENVIRONMENT": "int",          # 环境类型
-        "RFX_ROOMSIZE": "int",             # 房间大小
-        "VolumeControl": "float",          # 主音量（dB）
-        "VolumeScalarControl": "float",    # 标量音量（0..1）
-        "Enable_Channel_COPY_LFX": "bool",  # 声道复制
-        "DevSampleRateControl": "int",     # 设备采样率（44100/48000）
-        # ---- A 档 Xear 音效族（第 46 轮移植）----
-        # 值域逐条取自官方面板 .cml 的 Slider Minimum/Maximum；
-        # 可写性由 port_probe.py 逐项「写→读回」实测（wret=0 且 ret=0）。
-        # ★ 不登记在这里 = /api/params 报 w=False = 界面上控件点不动，
-        #   所以「能写但不登记」等价于「功能是假的」。
-        "Enable_AUDIOBRILLIANT_LFX": "bool",      # Xear Audio Brilliant 开关
-        "AUDIOBRILLIANT_LEVEL": "int",            # 增艳强度 0..6
-        "Enable_SMART_VOLUME_GFX": "bool",        # Xear Smart Volume 开关
-        "Enable_BM_GFX": "bool",                  # Xear Dynamic Bass 开关
-        "BM_Slider_BassLevel": "int",             # 低音强度 0..10
-        "BM_Slider_Frequency": "int",             # 低音截止 100..400 Hz
-        "Enable_VOICECLARITY_LFX": "bool",        # Xear Voice Clarity 开关
-        "VOICECLARITY_LEVEL": "int",              # 清晰度强度 0..6
-        "VOICECLARITY_NOISESUPP_LEVEL": "int",    # 通信降噪 0..20 dB
-        # ---- B 档 Xear 环绕族（第 47 轮移植，第 48 轮更正一处绑定）----
-        # 官方三张页的实际控件比参数表少得多：
-        #   apoSpeakerXearSurroundHeadPhone.cml  开关 + HPSPK_Mode 单选 + 房间大小三选
-        #   apoSpeakerSurroundMax.cml            **只有开关 BtnEnableSM**（SURRSENS_* 12 项无界面）
-        #   apoSpeakerXearSurroundSpeakers.cml   声场扩展 + 扬声器角度两根滑杆
-        # 值域取自 .cml：HPSPK_Mode Tag 0/1、RoomSize Tag 0=大 1=中 2=小（★ 反序）。
-        "Enable_CONLAB_HPSPK_LFX": "bool",        # Xear Surround Headphone 开关
-        "CONLAB_HPSPK_MODE": "int",               # 环绕模式 0=音乐/游戏 1=电影
-        "CONLAB_HPSPK_ROOMSIZE": "int",           # 环绕房间 0=大 1=中 2=小（Tag 反序）
-        # ★★ 第 48 轮更正：「环绕增强」原先绑 Enable_SURRMAX_FOR_HPSPK —— **绑错了**。
-        #    该名字在 XearAudioCenter_x64.exe 里出现 **0 次**（只在 osConfLib.dll 参数表
-        #    第 136 项躺着），说明官方面板从不用它。真正对应 Surround Max 页的（该页控件
-        #    只有一个 BtnEnableSM，见 apoSpeakerSurroundMax.cml）是 **Enable_SURRSENS_LFX**
-        #    —— 它在 exe 与 dll 里都有，且和 Enable_DHDVS_LFX / Enable_SS_LFX /
-        #    Enable_PLIIX_LFX / Enable_NEOPC_LFX 排在同一块，那正是「每个官方页一个
-        #    LFX 总开关」的清单。SURRSENS = Surround Sensation，Surround Max 的前身名。
-        "Enable_SURRSENS_LFX": "bool",            # Xear Surround Max 开关（第 48 轮更正）
-        "CONLAB_HPSPK_SFX": "int",                # 声场扩展 0..3
-        "CONLAB_HPSPK_SPKANGLE": "int",           # 扬声器角度 5..30（步进 5）
-        # ---- C 档 Dolby Headphone / Dolby Virtual Speaker（第 48 轮移植）----
-        # 官方页 apoSpeakerDolbyHPVS.cml（**耳机菜单里有**，MenuHeadset 与 MenuHeadPhone 都引用）。
-        # 控件 → 参数的对应由 exe 字符串表坐实（DolbyHPV2 → Enable_DHV2_LFX，
-        # DolbyHPVS → DVS_Mode/DH_Mode/DHDVS_USEDH 三者紧邻）：
-        #   BtnEnableDolbySurroundEffect  总开关            → Enable_DHDVS_LFX
-        #   BtnEnableVS / BtnEnableHP     VS 或 HP 二选一    → DHDVS_USEDH  (0=VS 1=HP)
-        #   BtnVSSmall / BtnVSLarge       Reference / Wide  → DVS_Mode     (0=Reference 1=Wide)
-        #   BtnHPDH1 / DH2 / DH3          Studio/Cinema/Hall→ DH_Mode      (0/1/2)
-        # ★ 档位数值按 .cml 里 RadioButton 的**声明顺序**推（这几个 RadioButton 没写 Tag），
-        #   与 B 档 SFX / SPKANGLE 同属「顺序推断」那一档证据。
-        "Enable_DHDVS_LFX": "bool",               # Dolby 环绕总开关
-        "DHDVS_USEDH": "int",                     # 0=Dolby Virtual Speaker 1=Dolby Headphone
-        "DVS_Mode": "int",                        # 0=Reference 1=Wide
-        "DH_Mode": "int",                         # 0=Studio 1=Cinema 2=Hall
-        # ---- D 档 7.1 虚拟音箱摆位（第 49 轮）----
-        # ★ 这 16 项（8 角度 + 8 距离）**本文件下方已有登记**（见 RANGES 之后的
-        #   `for _sp in (...)` 那一段），这里不重复列，避免同一份字典里出现
-        #   两处同名项。第 49 轮把界面的拖拽接上它们之后的结论记在那一段的注释里。
-        # ---- E 档 声道配置与声道互换（第 50 轮）----
-        # 官方「设定」页 apoSpeakerSetting.cml 实际渲染出来的控件（这一份是耳机 /
-        # 扬声器 / SPDIF 三个 Setting 菜单项**共用的唯一布局**，exe 里 `%sapo%s.cml`
-        # 拼出来的页面文件在 CPL 里只有它一个）：
-        #   Channels2/4/6/8 单选  → Speaker_Channel_Setting  ★ Tag 就是声道数 2/4/6/8
-        #   WooferCenterSwap 复选 → Enable_SwapLfeCn_LFX
-        #   SideBackSwap    复选 → Enable_SwapSrBk_LFX
-        # 配对依据 = XearAudioCenter_x64.exe 字符串表里控件名与参数名**紧邻**：
-        #   …WooferCenterSwap | Enable_SwapLfeCn_LFX | SideBackSwap | Enable_SwapSrBk_LFX…
-        # 控件名与参数名互不相干，紧邻是二者配对唯一的硬证据（第 46 轮定的方法）。
-        # ★ 同一页里还有 ChannelCopy 与 3 根 SpeakerDelay 滑杆，但那两块**整块被注释掉**
-        #   （AreaTimeDelay 还带 Visibility="Hidden"）⟹ 官方没做界面，按项目规则不移植。
-        #   「可写」不等于「该移植」：三项延迟实测全部可写，证据与取舍见
-        #   内部取证报告。
-        # ★ 为什么不给声道配置加「会中断播放」确认框：旧结论「改声道会重初始化端点、
-        #   打断在播流」第 50 轮已证伪 —— 当年 stream_kill.py 把 Enable_SS_LFX=0 与
-        #   Speaker_Channel_Setting=2 捆在同一次写入（归因混淆），逐项单测后真凶是
-        #   XearSurround71Control。实测 2→8→6→2 全程在播流不断、端点混音格式恒 8 声道。
-        "Speaker_Channel_Setting": "int",      # 声道配置 2/4/6/8
-        "Enable_SwapLfeCn_LFX": "bool",        # 中置 / 重低音声道互换
-        "Enable_SwapSrBk_LFX": "bool",         # 侧置 / 后置声道互换
-    },
-    EP_CAPTURE: {
-        "VolumeControl": "float",           # 麦克风音量（dB）
-        "VolumeScalarControl": "float",     # 麦克风标量音量
-        "MuteControl": "bool",              # 麦克风静音
-        "Enable_NOISEREDUCTION_LFX": "bool",  # 环境降噪
-        "NoiseReduction_Level": "int",      # 降噪强度 8..20
-        "Enable_MAGICVOICE": "bool",        # 魔音变声
-        "MagicVoice_Selection": "int",      # 魔音类型 0..3
-        "Enable_MICECHO": "bool",           # 麦克风回音
-        "MICECHO_Level": "int",             # 回音电平 -12..+12
-        "AGCControl": "bool",               # Microphone Boost
-        "AAVolumeControl": "float",         # 模拟功放音量 -23..+8
-        "DevSampleRateControl": "int",      # 采集采样率（44100/48000）
-        # ---- 第 62 轮 · 麦克风专项三开关（官方 MenuMicIn 菜单实有页）----
-        # 绑定证据：cml 控件 BtnEnableAEC/BtnEnableENC/BtnEnableBeamForming +
-        # exe 串表 MicInAECHandler/MicInENCHandler 同簇；参数名唯一对应；
-        # port_probe 实测 capture 端点「写→读回」全通（ret0=2 是从未写过）。
-        # ★ 同族的 MICARRAY_BEAMWIDTH / ENC_SELFCALIB / RecordingPreviewControl
-        #   在官方 exe 里 0 引用 ⟹ 官方没给控件，不做（红线）。
-        "Enable_AEC_LFX": "bool",           # 回音消除（apoMicInAEC）
-        "Enable_ENC_LFX": "bool",           # 通话降噪（apoMicInENC）
-        "Enable_MICARRAY_LFX": "bool",      # 麦克风收音（apoMicInBeamForming，原定名「指向性麦克风」）
-    },
-}
-for _i in range(1, 11):
-    WRITABLE[EP_RENDER]["EQ_Slider%d" % _i] = "int"
+# ★ S3 起真源 = model/device-model.toml [[writable]]（80 条显式展开，
+# 含 SS×16 / EQ×10 / 声道×2；kind 值域离散全在数据里，装载时自校验）。
+# 历史逐条证据注释（A-E 档移植、第 48/50/62 轮更正等）随数据走。
+WRITABLE = {ep: {} for ep in ENDPOINTS}
+for _w in _MODEL["writable"]:
+    WRITABLE[_w["ep"]][_w["name"]] = _w["t"]
+
+# --------------------------------------------------------------------
+# 场景排除名单（2026-10-22，与 Go 侧 profile.go 的 sceneExclude / sceneUnproven
+# 逐项同值；闸 scene_parity_gate.py 会反查两线的项数是否一致）
+#
+# 口径：「存为新场景」与「应用场景」共用同一份判定 —— 排除项既不写进 .profile，
+#   应用旧档时也跳过不写。Go 侧 2026-10-19 就有这套名单，Python 一直只有
+#   `"#" in pname` 一层，实测同一个「存为新场景」：Go 37 项 / Python 64 项。
+# ★ DevSampleRateControl 最要命：写它会触发 USB 重协商 → 端点重建 →
+#   采集端会话值全清，正是「应用场景后麦克风页整体不同步」的根因。
+#   Go 修了，Python 一直没修。
+# --------------------------------------------------------------------
+# ★ S1 起真源 = iKF-Audio-Center-Wails/model/device-model.toml [scene].exclude
+SCENE_EXCLUDE = _MODEL["exclude"]
+# ★ S1 起真源 = 同上 [scene].unproven
+SCENE_UNPROVEN = _MODEL["unproven"]
+
+
+def excluded_from_scene(name):
+    """场景排除判定（唯一入口）。带 # 声道后缀的（VolumeScalarControl#0）同样挡。"""
+    return "#" in name or name in SCENE_EXCLUDE or name in SCENE_UNPROVEN
+
+
+def scene_excluded_count():
+    """排除名单规模（自检用）：设备级 6 + APO 未实现 35。"""
+    return len(SCENE_EXCLUDE), len(SCENE_UNPROVEN)
 
 
 def writable_count():
@@ -333,70 +326,15 @@ _SLOW_CONST = frozenset(("GetDirectXVer",))
 #                           的读写接口（osConfLib 反编译确认），故按 0/1 布尔处理
 # 取值范围与端点无关，故仍按属性名统一登记。
 # --------------------------------------------------------------------
-RANGES = {
-    "VOCALCANCEL_LEVEL": (0, 100),
-    "KEYSHIFT_LEVEL": (-4, 4),
-    "RFX_ENVIRONMENT": (0, 27),
-    "RFX_ROOMSIZE": (0, 2),
-    "GFSControl": (0, 1),
-    "VolumeScalarControl": (0.0, 1.0),
-    "NoiseReduction_Level": (8, 20),
-    "MagicVoice_Selection": (0, 3),
-    "MICECHO_Level": (-12, 12),
-    "AAVolumeControl": (-23.0, 8.0),
-    # A 档 Xear 音效族（第 46 轮）
-    "AUDIOBRILLIANT_LEVEL": (0, 6),
-    "BM_Slider_BassLevel": (0, 10),
-    "BM_Slider_Frequency": (100, 400),
-    "VOICECLARITY_LEVEL": (0, 6),
-    "VOICECLARITY_NOISESUPP_LEVEL": (0, 20),
-    # B 档 Xear 环绕族（第 47 轮）：档位取自官方 .cml 的 RadioButton Tag
-    "CONLAB_HPSPK_MODE": (0, 1),
-    "CONLAB_HPSPK_ROOMSIZE": (0, 2),
-    # Xear Surround Speaker 页的滑杆 Min/Max
-    "CONLAB_HPSPK_SFX": (0, 3),
-    "CONLAB_HPSPK_SPKANGLE": (5, 30),
-    # C 档 Dolby Headphone / Virtual Speaker（第 48 轮）：
-    #   DHDVS_USEDH 二选一（VS / HP）· DVS_Mode 二档 · DH_Mode 三档。
-    #   档位数是**数 .cml 里 RadioButton 的个数**定的（VS 组 2 个、HP 组 3 个），
-    #   数值顺序按声明顺序推 —— 与 SFX/SPKANGLE 同属「顺序推断」证据。
-    "DHDVS_USEDH": (0, 1),
-    "DVS_Mode": (0, 1),
-    "DH_Mode": (0, 2),
-}
-for _i in range(1, 11):
-    RANGES["EQ_Slider%d" % _i] = (-20, 20)
+# ★ S3 起真源 = TOML [[writable]] 的 lo/hi（缺省 = 不钳制）。
+RANGES = {}
+for _w in _MODEL["writable"]:
+    if "lo" in _w:
+        rng = (_w["lo"], _w["hi"])
+        if _w["name"] in RANGES:
+            assert RANGES[_w["name"]] == rng, "值域跨端点不一致: " + _w["name"]
+        RANGES[_w["name"]] = rng
 
-# 音箱方位 / 距离（Xear Surround Speaker 一族的 SS_*_ANGLE / SS_*_DIST）。
-#
-# ★ 实测更正（2026-10-14）：这 16 项此前被判「本机不支持」，那是**只读探测**
-#   得出的错误结论。实际是「写后即可读」：没写过时读返回 2（存在但无值），
-#   写一次就变成可读（ret=0）且跨进程持久；驱动不做值域校验，负数照收
-#   （实测写 SS_LF_ANGLE=-32 读回 -32，写 SS_C_ANGLE=200 也读回 200）。
-#   所以界面上的「拖动音箱」必须真写，不能替硬件下「不支持」的结论。
-#
-# 值域：角度按几何意义收在 ±180；距离的单位未从驱动侧确认，**不收口**，
-#   由驱动自己决定（RANGES 里没有条目 = 不钳制）。
-#
-# ★★ 第 49 轮（D 档 7.1 虚拟音箱摆位）补齐的另一半证据：
-#   官方页 apoSpeakerVirtual.cml 的控件是 开关 + 4 个模式单选钮 + Reset +
-#   8 个可拖拽音箱 + 8 根**只读** dB 条 —— **没有角度/距离滑杆**，
-#   角度距离全靠拖动图标改。这 16 项就是那张页唯一的可写落点。
-#   ① 官方默认值（官方安装态 --dump 快照，界面 base 逐值照抄）：
-#        LF=-32 · C=0 · RF=32 · RS=90 · RB=148 · LB=-148 · LS=-90 · LFE=180 · 距离全 0
-#   ② 驱动**不钳位**（第 49 轮实测）：写 SS_C_ANGLE / SS_LF_DIST = ±999、±360
-#      一律原样回读。所以上面 ±180 是**符号约定的规范化区间**（官方默认集恰好
-#      横跨它，LFE=180 正落在边界），不是驱动给的上下限；距离则连规范区间也不给。
-#   ③ ★ 官方页那 4 个模式（顺时钟环绕 / 逆时钟环绕 / 手动旋转 / 手动平移）
-#      **不是驱动属性** —— __Manual / __Clockwise / __CounterClockwise /
-#      __WiseArround 原始读取 ret=-1（属性名未登记）；同块的
-#      SpeakerShifterControl 虽是真属性（ret=0）但载荷恒为全 0，
-#      写 0…6 这 8 个角度一个都不动。⟹ 它们是纯界面动作，
-#      **绝不能登记进白名单**：登记了就等于假装驱动有它（第 46 轮 GFSControl 同类错误）。
-for _sp in ("C", "LF", "RF", "LS", "RS", "LB", "RB", "LFE"):
-    WRITABLE[EP_RENDER]["SS_%s_ANGLE" % _sp] = "int"
-    WRITABLE[EP_RENDER]["SS_%s_DIST" % _sp] = "int"
-    RANGES["SS_%s_ANGLE" % _sp] = (-180, 180)
 
 # --------------------------------------------------------------------
 # ★★ 第 52 轮（H 档）：**逐声道音量** —— 名字里带 "#<声道索引>" 的虚拟参数
@@ -418,13 +356,11 @@ for _sp in ("C", "LF", "RF", "LS", "RS", "LB", "RB", "LFE"):
 #   所以 profile_save 显式跳过含 "#" 的名字；_group_of 先剥后缀再查分组表。
 # ★ 也**不进 `ALL_NAMES`**（那是 208 项真实属性的名单），只在 param_map()
 #   里额外补出来，于是「参数」页不会多出两个假参数行。
-CHANNEL_PARAMS = {
-    "VolumeScalarControl#0": 0,   # FrontLeft
-    "VolumeScalarControl#1": 1,   # FrontRight
-}
-for _cn in CHANNEL_PARAMS:
-    WRITABLE[EP_RENDER][_cn] = "float"
-    RANGES[_cn] = (0.0, 1.0)
+# ★ S3 起真源 = TOML [[writable]] 里带 # 的虚拟参数（名字内 #<声道索引>）。
+CHANNEL_PARAMS = {}
+for _w in _MODEL["writable"]:
+    if "#" in _w["name"]:
+        CHANNEL_PARAMS[_w["name"]] = int(_w["name"].rpartition("#")[2])
 
 
 def _split_channel(name):
@@ -446,10 +382,15 @@ def _split_channel(name):
 # ★ 第 50 轮（E 档）Speaker_Channel_Setting：官方 .cml 只给了 4 个 RadioButton，
 #   Tag 分别是 2 / 4 / 6 / 8（= 声道数本身，不是档位下标）。实测这 4 个值
 #   写→读回全部原样（wret=0 / ret=0），其它值没有官方依据，一律挡在应用层。
-CHOICES = {
-    "DevSampleRateControl": (44100, 48000),
-    "Speaker_Channel_Setting": (2, 4, 6, 8),
-}
+# ★ S3 起真源 = TOML [[writable]] 的 choices（驱动对非法值返回 0x10003，
+# 先在应用层收口；同名字跨端点必须同值，装载时断言）。
+CHOICES = {}
+for _w in _MODEL["writable"]:
+    if _w.get("choices"):
+        ch = tuple(_w["choices"])
+        if _w["name"] in CHOICES:
+            assert CHOICES[_w["name"]] == ch, "离散取值跨端点不一致: " + _w["name"]
+        CHOICES[_w["name"]] = ch
 
 # 魔音类型：取自原面板 apoMicInXearMagicVoice.cml 的 RadioButton 文案
 MAGIC_VOICES = ["怪兽", "卡通", "男人", "女人"]
@@ -478,7 +419,7 @@ TEST_CHANNELS = [
 TEST_WAV = dict((c[1], c[3]) for c in TEST_CHANNELS)
 
 # 环境类型。索引语义由 CMEffectAPO_108B.dll 反编译 + 原面板 apoSpeakerEM.cml
-# 的 RadioButton Tag 双重确认（详见 tools/build_center.py 的 ENV_FALLBACK 注释）：
+# 的 RadioButton Tag 双重确认（详见 工具/build_center.py 的 ENV_FALLBACK 注释）：
 #   0 = 预设（原厂默认，面板下拉里被注释掉的那一项）
 #   1..23 = 一般环境 … 水底（EAX 标准序，APO 调试 switch 逐项吻合）
 #   24..27 = 迷幻 / 晕眩 / 疯狂 / KTV（取自原面板下拉定义，顺序存疑）
@@ -703,6 +644,8 @@ class Driver(object):
         self.ctx = None
         self.cpl = None
         self.dll = None
+        # close() 缓存下来的已加载句柄 —— 重连复用它，绝不 FreeLibrary
+        self._lib_cached = None
         self.error = None
         self._keep = None
         # 采集端点（麦克风）。拿不到不算失败 —— 有些机型只有渲染端点。
@@ -749,11 +692,39 @@ class Driver(object):
     def close(self):
         if self.lib is not None:
             try:
-                self._call(lambda: self.lib.ConfLibUnInit())
+                # 线程已经退出时再投递就是永久阻塞 —— 二次 close 必须先看它活着
+                if self._worker is not None and self._worker.is_alive():
+                    self._call(lambda: self.lib.ConfLibUnInit())
             except Exception:
                 pass
+            # ★ 2026-10-21：**不释放 DLL**。ctypes 的 WinDLL 对象一被回收就
+            # FreeLibrary 真卸载 osConfLib.dll，而驱动内部状态/线程还指着它 ——
+            # 实测第一次 reopen 正常、第二次必崩（进程无声退出，HTTP 无响应）。
+            # Go 版 LazyDLL 本来就只 ConfLibUnInit、从不卸载，这里缓存句柄
+            # 与之逐项对齐，重连时复用同一份映射。
+            self._lib_cached = self.lib
             self.lib = None
+        # ★ 2026-10-21：上下文必须一起清。以前只清 lib，close→open 之后
+        # 若新设备枚举不出采集端点，cap_ctx 还留着上一轮的旧指针 —— 那是
+        # 已作废的设备上下文，再拿去 PropertyControl 就是悬垂指针。
+        # reopen 让这条路径变成常规路径（与 Go 版 driver.go Close 对齐）。
+        self.ctx = None
+        self.cap_ctx = None
+        self._keep = None
+        self._cap_keep = None
+        self.cap_count = 0
+        self.device_count = 0
+        # ★ 2026-10-22：常量缓存一起清（与 Go 版 Close 对齐）—— Close 之后
+        #   设备可能换了/驱动重装了，沿用上一轮 slowConst 读数没有意义。
+        self._const_cache = {}
         self._jobs.put(None)
+        # ★ 2026-10-21：必须等线程真的退出再返回。_ensure_worker 用
+        # is_alive() 判断，线程还在处理结束哨兵时它仍是 True —— 于是
+        # open() 不会重建线程，任务投进一个即将没人消费的队列，close→open
+        # 死死卡在 _call 上（实测 POST /api/driver/reopen 永不返回）。
+        w = self._worker
+        if w is not None and w.is_alive() and w is not threading.current_thread():
+            w.join(timeout=3)
 
     # ---------------- 端点 ----------------
     def ctx_of(self, ep):
@@ -769,6 +740,38 @@ class Driver(object):
     def open(self):
         self._ensure_worker()
         return self._call(self._open_impl)
+
+    def reopen(self):
+        """松开旧上下文再重新枚举，带退避重试（与 Go 版 Driver.Reopen 对齐）。
+
+        ★ 2026-10-22（用户虚拟机实测）：装完驱动再点「重新检测」，出现的是
+        「麦克风 + 自定义场景」不可用、其余正常，而且**退出重开就好**。
+        端点重建不是原子的 —— 渲染端点先就绪、采集端点（麦克风）后到，
+        _open_impl 一次返回的话渲染侧全通、采集侧全 -9，界面就是"一半能用"。
+
+        ★ 判据不能用「上一轮有没有采集端点」：启动时驱动根本没装，上一轮
+        必然没有，判据恒不成立 —— 第一次修就栽在这里（一次都没重试）。
+        现在只认「本轮连上了但采集端点缺失」，重试到拿到为止
+        （400 / 800 / 1600 / 1600ms，合计约 4.4 秒）。
+        """
+        ok = False
+        for i in range(5):
+            if i:
+                time.sleep(min(0.4 * (1 << (i - 1)), 1.6))
+            self.close()
+            ok = self.open()
+            if not ok:
+                # 完全没连上（驱动没装/端点整个没起来）：只再给一次机会
+                # （400ms）。等满 5 轮 = 4.4 秒，用户点一下「重新检测」
+                # 干等 4 秒才被告知没驱动，这个体验不能要。
+                if i >= 1:
+                    return False
+                continue
+            # 采集端点还没起来 → 端点重建没结束，这里才值得多等几轮
+            if self.cap_ctx is None and i < 4:
+                continue
+            return True
+        return ok
 
     def _ensure_worker(self):
         """close() 之后重连前，先把工作线程拉回来。
@@ -813,7 +816,13 @@ class Driver(object):
             except (OSError, AttributeError):
                 pass
             try:
-                lib = ctypes.WinDLL(dll)
+                # ★ 2026-10-21：同一份 DLL 走缓存句柄，别重新 WinDLL ——
+                # 重复加载再加一次引用计数没意义，而释放又会真卸载（见 close）。
+                if (self._lib_cached is not None and self.dll and
+                        os.path.normcase(dll) == os.path.normcase(self.dll)):
+                    lib = self._lib_cached
+                else:
+                    lib = ctypes.WinDLL(dll)
             except OSError:
                 continue
             try:
@@ -824,10 +833,14 @@ class Driver(object):
                 count = ctypes.c_int(0)
                 lib.GetDeviceCount(0, ctypes.byref(count))
                 if count.value <= 0:
+                    # ★ 2026-10-22：Init 成功就配对撤销（与 Go 版 openLocked 对齐）。
+                    #   启动重试 4 次若都不配对，会留下 4 次净 Init。
+                    lib.ConfLibUnInit()
                     continue
                 dev = ctypes.create_string_buffer(32)
                 if lib.GetDeviceById(0, 0,
                                      ctypes.cast(dev, ctypes.c_void_p)) != 0:
+                    lib.ConfLibUnInit()
                     continue
                 # 采集端点（type=1）。失败不影响整体连接。
                 cdev = ctypes.create_string_buffer(32)
@@ -849,6 +862,7 @@ class Driver(object):
             self.cpl = cpl
             self.dll = dll
             self.device_count = count.value
+            self.error = None  # 重连成功要把上一轮的失败原因擦掉
             self._warm_up()
             return True
 
@@ -902,7 +916,7 @@ class Driver(object):
             ctypes.c_void_p, ctypes.c_wchar_p,
             ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p, ctypes.c_int]
         # ---- 函数型导出：原面板用它们做声道测试与麦克风监听，早期实现漏掉了
-        # 签名由 osConfLib.dll 反编译还原（见内部取证报告）：
+        # 签名由 osConfLib.dll 反编译还原（见 工具/原面板功能移植对照表.md §四）：
         #   PlayTestSound(wavPath, mode, pInfo)  —— **三个参数**：
         #     [1] wavPath : LPWSTR，测试音 WAV 的路径（第 28 轮改正，
         #                   以前按「设备指针」传，导致恒返 0x10001）
@@ -973,8 +987,8 @@ class Driver(object):
         return self._call(job)
 
     def read(self, name, ep=EP_RENDER):
-        """返回 (ret, 字符串值)。ret=0 成功，2 本机不支持，-1 未找到，
-        -2 调用异常（该属性需要特殊 pValue 结构）。"""
+        """返回 (ret, 字符串值)。ret=0 成功，2 存在但从未写过（不是不支持），
+        -1 未找到，-2 调用异常（该属性需要特殊 pValue 结构）。"""
         if self.lib is None or self.ctx_of(ep) is None:
             return -9, ""
         if name in _SLOW_CONST:
@@ -1319,11 +1333,11 @@ class Driver(object):
             if self.ctx_of(ep) is None:
                 continue
             for pname in sorted(WRITABLE.get(ep, {})):
-                # ★ 第 52 轮：`VolumeScalarControl#0/#1` 这类**带声道后缀的
-                # 虚拟参数不是驱动属性名**，写进 .profile 官方面板读不懂、
-                # 我们自己的 apply 也会失败 ⟹ 组态里一律不收。
-                # （官方 FactoryDefault.xml 里也没有逐声道音量。）
-                if "#" in pname:
+                # ★ 2026-10-22：口径收敛到 excluded_from_scene —— 不再只是挡
+                # 「带声道后缀的虚拟参数」，而是设备级（音量/静音/采样率/声道拓扑）
+                # 与 APO 未实现族一并排除。Go 侧 2026-10-19 起就走这条判定，
+                # Python 此前只剩 `"#" in pname`，实测同一动作 37 vs 64 项。
+                if excluded_from_scene(pname):
                     continue
                 kind = WRITABLE[ep][pname]
                 ret, val = self.read(pname, ep)
@@ -1371,6 +1385,8 @@ class Driver(object):
         applied = failed = skipped = 0
         detail = []
         done = set()
+        ops = []          # (ep, pname, v, kind, unknown, is_switch)
+        factory_cmd_failed = False
         for ep_name, flow, _fx, pname, val, vtype in items:
             ep = EP_CAPTURE if flow.lower() == "in" else EP_RENDER
             if not pname:
@@ -1381,6 +1397,11 @@ class Driver(object):
             if (ep, pname) in done:
                 continue
             done.add((ep, pname))
+            # 兜底：旧档（排除名单出现前保存的）里混进的音量/采样率/拓扑项不写 ——
+            # 音量被系统通路回滚造成读数不一致，采样率触发端点重建清空会话值。
+            if excluded_from_scene(pname):
+                skipped += 1
+                continue
             kind = WRITABLE.get(ep, {}).get(pname)
             unknown = kind is None
             if unknown:
@@ -1393,19 +1414,37 @@ class Driver(object):
                 detail.append({"name": pname, "ep": ep, "ret": -1,
                                "error": "值不合法：%s" % val})
                 continue
-            if unknown:
-                res = self.write_raw(pname, v, ep, kind)
-            else:
-                res = self.write(pname, v, ep)
-            if res.get("ok"):
-                applied += 1
-            else:
-                failed += 1
-                detail.append({"name": pname, "ep": ep,
-                               "ret": res.get("ret"), "error": res.get("error")})
-        return {"ok": failed == 0, "ret": 0 if failed == 0 else -3,
-                "name": name, "applied": applied, "failed": failed,
-                "skipped": skipped, "detail": detail[:12]}
+            # 两轮写入只对**登记过的布尔开关**讲：白名单外的项不知道语义，不猜。
+            ops.append((ep, pname, v, kind, unknown,
+                        (not unknown) and kind == "bool"))
+
+        # ★ 两轮写入（与 Go 侧 ProfileApply 同序）：驱动的语义是**效果开关先开，
+        #   级别/滑杆参数才收写入**（真机探针：Enable_ 关闭时写 LEVEL 一律失败）。
+        #   所以第一轮写全部布尔开关，第二轮写其余参数。
+        for want_switch in (True, False):
+            for ep, pname, v, kind, unknown, is_switch in ops:
+                if is_switch != want_switch:
+                    continue
+                if unknown:
+                    res = self.write_raw(pname, v, ep, kind)
+                else:
+                    res = self.write(pname, v, ep)
+                if res.get("ok"):
+                    applied += 1
+                else:
+                    failed += 1
+                    err = res.get("error")
+                    if pname == "DefaultDeviceControl":
+                        factory_cmd_failed = True
+                        err = "当前耳机不支持一键恢复出厂设置"
+                    detail.append({"name": pname, "ep": ep,
+                                   "ret": res.get("ret"), "error": err})
+        out = {"ok": failed == 0, "ret": 0 if failed == 0 else -3,
+               "name": name, "applied": applied, "failed": failed,
+               "skipped": skipped, "detail": detail[:12]}
+        if factory_cmd_failed and applied == 0:
+            out["error"] = "当前耳机不支持一键恢复出厂设置，该场景无法应用"
+        return out
 
     def profile_delete(self, name):
         """删除用户自建组态。驱动自带的档拒绝删除。"""
@@ -1722,20 +1761,17 @@ class Driver(object):
 # 读取时两处都扫，驱动自带的内置档照常列出。
 # --------------------------------------------------------------------
 
-PROFILE_FACTORY = "预设"          # 对应 FactoryDefault.xml
+PROFILE_FACTORY = _MODEL["factory_profile"]   # 对应 FactoryDefault.xml（S1 起真源=TOML）
 # 自建出厂基线场景名（2026-10-20 用户拍板由「原厂默认」改名「默认」）。
-# 与 Go 侧 profile.go 的 profileFactoryScene 逐字对应 —— 场景墙第一张卡、
-# 一键还原基线。名字必须与 Go 侧 EnsureSeedScenes 播种的文件名一致。
-PROFILE_FACTORY_SCENE = "默认"
+# ★ S1 起真源 = TOML [scene].factory_scene；与 Go 侧 profileFactoryScene 逐字对应
+PROFILE_FACTORY_SCENE = _MODEL["factory_scene"]
 # 内置场景名单：源包自带 + Go 侧 EnsureSeedScenes 播种。
 # ★ builtin 判定按名字、不按目录（与 Go 侧 builtinScenes/builtinMark 逐项
 #   对应）：便携包下用户自建场景与内置档同住 CPL\profile，按目录一刀切
 #   会把用户场景也标成内置 —— 场景墙的可改可删判定、排序分层全部失真
-#   （Go 侧 2026-10-19 真机确认过同样的坑）。两边名单改动必须同步。
-BUILTIN_SCENES = {
-    PROFILE_FACTORY_SCENE, "游戏", "音乐", "电影",
-    "UserDefine", "UserDefineFormwork", "HiFi",
-}
+#   （Go 侧 2026-10-19 真机确认过同样的坑）。
+# ★ S1 起真源 = TOML [scene].builtin（7 项，含 HiFi）。
+BUILTIN_SCENES = _MODEL["builtin"]
 PROFILE_TEMPLATE = "UserDefineFormwork.cml"
 PROFILE_CURRENT = "UserDefine.cml"
 
@@ -1757,60 +1793,11 @@ PROFILE_CURRENT = "UserDefine.cml"
 # 与 Go 侧 iKF-Audio-Center-Wails/profile.go 的 factoryDefaults 逐项对应，
 # 改一边必须同步另一边。
 # --------------------------------------------------------------------
-FACTORY_DEFAULTS = [
-    # SpeakerEQ —— 均衡器（11 项）
-    (EP_RENDER, "Enable_EQ_GFX", "1"),
-    (EP_RENDER, "EQ_Slider1", "0"),
-    (EP_RENDER, "EQ_Slider2", "7"),
-    (EP_RENDER, "EQ_Slider3", "-1"),
-    (EP_RENDER, "EQ_Slider4", "-7"),
-    (EP_RENDER, "EQ_Slider5", "-12"),
-    (EP_RENDER, "EQ_Slider6", "-8"),
-    (EP_RENDER, "EQ_Slider7", "0"),
-    (EP_RENDER, "EQ_Slider8", "10"),
-    (EP_RENDER, "EQ_Slider9", "4"),
-    (EP_RENDER, "EQ_Slider10", "-5"),
-    # General —— Xear Surround 音箱方位（16 项）
-    (EP_RENDER, "SS_C_ANGLE", "0"),
-    (EP_RENDER, "SS_C_DIST", "0"),
-    (EP_RENDER, "SS_LF_ANGLE", "-32"),
-    (EP_RENDER, "SS_LF_DIST", "0"),
-    (EP_RENDER, "SS_RF_ANGLE", "32"),
-    (EP_RENDER, "SS_RF_DIST", "0"),
-    (EP_RENDER, "SS_LS_ANGLE", "-90"),
-    (EP_RENDER, "SS_LS_DIST", "0"),
-    (EP_RENDER, "SS_RS_ANGLE", "90"),
-    (EP_RENDER, "SS_RS_DIST", "0"),
-    (EP_RENDER, "SS_LB_ANGLE", "-148"),
-    (EP_RENDER, "SS_LB_DIST", "0"),
-    (EP_RENDER, "SS_RB_ANGLE", "148"),
-    (EP_RENDER, "SS_RB_DIST", "0"),
-    (EP_RENDER, "SS_LFE_ANGLE", "180"),
-    (EP_RENDER, "SS_LFE_DIST", "0"),
-    # XearSurroundSpeakers —— 虚拟环绕总开关（1 项）
-    (EP_RENDER, "Enable_SS_LFX", "0"),
-    # KeyShift —— 升降 Key（2 项）
-    (EP_RENDER, "Enable_KEYSHIFT_GFX", "0"),
-    (EP_RENDER, "KEYSHIFT_LEVEL", "0"),
-    # Karaoke —— 人声消除（2 项）
-    (EP_RENDER, "Enable_VOCALCANCEL_GFX", "0"),
-    (EP_RENDER, "VOCALCANCEL_LEVEL", "50"),
-    # Environment —— 环境音效（3 项）
-    (EP_RENDER, "Enable_RFX_GFX", "0"),
-    (EP_RENDER, "RFX_ENVIRONMENT", "7"),
-    (EP_RENDER, "RFX_ROOMSIZE", "0"),
-    # ChannelCopy —— 声道复制（1 项）
-    (EP_RENDER, "Enable_Channel_COPY_LFX", "0"),
-    # 采集端点（麦克风）—— 6 项
-    # 官方卸载后同样退回 ret=2，界面把麦克风页的降噪 / 魔音 / 回音
-    # 三个开关及两个滑杆一并灰掉。值取自官方在位时的采集端快照。
-    (EP_CAPTURE, "Enable_NOISEREDUCTION_LFX", "0"),
-    (EP_CAPTURE, "NoiseReduction_Level", "14"),
-    (EP_CAPTURE, "Enable_MAGICVOICE", "0"),
-    (EP_CAPTURE, "MagicVoice_Selection", "1"),
-    (EP_CAPTURE, "Enable_MICECHO", "0"),
-    (EP_CAPTURE, "MICECHO_Level", "0"),
-]
+# ★ S2 起真源 = model/device-model.toml [[factory]]（42 项，装载时自校验）。
+# 历史真值注释随数据走：EQ 全 0 = 官方预设索引 11（反编译）、
+# RFX_ENVIRONMENT=0 = 官方预设口径（驱动原始出厂是 7，用户拍板按预设）。
+FACTORY_DEFAULTS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[2])
+                    for kv in _MODEL["factory"]]
 
 # 属性 → 官方 ApoEffect 分组名（写进 .profile 的 <ApoEffect Name>，
 # 便于与官方面板的导出文件互相阅读）
@@ -1840,96 +1827,20 @@ FACTORY_DEFAULTS = [
 #     · `GFSControl` —— 设备控制（HKCU\SOFTWARE\C-Media\Hook\EnableGFS，
 #        第 46 轮取证），任何 .cml 里都没有它；
 #     · `MicEcho` —— 旧面板 `CDlgMicEcho` 对话框，官方新面板没有这张页。
-PROFILE_GROUPS = {
-    EP_RENDER: {
-        # —— apoSpeakerVol / apoSpeakerEQ / apoSpeakerEM ——
-        "MuteControl": "SpeakerVolume", "VolumeControl": "SpeakerVolume",
-        "VolumeScalarControl": "SpeakerVolume",
-        "Enable_EQ_GFX": "SpeakerEQ", "EQ_Slider": "SpeakerEQ",
-        "Enable_RFX_GFX": "SpeakerEM", "RFX_ENVIRONMENT": "SpeakerEM",
-        "RFX_ROOMSIZE": "SpeakerEM",
-        # —— apoSpeakerKaraoke（人声消除 + 升降调住同一页）——
-        "Enable_VOCALCANCEL_GFX": "SpeakerKaraoke",
-        "VOCALCANCEL_LEVEL": "SpeakerKaraoke",
-        "Enable_KEYSHIFT_GFX": "SpeakerKaraoke",
-        "KEYSHIFT_LEVEL": "SpeakerKaraoke",
-        # —— apoSpeakerSamplingRate / apoSpeakerSetting（声道复制也在这张页上）——
-        "DevSampleRateControl": "SpeakerSamplingRate",
-        "Enable_Channel_COPY_LFX": "SpeakerSetting",
-        # —— 设备控制，无页面 ——
-        "GFSControl": "GFS",
-        # —— A 档（第 46 轮）——
-        "Enable_AUDIOBRILLIANT_LFX": "SpeakerXearAudioBrilliant",
-        "AUDIOBRILLIANT_LEVEL": "SpeakerXearAudioBrilliant",
-        "Enable_BM_GFX": "SpeakerXearDynamicBass",
-        "BM_Slider_BassLevel": "SpeakerXearDynamicBass",
-        "BM_Slider_Frequency": "SpeakerXearDynamicBass",
-        "Enable_SMART_VOLUME_GFX": "SpeakerXearSmartVolume",
-        "Enable_VOICECLARITY_LFX": "SpeakerXearVoiceClarity",
-        "VOICECLARITY_LEVEL": "SpeakerXearVoiceClarity",
-        "VOICECLARITY_NOISESUPP_LEVEL": "SpeakerXearVoiceClarity",
-        # —— B 档（第 47 轮）——
-        "Enable_CONLAB_HPSPK_LFX": "SpeakerXearSurroundHeadPhone",
-        "CONLAB_HPSPK_MODE": "SpeakerXearSurroundHeadPhone",
-        "CONLAB_HPSPK_ROOMSIZE": "SpeakerXearSurroundHeadPhone",
-        "CONLAB_HPSPK_SFX": "SpeakerXearSurroundSpeakers",
-        "CONLAB_HPSPK_SPKANGLE": "SpeakerXearSurroundSpeakers",
-        "Enable_SURRSENS_LFX": "SpeakerSurroundMax",
-        # —— C 档（第 48 轮）——
-        "Enable_DHDVS_LFX": "SpeakerDolbyHPVS",
-        "DHDVS_USEDH": "SpeakerDolbyHPVS",
-        "DVS_Mode": "SpeakerDolbyHPVS",
-        "DH_Mode": "SpeakerDolbyHPVS",
-        # —— D 档（第 49 轮）—— 7.1 虚拟环绕；同页的 8 组
-        #    SS_*_ANGLE / SS_*_DIST 走 _group_of 的前缀规则，也落这一组
-        "Enable_SS_LFX": "SpeakerVirtual",
-        # —— E 档（第 50 轮）—— apoSpeakerSetting
-        "Speaker_Channel_Setting": "SpeakerSetting",
-        "Enable_SwapLfeCn_LFX": "SpeakerSetting",
-        "Enable_SwapSrBk_LFX": "SpeakerSetting",
-    },
-    EP_CAPTURE: {
-        "VolumeControl": "MicInVolume", "VolumeScalarControl": "MicInVolume",
-        "MuteControl": "MicInVolume",
-        # AA（模拟功放）的 AABalance / AALeft / AARight 就在 apoMicInVol.cml 上
-        "AAVolumeControl": "MicInVolume",
-        "Enable_NOISEREDUCTION_LFX": "MicInNoiseReduction",
-        "NoiseReduction_Level": "MicInNoiseReduction",
-        "Enable_MAGICVOICE": "MicInXearMagicVoice",
-        "MagicVoice_Selection": "MicInXearMagicVoice",
-        "AGCControl": "MicInAGC",
-        "DevSampleRateControl": "MicInSamplingRate",
-        # —— 无官方页，保留旧名 ——
-        "Enable_MICECHO": "MicEcho", "MICECHO_Level": "MicEcho",
-        # 第 62 轮 · 麦克风专项三开关（组名 = 官方 Canvas 名，场景存档分组用）
-        "Enable_AEC_LFX": "MicInAEC",
-        "Enable_ENC_LFX": "MicInENC",
-        "Enable_MICARRAY_LFX": "MicInBeamForming",
-    },
-}
+# ★ S4 起真源 = TOML [profile_groups]（53 条含 EQ_Slider 前缀键）。
+# 组名出处/前缀规则/合并页口径见 TOML 注释；SS_* 前缀规则在 _group_of。
+PROFILE_GROUPS = {ep: dict(tbl) for ep, tbl in _MODEL["profile_groups"].items()}
 
 # 旧版工具写出过的分组名 → 归一到现在的 Canvas 名。
 # **只用于读**：用户已经存下来的场景不该因为这次改名而在详情里显示成「其他」。
-_GROUP_ALIAS = {
-    "Volume": "SpeakerVolume",
-    "Environment": "SpeakerEM",
-    "Karaoke": "SpeakerKaraoke",
-    "KeyShift": "SpeakerKaraoke",
-    "SamplingRate": "SpeakerSamplingRate",
-    "ChannelCopy": "SpeakerSetting",
-    "XearSurroundSpeakers": "SpeakerVirtual",
-    "NoiseReduction": "MicInNoiseReduction",
-    "XearMagicVoice": "MicInXearMagicVoice",
-    "AAVolume": "MicInVolume",
-}
+# ★ S1 起真源 = TOML [group_alias]（10 条，装载时自校验）。
+_GROUP_ALIAS = _MODEL["alias"]
 
 # 端点 → 官方 Endpoint 名 / DataFlow
-PROFILE_ENDPOINT = {EP_RENDER: ("Speakers", "Out"),
-                    EP_CAPTURE: ("Mic", "In")}
+# ★ S4 起真源 = TOML [profile_endpoint] / [profile_value_type]。
+PROFILE_ENDPOINT = {ep: (v[0], v[1]) for ep, v in _MODEL["profile_endpoint"].items()}
+PROFILE_VALUE_TYPE = dict(_MODEL["profile_value_type"])
 
-# 数值类型 → ValueType 文本（官方用 .NET 类型名）
-PROFILE_VALUE_TYPE = {"bool": "System.UInt32", "int": "System.Int32",
-                      "float": "System.Single"}
 
 
 def _appdata_profile_dir():
@@ -1984,18 +1895,14 @@ def heal_missing(drv):
     """
     if drv is None or drv.lib is None:
         return 0
-    healed = 0
-    for ep, name, val in FACTORY_DEFAULTS:
-        ret, _ = drv.read(name, ep)
-        if ret != 2:
-            continue
-        kind = WRITABLE.get(ep, {}).get(name) or "int"
-        try:
-            if drv.write_auto(name, val, ep, kind).get("ok"):
-                healed += 1
-        except Exception:
-            continue          # 单项失败不打断整轮 —— 自愈是尽力而为
-    return healed
+    # ★ 2026-10-22 第二版：补的范围从「出厂表 42 项」扩到**初始化清单**
+    #   （55 项 = 出厂表 ∪ 「默认」档 ∪ 设备级）。以前那 12 项采集/新参数
+    #   只能靠 _apply_scene_extras 补第二次，两套遍历各写各的；现在同一个
+    #   执行器，strong=False 就是「只补 ret==2」，有值一个字不动。
+    #   设备级（拓扑）由 ensure_channel_topology 负责，这里跳过。
+    applied, _failed, _skipped = apply_init_manifest(
+        drv, build_init_manifest(drv), strong=False)
+    return applied
 
 
 # ---------------- 驱动重置后自动回到「默认」场景（2026-10-20 用户拍板） ----------------
@@ -2028,21 +1935,147 @@ def restore_default_scene(drv, force=False):
     if not force and missing < LAST_APPLIED_RESET_THRESHOLD:
         return False, ("设备参数在位（出厂默认表缺省仅 %d/%d 项），无需恢复"
                        % (missing, len(FACTORY_DEFAULTS)))
-    applied = failed = 0
+    # ★ 2026-10-22 第二版：执行体不再「遍历出厂表 + 补一次场景档」，
+    #   而是**按初始化清单**一次写完（见 build_init_manifest）。
+    #   清单 = 出厂表 42 ∪ 「默认」档 37 ∪ 设备级 1 = 55 项。
+    #   这里只做 param 项，拓扑交给 ensure_channel_topology —— 它才有
+    #   「写后回读 + 重试」的抗端点重建窗口能力。
+    #   strong=True：全量写，不看当前值（语义 = 自动应用「默认」场景）。
+    items = build_init_manifest(drv)
+    applied, failed, _skipped = apply_init_manifest(drv, items, strong=True)
+    n_param = len([x for x in items if x["scope"] == "param"])
+    if failed == 0:
+        return True, ("检测到参数被驱动重置（缺省 %d/%d 项），已按初始化清单恢复"
+                      "（写入 %d/%d 项）"
+                      % (missing, len(FACTORY_DEFAULTS), applied, n_param))
+    return True, ("按初始化清单恢复未完全成功（成功 %d / 失败 %d）"
+                  % (applied, failed))
+
+
+# ---------------- 初始化清单：初始化目标的唯一真相（2026-10-22） ----------------
+# 与 Go 侧 initmanifest.go 逐字段对应。为什么要有它：在这之前「初始化该写
+# 哪些项」散在五处（FACTORY_DEFAULTS 42 / 默认.profile 37 / _apply_scene_extras
+# 补 12 / ensure_channel_topology 1 / seed 三哨兵），每次修一个漏洞就冒一个
+# 新的。这里把并集算成一份可枚举的数据，链 / 核对命令 / 闸三方共用。
+#
+#   source  factory / scene / device —— 从哪来（排障时倒查）
+#   scope   param / device           —— 执行策略不同：
+#           param  安装级触发全量写，其它触发只补 ret==2（不覆盖用户调音）
+#           device 任何触发都校正（拓扑是硬件事实，不是用户偏好）
+# ★ S2 起真源 = TOML [[init_device]]（1 项，拓扑；scope=device 规则在解释器）。
+INIT_DEVICE_ITEMS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[2])
+                     for kv in _MODEL["init_device"]]
+
+
+def build_init_manifest(drv):
+    """汇总初始化目标 = 出厂表 ∪ 「默认」场景档 ∪ 设备级。
+
+    顺序固定（出厂 → 场景补差 → 设备级），去重靠 seen；同名以**出厂表为准**
+    （两者值逐项一致，10-22 实测 25 项交集零冲突，但出厂表是硬编码、不会
+    被场景文件被改而漂移）。场景档读不到就只给 42 + 设备级，不报错不编值。
+    """
+    out = []
+    seen = set()
+
+    def add(ep, name, val, source, scope):
+        if (ep, name) in seen:
+            return
+        seen.add((ep, name))
+        out.append({"ep": ep, "name": name, "val": str(val),
+                    "source": source, "scope": scope})
+
     for ep, name, val in FACTORY_DEFAULTS:
-        kind = WRITABLE.get(ep, {}).get(name) or "int"
+        add(ep, name, val, "factory", "param")
+
+    if drv is not None:
         try:
-            if drv.write_auto(name, val, ep, kind).get("ok"):
+            path, _d, _b = drv._profile_path(PROFILE_FACTORY_SCENE)
+        except Exception:
+            path = ""
+        items = []
+        if path and os.path.isfile(path):
+            try:
+                items = _profile_items(_read_text(path))
+            except Exception:
+                items = []          # 只读目录 / 半就绪：清单退化成出厂表
+        for _e, flow, _fx, name, val, _vt in items:
+            if not name or "#" in name:
+                continue            # 逐声道项不进场景档（与 profile_save 口径一致）
+            ep = EP_CAPTURE if str(flow).lower() == "in" else EP_RENDER
+            if WRITABLE.get(ep, {}).get(name) is None:
+                continue            # 本机能力面没这项，写了也是白写
+            add(ep, name, val, "scene", "param")
+
+    for ep, name, val in INIT_DEVICE_ITEMS:
+        add(ep, name, val, "device", "device")
+    return out
+
+
+def apply_init_manifest(drv, items=None, strong=False):
+    """按清单执行。返回 (成功, 失败, 跳过)。
+
+    strong=True  全量写（安装级触发 / 用户点默认）：不看当前值，一律写 ——
+                 这是「装完驱动就该是默认状态」的唯一可靠实现。
+    strong=False 只补 ret==2（普通启动）：有值一个字都不动，保护用户调音。
+
+    设备级项（scope=device）不在这里写，走 ensure_channel_topology。
+    """
+    if drv is None or drv.lib is None:
+        return 0, 0, 0
+    if items is None:
+        items = build_init_manifest(drv)
+    applied = failed = skipped = 0
+    for it in items:
+        if it["scope"] == "device":
+            continue
+        ep, name, val = it["ep"], it["name"], it["val"]
+        if not strong:
+            ret, _cur = drv.read(name, ep)
+            if ret != 2:
+                skipped += 1
+                continue        # 有值（0）或不存在（-1/-2）：都不是本次该改的
+        kind = WRITABLE.get(ep, {}).get(name)
+        try:
+            res = drv.write_auto(name, val, ep, kind)
+            if res.get("ok"):
                 applied += 1
             else:
                 failed += 1
         except Exception:
             failed += 1
-    if failed == 0:
-        return True, ("检测到参数被驱动重置（缺省 %d/%d 项），已自动恢复出厂默认参数"
-                      "（写入 %d 项）" % (missing, len(FACTORY_DEFAULTS), applied))
-    return True, ("尝试恢复出厂默认参数未完全成功（成功 %d / 失败 %d）"
-                  % (applied, failed))
+    return applied, failed, skipped
+
+
+def check_init_manifest(drv):
+    """逐项核对设备与清单（只读，绝不写）。返回 (统计 dict, 明细行)。
+
+    每项归四类：ok / missing（ret=2 从未写过）/ drift（有值但偏离目标）/
+    unsupported（ret<0 本机没这项能力，不算失败）。
+    """
+    r = {"total": 0, "ok": 0, "missing": 0, "drift": 0, "unsupported": 0}
+    lines = []
+    items = build_init_manifest(drv)
+    r["total"] = len(items)
+    for it in items:
+        ep, name, want = it["ep"], it["name"], it["val"]
+        ret, cur = drv.read(name, ep)
+        if ret == 0 and cur == "":
+            ret, cur = drv.read(name, ep)      # 已知读抖动，重读一次
+        if ret == 0 and str(cur) == want:
+            r["ok"] += 1
+            lines.append("  达标   %-7s %-32s %-8s %s" % (ep, name, want, it["source"]))
+        elif ret == 2:
+            r["missing"] += 1
+            lines.append("  未设置 %-7s %-32s %-8s %s（存在但从未写过）"
+                         % (ep, name, want, it["source"]))
+        elif ret == 0:
+            r["drift"] += 1
+            lines.append("  偏离   %-7s %-32s 目标 %-6s 当前 %s"
+                         % (ep, name, want, cur))
+        else:
+            r["unsupported"] += 1
+            lines.append("  不支持 %-7s %-32s ret=%d" % (ep, name, ret))
+    return r, lines
 
 
 def identify_active_scene(drv):
@@ -2077,6 +2110,15 @@ def identify_active_scene(drv):
             seen.add(stem)
             here.append(stem)
         names.extend(here)
+    # ★ 2026-10-22：多个场景内容相同时，识别必须先判「默认」。
+    # 当时 `音乐.profile` 与 `默认.profile` 逐项完全相同（默认就是古典乐曲线），
+    # sorted() 按 UTF-8 排「音」在「默」之前，识别一命中就返回「音乐」。
+    # ★ 同日改判：默认档 EQ 换成**官方预设 Default 的平直曲线**，音乐仍是
+    #   古典乐 ⟹ 两档不再同分，这里只是兜底（用户自己把某档调得跟默认一样时
+    #   仍然归到「默认」这个出厂态名字下）。与 Go 侧 profileNamesForIdentify 同口径。
+    if PROFILE_FACTORY_SCENE in names:
+        names.remove(PROFILE_FACTORY_SCENE)
+        names.insert(0, PROFILE_FACTORY_SCENE)
     for name in names:
         path, _, _ = drv._profile_path(name)
         if not path or not os.path.isfile(path):
@@ -2168,6 +2210,350 @@ def migrate_profile_groups(drv):
             files += 1
             tags += hit[0]
     return files, tags
+
+
+# ---------------- 安装指纹：分清「驱动被重装过」与「普通启动」（10-22） --------
+# 与 Go 侧 initfp.go 逐字段对应。
+#
+# 为什么要有它：前两轮把初始化收成了一份清单（INIT_DEVICE_ITEMS +
+# build_init_manifest）和一条链（ensure_initial_state），但「什么时候该全量写」
+# 一直是**启发式**：出厂表 42 项里缺省 >= 21 项才当成「驱动被重置」
+# （LAST_APPLIED_RESET_THRESHOLD）。启发式测的是「值在不在」，用户说的是
+# 「**驱动被重装过**」，两者不等价：驱动只装了一半（20/42 缺省）就不写；
+# 驱动升级后把旧值搬回来也不写。
+#
+# 判据（2026-10-22 用户拍板：端点 GUID + 驱动版本）：
+#   GetExtraInfo      -> {0.0.0.00000000}.{b2446ada-...}  渲染端点 ID
+#   GetExtraInfo(cap) -> {0.0.1.00000000}.{3b3b5ea3-...}  采集端点 ID
+#   GetDriverVer      -> 10.0.1.1
+#   GetDeviceID       -> usb\vid_0d8c&pid_0012&mi_00\8&33013dbd&0&0000
+# 都是 osConfLib 的只读查询，两条线现成能读，不碰注册表、不枚举 MMDevices
+#（本机 iKF-V11 在 MMDevices 里有两个渲染 GUID，其中一个 {204114b8-...}
+# 是上次安装留下的死端点 —— 光按设备名数会数到两个，GetExtraInfo 不会）。
+#
+# 三条安全规则（比判据本身更重要）：
+#   1. 指纹文件不存在 != 重装 —— 首次运行只记基线，绝不因此全量写，
+#      否则老用户升级一次就被清一次调音。全新机器由 21/42 启发式兜底。
+#   2. 只有两边都非空且不同才算「变了」 —— 读抖动/采集端点没起来都表现为
+#      空串，一律判「不知道」，宁可不动。
+#   3. 字段新旧**合并**写，空串不覆盖旧值 —— 否则一次读失败就把基线擦掉。
+INIT_FP_VER = 1
+INIT_FP_NAME = "init-fingerprint.json"
+
+
+def _appdata_state_dir():
+    """用户级状态目录（%APPDATA%\\iKF Audio Center），与 profile 子目录同级。"""
+    base = os.environ.get("APPDATA") or os.path.expanduser("~")
+    return os.path.join(base, "iKF Audio Center")
+
+
+def _init_fp_path():
+    return os.path.join(_appdata_state_dir(), INIT_FP_NAME)
+
+
+def _read_init_fp():
+    """读指纹文件。第二个返回值 = 存在且可解析（结构版本不符也算没）。"""
+    try:
+        with io.open(_init_fp_path(), "r", encoding="utf-8") as f:
+            fp = json.load(f)
+    except (OSError, ValueError):
+        return {}, False
+    if not isinstance(fp, dict) or fp.get("ver") != INIT_FP_VER:
+        return {}, False
+    return fp, True
+
+
+def _fp_field(drv, name, ep):
+    """读一个只读查询项，读不到返回空串（重读一次抗已知抖动）。"""
+    try:
+        ret, v = drv.read(name, ep)
+        if ret != 0 or not str(v or "").strip():
+            ret, v = drv.read(name, ep)
+    except Exception:
+        return ""
+    if ret != 0:
+        return ""
+    return str(v or "").strip()
+
+
+def _init_fp_now(drv):
+    """读当前指纹（只读，不落盘）。"""
+    fp = {
+        "ver": INIT_FP_VER,
+        "endpoint": _fp_field(drv, "GetExtraInfo", EP_RENDER),
+        "hwid": _fp_field(drv, "GetDeviceID", EP_RENDER),
+        "driver": _fp_field(drv, "GetDriverVer", EP_RENDER),
+        "model": _fp_field(drv, "GetDeviceFriendlyName", EP_RENDER),
+        "capture": "",
+    }
+    if getattr(drv, "cap_ctx", None):
+        fp["capture"] = _fp_field(drv, "GetExtraInfo", EP_CAPTURE)
+    return fp
+
+
+def _fp_known(fp):
+    return bool(fp.get("endpoint") or fp.get("hwid") or fp.get("driver"))
+
+
+def _fp_differs(a, b):
+    """两边都非空且不同才算变了（安全规则 2）。"""
+    a, b = str(a or ""), str(b or "")
+    return bool(a) and bool(b) and a.lower() != b.lower()
+
+
+def _short_fp(s):
+    """端点 ID 太长，日志里只留 GUID 那一段。"""
+    s = str(s or "")
+    if "}." in s:
+        return s.rsplit("}.", 1)[1]
+    return s or "（空）"
+
+
+def init_fp_changed(drv):
+    """判定「这台机器上的驱动换过一茬」。返回 (是否该全量写, 原因)。"""
+    if drv is None or drv.lib is None:
+        return False, ""
+    cur = _init_fp_now(drv)
+    if not _fp_known(cur):
+        return False, ""          # 三个字段全读不到：判不了，宁可不动用户参数
+    old, ok = _read_init_fp()
+    if not ok:
+        return False, ""          # 安全规则 1：没有指纹 != 重装
+    why = []
+    if _fp_differs(old.get("endpoint"), cur["endpoint"]):
+        why.append("渲染端点 %s → %s" % (_short_fp(old.get("endpoint")),
+                                        _short_fp(cur["endpoint"])))
+    if _fp_differs(old.get("capture"), cur["capture"]):
+        why.append("采集端点 %s → %s" % (_short_fp(old.get("capture")),
+                                        _short_fp(cur["capture"])))
+    if _fp_differs(old.get("driver"), cur["driver"]):
+        why.append("驱动版本 %s → %s" % (old.get("driver"), cur["driver"]))
+    if _fp_differs(old.get("hwid"), cur["hwid"]):
+        why.append("设备实例 %s → %s" % (old.get("hwid"), cur["hwid"]))
+    if not why:
+        return False, ""
+    return True, "；".join(why)
+
+
+def _save_init_fp(drv):
+    """记录/刷新基线。新读到的覆盖旧的，但空串不覆盖（安全规则 3）。"""
+    if drv is None or drv.lib is None:
+        return False
+    cur = _init_fp_now(drv)
+    if not _fp_known(cur):
+        return False              # 读不到就别写，免得把好基线擦成空
+    old, _ok = _read_init_fp()
+    merged = {"ver": INIT_FP_VER}
+    for k in ("endpoint", "capture", "hwid", "driver", "model"):
+        merged[k] = cur.get(k) or old.get(k) or ""
+    merged["at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        d = _appdata_state_dir()
+        if not os.path.isdir(d):
+            os.makedirs(d)
+        path = _init_fp_path()
+        # 先写临时文件再 rename：半截 JSON 会让下次启动把基线当损坏
+        with io.open(path + ".tmp", "w", encoding="utf-8") as f:
+            f.write(json.dumps(merged, ensure_ascii=False, indent=2))
+        os.replace(path + ".tmp", path)
+        return True
+    except OSError:
+        return False
+
+
+def init_fp_report(drv):
+    """--init-fp 的人读报告（只读，不落盘）。"""
+    lines = ["安装指纹（只读，不写设备）",
+             "-" * 60,
+             "指纹文件 : %s" % _init_fp_path()]
+    old, ok = _read_init_fp()
+    if ok:
+        lines.append("已记录   : 端点 %s · 采集 %s"
+                     % (_short_fp(old.get("endpoint")), _short_fp(old.get("capture"))))
+        lines.append("           %s · %s · %s" % (old.get("driver"), old.get("hwid"),
+                                               old.get("model")))
+        lines.append("           记录于 %s" % old.get("at"))
+    elif os.path.isfile(_init_fp_path()):
+        lines.append("已记录   : （文件存在但无法解析 —— 下次启动会重记基线）")
+    else:
+        lines.append("已记录   : （无 —— 下次启动记基线，不写设备）")
+
+    cur = _init_fp_now(drv)
+    lines.append("当前     : 端点 %s · 采集 %s"
+                 % (_short_fp(cur["endpoint"]), _short_fp(cur["capture"])))
+    lines.append("           %s · %s · %s" % (cur["driver"], cur["hwid"], cur["model"]))
+    lines.append("-" * 60)
+
+    changed, why = init_fp_changed(drv)
+    if not _fp_known(cur):
+        lines.append("结论     : 读不到指纹字段，无法判定（不动用户参数）")
+    elif changed:
+        lines.append("结论     : 变了 —— 下次初始化走全量写（%s）" % why)
+    elif not ok:
+        lines.append("结论     : 无基线 —— 下次启动记录基线，设备不动")
+    else:
+        lines.append("结论     : 未变 —— 初始化只补空缺（ret=2），不覆盖调音")
+    return "\n".join(lines)
+
+
+def init_fp_summary(drv):
+    """给 /api/driver 用的现状摘要（与 Go 侧 initFpSummary 同名同构）。"""
+    cur = _init_fp_now(drv)
+    old, ok = _read_init_fp()
+    changed, why = init_fp_changed(drv)
+    m = {
+        "path": _init_fp_path(),
+        "recorded": ok,
+        "changed": changed,
+        "current": {"endpoint": cur["endpoint"], "capture": cur["capture"],
+                    "driver": cur["driver"], "hwid": cur["hwid"],
+                    "model": cur["model"]},
+    }
+    if ok:
+        m["baseline"] = {k: old.get(k) or "" for k in
+                         ("endpoint", "capture", "driver", "hwid", "model", "at")}
+    if why:
+        m["reason"] = why
+    return m
+
+
+def ensure_channel_topology(drv):
+    """声道拓扑必须是**立体声（2 声道）**。与 Go 侧 initstate.go 逐字段对应。
+
+    两种局面都要处理：
+      ① ret != 0（没有记忆值）—— 装完驱动 / 端点重建后的常态；
+      ② 值为 4/6/8 —— 声道拓扑是驱动服务级状态，重启/重新枚举后会被复位
+         成驱动的默认 5.1；本机耳机硬件就是立体声，纯属驱动默认值作祟。
+
+    ★ 写后必须**回读确认**，不能只看写入返回码。用户虚拟机实测：装完驱动
+    首次启动声道组不是立体声，退出主程序再打开就对了 —— 那次写入落在端点
+    重建窗口里被丢弃，而写入本身返回成功。所以最多重试 3 次、间隔 200ms，
+    只有回读到 "2" 才算成功。除 2/4/6/8 之外的怪值一律不猜。
+
+    返回 (是否写入成功, 人读描述)。
+    """
+    if drv is None or drv.lib is None:
+        return False, ""
+
+    def _stereo(s):
+        return str(s or "").strip() in ("2", "2.0")
+
+    ret, v = drv.read("Speaker_Channel_Setting", EP_RENDER)
+    if ret == 0 and v == "":
+        ret, v = drv.read("Speaker_Channel_Setting", EP_RENDER)   # 已知读抖动，重读一次
+    if ret == 0 and _stereo(v):
+        return False, ""
+    if ret != 0:
+        why = "无记忆值（驱动重装/端点重建）"
+    elif str(v).strip() in ("4", "6", "8"):
+        why = "驱动复位成 %s" % v
+    else:
+        return False, ""
+    for i in range(3):
+        try:
+            drv.write_auto("Speaker_Channel_Setting", 2, EP_RENDER, "int")
+        except Exception:
+            pass
+        r, w = drv.read("Speaker_Channel_Setting", EP_RENDER)
+        if r == 0 and _stereo(w):
+            return True, "%s → 立体声 2（第 %d 次写入生效）" % (why, i + 1)
+        time.sleep(0.2)
+    return False, "%s → 立体声 2 写入 3 次均未生效（端点可能仍在重建）" % why
+
+
+def ensure_initial_state(drv, full=False):
+    """连上驱动后必须跑一次的初始化链。与 Go 侧 initstate.go:EnsureInitialState 对应。
+
+    为什么抽成一个函数：**启动路径**和「重新检测」/装驱动重连做的是同一件事
+    （把设备恢复到可用起点 = 「默认」场景状态），以前只有启动路径跑它，于是
+    用户最常见的那条路径正好错过：
+
+        装驱动 → 主程序已在跑（或启动那刻驱动还没装好）→ open 失败/半就绪
+        → 启动时的 restore_default_scene 因未就绪直接返回
+        → 用户点「重新检测」→ reopen 成功 → 没人再跑恢复
+        → 设备全 ret=2，界面一片「未设置」，必须自己去场景页点「默认」
+
+    2026-10-22 用户实测：「得我去自定义场景点默认然后所有参数才会按照默认去设定」。
+
+    幂等性由被调函数各自保证，可反复跑：restore_default_scene 有指纹保护
+    （缺省 < 21/42 项一个字都不写）、heal_missing 只补 ret==2。
+
+    full=True 给启动路径用，多做一次性的事（清废弃标记文件、场景分组名就地
+    升级）；重连路径不需要。
+
+    返回非空 dict 供 HTTP 响应体透传（{"restored"/"healed"/"migrated"}）。
+    """
+    out = {}
+    if drv is None or drv.lib is None:
+        # 没连上就什么都别碰。半就绪时采集端点读回 -9（不是 2），指纹会算错。
+        return out
+
+    if full:
+        cleanup_legacy_last_applied(drv)
+
+    # ★ 2026-10-22：声道拓扑排在最前，且放进这条链里 —— 以前只挂在启动
+    #   路径上（Python 线甚至一直没有），装完驱动点「重新检测」连上后
+    #   没人补，设备页声道组就不是立体声。放最前还有一个原因：切拓扑可能
+    #   触发端点属性重建，必须在写参数**之前**把这件事做完。
+    topo_changed, topo_msg = ensure_channel_topology(drv)
+    if topo_changed:
+        out["topology"] = topo_msg
+        print("[初始化] 声道拓扑：%s" % topo_msg)
+        time.sleep(0.15)      # 给驱动一点时间把属性落稳
+    elif topo_msg:
+        print("[初始化] 声道拓扑：%s" % topo_msg)   # 没写成功也要留痕
+
+    # ★ 2026-10-22 第三版：先问「驱动换过一茬没有」（init_fp_changed）。
+    #   以前唯一的判据是 21/42 启发式（缺省过半才算被重置），它测的是
+    #   「值在不在」，而用户要的是「驱动被重装过」—— 两者不等价：驱动装
+    #   了一半（20/42 缺省）就不写，驱动升级后把旧值搬回来也不写。现在
+    #   指纹（端点 GUID + 驱动版本 + 设备实例）变化 ⟹ 直接全量写。
+    #
+    #   顺序铁律不变：恢复必须在自愈**之前**（自愈把 ret=2 补成默认值后，
+    #   「端点被重置」的启发式就再也测不出来了，2026-10-20）。
+    fp_changed, fp_why = init_fp_changed(drv)
+    full_write_ok = True
+    if fp_changed:
+        items = build_init_manifest(drv)
+        applied, failed, _skipped = apply_init_manifest(drv, items, strong=True)
+        full_write_ok = (failed == 0)
+        n_param = len([x for x in items if x["scope"] == "param"])
+        msg = ("安装指纹变化（%s），已按初始化清单全量写回（成功 %d / 失败 %d / 共 %d 项）"
+               % (fp_why, applied, failed, n_param))
+        out["restored"] = True
+        out["restore_reason"] = fp_why
+        out["restore_msg"] = msg
+        print("[初始化] %s" % msg)
+    else:
+        triggered, msg = restore_default_scene(drv)
+        if triggered:
+            out["restored"] = True
+            out["restore_msg"] = msg
+            print("[初始化] 场景自动恢复：%s" % msg)
+
+    healed = heal_missing(drv)
+    if healed > 0:
+        out["healed"] = healed
+        print("[初始化] 设备侧自愈：补写了 %d 项出厂默认值" % healed)
+
+    if full:
+        mf, mt = migrate_profile_groups(drv)
+        if mf > 0:
+            out["migrated"] = mf
+            print("[初始化] 场景分组名升级：%d 个文件的 %d 个 <ApoEffect> 换成官方页名"
+                  % (mf, mt))
+
+    # 指纹落盘 = 「这台机器这个驱动版本，我已经初始化过了」。放最后：前面
+    # 所有写设备的动作都结束了，记下的才是真实现状。
+    # ★ 全量写有失败项时**不落指纹** —— 下次启动会再判一次「变了」，重试
+    #   那一轮（补空缺紧跟在上一步跑过，能补的都补了）。
+    # ★ 首次运行（无基线）也走这里：只记基线、不写设备（安全规则 1），
+    #   所以老用户升级上来调音不会被清。
+    if fp_changed and not full_write_ok:
+        print("[初始化] 全量写有失败项，指纹暂不更新（下次启动重试）")
+    else:
+        _save_init_fp(drv)
+    return out
 
 
 def _read_text(path):
@@ -2306,56 +2692,13 @@ def _group_of(ep, name):
 # 一张官方页住着多个模块时（Karaoke 页有人声消除+升降调、Setting 页有
 # 声道配置/互换/复制、MicInVol 页有麦克风音量+模拟功放），标签写成合并描述 ——
 # 官方本来就按「页」归属，拆开反而与官方 .profile 对不上。
-_GROUP_LABEL = {
-    "SpeakerVolume": "音量",
-    "SpeakerEQ": "EQ",
-    "SpeakerEM": "环境声",
-    "SpeakerKaraoke": "人声消除与变调",
-    "SpeakerSamplingRate": "采样率",
-    "SpeakerSetting": "声道设定",
-    "SpeakerVirtual": "虚拟环绕",
-    "SpeakerXearSurroundHeadPhone": "耳机环绕",
-    "SpeakerXearSurroundSpeakers": "环绕扬声器",
-    "SpeakerSurroundMax": "环绕增强",
-    "SpeakerDolbyHPVS": "Dolby 环绕",
-    "SpeakerXearAudioBrilliant": "音频增艳",
-    "SpeakerXearDynamicBass": "动态低音",
-    "SpeakerXearSmartVolume": "智能音量",
-    "SpeakerXearVoiceClarity": "语音清晰度",
-    "GFS": "GFS",
-    "MicInVolume": "麦克风音量",
-    "MicInNoiseReduction": "降噪",
-    "MicInXearMagicVoice": "魔音",
-    "MicEcho": "回音",
-    "MicInAGC": "自动增益",
-    # 第 62 轮 · 麦克风专项三组（组名 = 官方 Canvas 名；中文名照官方 zh-CN 词条，
-    # ENC 官方未译，定「通话降噪」与既有「环境降噪」区分）
-    "MicInAEC": "回音消除",
-    "MicInENC": "通话降噪",
-    "MicInBeamForming": "麦克风收音",
-    "MicInSamplingRate": "麦克风采样率",
-    # 这两组我们**不写**，只用来把官方 FactoryDefault.xml（「原厂默认」场景）
-    # 读好看 —— 它用的是 SpeakerQuarter / DesktopMic 两个族，标签不给就会露出英文原名。
-    "SpeakerQuarterSetting": "四声道设定",
-    "DesktopMicSamplingRate": "桌面麦克风采样率",
-    "General": "其他",
-}
+# ★ S4 起真源 = TOML [group_label]（28 项，含只读两组）。
+_GROUP_LABEL = dict(_MODEL["group_label"])
 
 # 渲染端点的分组展示顺序（照官方面板菜单：音量→EQ→环境→环绕一族→人声→
 # Xear 音效族→设定/采样率；采集端点整体排在后面）。
-_GROUP_ORDER = (
-    "SpeakerVolume", "SpeakerEQ", "SpeakerEM", "SpeakerVirtual",
-    "SpeakerXearSurroundHeadPhone", "SpeakerXearSurroundSpeakers",
-    "SpeakerSurroundMax", "SpeakerDolbyHPVS", "SpeakerKaraoke",
-    "SpeakerXearAudioBrilliant", "SpeakerXearDynamicBass",
-    "SpeakerXearSmartVolume", "SpeakerXearVoiceClarity",
-    "SpeakerSetting", "SpeakerSamplingRate", "GFS",
-    "MicInVolume", "MicInNoiseReduction", "MicInAGC",
-    "MicInXearMagicVoice", "MicEcho",
-    "MicInAEC", "MicInENC", "MicInBeamForming",
-    "MicInSamplingRate",
-    "SpeakerQuarterSetting", "DesktopMicSamplingRate",
-)
+# ★ S4 起真源 = TOML [display].group_order（27 项；采集端 rank+1000 在 _group_rank）。
+_GROUP_ORDER = tuple(_MODEL["display"]["group_order"])
 
 
 def _profile_ep_of(flow):
@@ -3348,7 +3691,7 @@ LOOPBACK = Loopback()
 #   那是个依附官方面板 COM 环境的薄客户端，导入表仅 KERNEL32+ole32
 #   （无 user32 画不了窗、无 winmm 记不了音），脱离官方面板单独拉起
 #   必然静默退出（本机实测恒退 241，事件日志无崩溃记录）。
-#   取证过程见 内部取证报告（未随仓库分发）。
+#   取证过程见 工具/录音机取证-Recorder.exe死件.md。
 # 与 Wails 线 recorder.go 的 MicRecorder 逐字段对齐：start/stop/status
 # 返回键、文件命名（文档\iKF录音\iKF录音_时间戳.wav）、以及「不做断流
 # 自动重试」（自动续录会把一段录音裂成多份，宁可明确报错）。
@@ -3780,7 +4123,7 @@ class MicListen(object):
     """一路麦克风监听会话（内嵌自研，2026-10-20）。
 
     为什么不走官方路径（Driver.listen → osConfLib.RunListen2Device）：
-    反编译实锤（内部取证报告），RunListen2Device
+    反编译实锤（工具/监听取证-监听COM组件缺失.md），RunListen2Device
     内部 CoCreateInstance 的监听引擎 CLSID {E642D042-5BCF-4E80-9451-
     83F4E398A88F} 在整套 WHQL 驱动包、System32、注册表里都不存在——
     官方原版面板同样开不了，实测恒返 0x80040154（类未注册）。
@@ -4559,7 +4902,7 @@ def driver_info(drv):
     """主程序眼里的驱动现状。ready 与 setup_ok 是两件事：
     前者是「能不能跑」（端点枚举得出来吗），后者是「有没有带安装器」。"""
     setup = _setup_path()
-    return {
+    info = {
         "ok": True,
         "ready": drv.lib is not None and drv.ctx is not None,
         "devices": drv.device_count,
@@ -4570,6 +4913,15 @@ def driver_info(drv):
         "setup": setup,
         "setup_ok": setup != "",
     }
+    # ★ 2026-10-22：把「安装指纹」挂出来（见 init_fp_summary）—— 这是
+    #   「初始化该全量写还是只补空缺」的判据本体现状，与 Go 侧 DriverInfo
+    #   逐字段一致。只在 /api/driver 这类按需接口上取，不进 /api/status 轮询。
+    if info["ready"]:
+        try:
+            info["init_fp"] = init_fp_summary(drv)
+        except Exception:
+            pass
+    return info
 
 
 def _run_elevated(exe, params):
@@ -4639,7 +4991,13 @@ def run_setup(drv, action):
     # 先松手：装驱动会重启设备实例，握着旧上下文等它回来只会读出错值
     drv.close()
     code, err = _run_elevated(setup, params)
-    drv.open()
+    # ★ 2026-10-22：装完立刻重连走 reopen()（带退避重试），与 Go 版
+    #   RunSetup 对齐 —— 端点重建期间采集端点常比渲染端点晚到。
+    ok = drv.reopen()
+    # ★ 2026-10-22：装完是**最该**跑初始化链的时刻 —— 安装器清空了
+    #   FxProperties，设备参数全回 ret=2。不补跑就是「全未设置」，用户得
+    #   自己去场景页点「默认」。与 Go 侧 RunSetup 同一套。
+    init = ensure_initial_state(drv) if ok else {}
 
     info = driver_info(drv)
     if err:
@@ -4648,6 +5006,8 @@ def run_setup(drv, action):
         return info
     info["action"] = action
     info["exit_code"] = code
+    if init:
+        info["init"] = init
     if code != 0:
         info["ok"] = False
         info["error"] = ("已取消：没有授予管理员权限，驱动组件未改动。" if code == 1223
@@ -4766,7 +5126,7 @@ class Handler(BaseHTTPRequestHandler):
         if path not in ("/api/set", "/api/test", "/api/listen", "/api/asio",
                         "/api/profile/save", "/api/profile/apply",
                         "/api/profile/delete", "/api/profile/rename",
-                        "/api/driver/setup"):
+                        "/api/driver/setup", "/api/driver/reopen"):
             return self._json({"ok": False, "error": "not found"}, 404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -4774,6 +5134,25 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return self._json({"ok": False, "error": "请求体解析失败"}, 400)
 
+        if path == "/api/driver/reopen":
+            # ★ 2026-10-21：界面上「重新检测」的后端入口，与 Go 版
+            #   Driver.ReopenInfo 同契约（driver_info + reopened）。
+            #   装完驱动 / 端点重建窗口期里启动失败时用来自恢复。
+            #   ★ 2026-10-22：改走 reopen()（带退避重试），不再手写
+            #   close + open —— 装完驱动那一刻采集端点常比渲染端点晚到。
+            ok = self.driver.reopen()
+            info = driver_info(self.driver)
+            info["ok"] = bool(ok)
+            info["reopened"] = bool(ok)
+            # ★ 2026-10-22：连上之后必须补跑初始化链（恢复默认 / 自愈）。
+            #   以前这里只重连 —— 而装完驱动点「重新检测」是最常见的路径，
+            #   启动那次恢复因驱动没就绪被跳过，设备停在「全 ret=2」，
+            #   用户必须自己去场景页点「默认」。见 ensure_initial_state。
+            if ok:
+                init = ensure_initial_state(self.driver)
+                if init:
+                    info["init"] = init
+            return self._json(info)
         if path == "/api/driver/setup":
             # 提权拉起同目录的驱动管理程序并等它结束，会阻塞数十秒
             act = body.get("action") or ""
@@ -4818,7 +5197,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/listen":
             # 2026-10-20 内嵌监听：官方 RunListen2Device 依赖的 COM
-            # 服务器驱动包里没有（见内部取证报告），
+            # 服务器驱动包里没有（见 工具/监听取证-监听COM组件缺失.md），
             # 改走 MicListen（listen.go 对应实现）。响应保留 {ok, on}
             # 形状，前端零改动。
             on = bool(body.get("on"))
@@ -4852,12 +5231,45 @@ def _free_port(start=17800, tries=40):
     return 0
 
 
+def _audio_rust_status():
+    """音频热路 Rust DLL（ikf_audio.dll）状态 —— 与 Go 线 selfTest 输出逐行对齐。
+
+    P1 只把 Go exe 的热路径切到 Rust；Python 线不消费该 DLL，这里只做
+    存在性/ABI 探测供体检对齐（true 单源在 audiocore/target/release）。
+    """
+    import ctypes
+    here = os.path.dirname(os.path.abspath(__file__))
+    # here 可能是仓库根（构建产物）或 tools/src（源码态），两级候选都给
+    cand = [os.path.join(here, "iKF-Audio-Center-Wails",
+                         "audiocore", "target", "release", "ikf_audio.dll"),
+            os.path.join(here, os.pardir, os.pardir, "iKF-Audio-Center-Wails",
+                         "audiocore", "target", "release", "ikf_audio.dll"),
+            os.path.join(here, os.pardir, "iKF-Audio-Center-Wails",
+                         "audiocore", "target", "release", "ikf_audio.dll")]
+    path = next((c for c in cand if os.path.isfile(c)), None)
+    if path is None:
+        return "rust: 未启用（ikf_audio.dll 未构建，cargo build --release audiocore）"
+    try:
+        lib = ctypes.CDLL(path)
+        abi = lib.ikf_abi_version()
+        lib.ikf_version.restype = ctypes.c_int
+        n = lib.ikf_version(None, 0)
+        buf = ctypes.create_string_buffer(n)
+        lib.ikf_version(buf, n)
+        ver = buf.value.decode("utf-8", "replace").rstrip("\x00")
+        ok = lib.ikf_selftest() == 0xF00D
+        return "rust: %s (abi %d, selftest %s, Py 线未接入)" % (ver, abi, "ok" if ok else "FAIL")
+    except Exception as e:
+        return "rust: 未启用（加载失败: %s）" % e
+
+
 def _self_test(drv):
     print("=" * 68)
     print(" %s %s  ·  接口自检" % (APP_NAME, APP_VER))
     print("=" * 68)
     print("驱动目录 : %s" % drv.cpl)
     print("驱动模块 : %s" % drv.dll)
+    print("音频热路 : %s" % _audio_rust_status())
     if drv.lib is None:
         print("状态     : 未连接 —— %s" % drv.error)
         return 1
@@ -4890,7 +5302,9 @@ def _self_test(drv):
     print("属性总数 : %d（通用 %d + OEM %d）"
           % (len(ALL_NAMES), len(GENERIC_NAMES), len(OEM_NAMES)))
     print("可读     : %d" % ok)
-    print("本机不支持: %d" % unsup)
+    # 2026-10-22：原写「本机不支持」。ret=2 的实测含义是「存在但从未写过」
+    # （卸载/重装驱动清空 FxProperties 后全变 2，写一次就回 0），不是本机不支持。
+    print("未写入   : %d" % unsup)
     print("未找到   : %d" % notfound)
     print("需特殊参数: %d" % broken)
     print("-" * 68)
@@ -4962,6 +5376,45 @@ def _channel_test(drv, target):
     return 0
 
 
+# 启动重试时要跳过的无界面子命令：它们失败本身就是观测结果，
+# 多等 7 秒只会拖慢闸脚本与排障（与 Go 版 openAttempts 逐项一致）。
+_OPEN_ONCE_ARGS = ("--self-test", "--selftest", "--roundtrip", "--dump",
+                   "--heal", "--channel-test", "--play",
+                   "--loopback-devices", "--loopback-fft",
+                   "--loopback-test", "--restore-scene",
+                   # ★ 2026-10-22：--init-check / --init-fp 都是核对类命令，
+                   #   失败本身就是它们要报的结果；Go 线早就在表里，这边漏了
+                   #   ⟹ 驱动没装时白等 1+2+4=7 秒才报「未就绪」。
+                   "--init-check", "--init-fp",
+                   # ★ 2026-10-22：--no-browser 是无界面模式，必须单次。
+                   #   以前漏了它，服务启动要白等 1+2+4=7 秒，闸脚本按
+                   #   sleep 5 起就撞「页面没就绪」。
+                   "--no-browser")
+
+
+def open_with_retry(drv, argv):
+    """启动时按 1s / 2s / 4s 退避重连（与 Go 版 openWithRetry 行为一致）。
+
+    ★ 2026-10-21（用户拍板）：Open 以前只试一次。iKF-驱动管理装完驱动后
+    会 `pnputil /restart-device` 重建音频端点，用户点完「已安装完成」就
+    立刻打开主程序，很容易撞在重建窗口期里 —— 一次失败界面就永久停在
+    「未连接驱动」，以前只能彻底关掉重开。GUI 重试，CLI 单次。
+    """
+    attempts = 1 if any(a in argv for a in _OPEN_ONCE_ARGS) else 4
+    for i in range(attempts):
+        if i:
+            wait = 1 << (i - 1)
+            print("[启动] 驱动未就绪（%s），%ds 后重试 %d/%d"
+                  % (drv.error, wait, i, attempts - 1), flush=True)
+            time.sleep(wait)
+        if drv.open():
+            if i:
+                print("[启动] 第 %d 次重连成功 —— 端点重建窗口期已过" % i,
+                      flush=True)
+            return True
+    return False
+
+
 def _dump(drv, ep=EP_RENDER):
     if drv.lib is None:
         print("驱动未连接：%s" % drv.error)
@@ -4985,7 +5438,7 @@ def main(argv):
         return 0
 
     drv = Driver()
-    drv.open()
+    open_with_retry(drv, argv)
 
     if "--self-test" in argv:
         return _self_test(drv)
@@ -5070,26 +5523,45 @@ def main(argv):
               % heal_missing(drv))
         return 0
 
-    # 场景自动恢复（回到「默认」）必须在自愈**之前**：自愈把 ret=2 项补成
-    # 默认值后，「端点被重置」的指纹就测不出来了（2026-10-20）。
-    cleanup_legacy_last_applied(drv)
-    _rt, _rmsg = restore_default_scene(drv)
-    if _rt:
-        print("场景自动恢复：%s" % _rmsg)
+    # --init-fp：只读查看「安装指纹」—— 端点 GUID / 采集端点 / 驱动版本 /
+    # 设备实例，以及它相对上次记录有没有变。这是「初始化什么时候该全量写」
+    # 的可观察面（见 init_fp_changed）：变了 ⟹ 下次初始化按清单全量写；
+    # 没变 ⟹ 只补空缺。**只读，不写设备、不落盘。**
+    if "--init-fp" in argv:
+        if drv.lib is None:
+            print("驱动未就绪，无法读取指纹：%s" % drv.error)
+            return 3
+        print(init_fp_report(drv))
+        return 0
 
-    # 设备侧自愈：官方靠安装时的 `/h /i` + 每次开机的 `/h /d` 维持默认值，
-    # 这里做等价的事 —— 只补「存在但当前无值」（ret=2）的项。放在诊断分支
-    # 之后：--dump/--self-test 等纯诊断不写设备。
-    healed = heal_missing(drv)
-    if healed:
-        print("设备侧自愈：补写了 %d 项出厂默认值" % healed)
+    # --init-check：把「初始化清单」逐项对一遍设备，只读不写。
+    # 这是「初始化」从口头约定变成可验收的关键一步：以前判断「装完驱动是不是
+    # 真回到默认」只能拿界面肉眼看，现在一条命令给出「应有 55 · 达标 a ·
+    # 未设置 b · 偏离 c」。退出码 1 = 不达标，可直接当安装后的验收闸。
+    if "--init-check" in argv:
+        if drv.lib is None:
+            print("驱动未就绪，无法核对：%s" % drv.error)
+            return 3
+        _r, _lines = check_init_manifest(drv)
+        print("初始化清单核对（只读，不写设备）")
+        print("-" * 64)
+        for _ln in _lines:
+            print(_ln)
+        print("-" * 64)
+        print("应有 %d 项（参数 %d + 设备级 %d） · 达标 %d · 未设置 %d · 偏离 %d · 不支持 %d"
+              % (_r["total"], _r["total"] - len(INIT_DEVICE_ITEMS), len(INIT_DEVICE_ITEMS),
+                 _r["ok"], _r["missing"], _r["drift"], _r["unsupported"]))
+        if _r["missing"] + _r["drift"] > 0:
+            print("结论：不达标（未设置/偏离 = %d 项）" % (_r["missing"] + _r["drift"]))
+            return 1
+        print("结论：达标 —— 设备已是初始化定义的默认状态")
+        return 0
 
-    # 存量场景文件的旧分组名就地升级（见 migrate_profile_groups 的说明）。
-    # 只改 <ApoEffect Name> 的值，命中才写，且先留 .bak。
-    mf, mt = migrate_profile_groups(drv)
-    if mf:
-        print("场景分组名升级：%d 个文件的 %d 个 <ApoEffect> 换成官方页名"
-              "（原文件留在同名 .bak）" % (mf, mt))
+    # ★ 2026-10-22：整条链收进 ensure_initial_state —— 「重新检测」和装驱动
+    #   重连也要跑同一套（以前只在这里跑，用户装完驱动点重新检测就错过了）。
+    #   内部顺序：恢复默认（带指纹保护）→ 设备侧自愈 → 场景分组名升级。
+    #   恢复默认必须在自愈**之前**：自愈补完默认值后指纹就测不出来了。
+    ensure_initial_state(drv, full=True)
 
     port = _free_port()
     if "--port" in argv:

@@ -1,0 +1,1237 @@
+# device-model.toml —— 数据即真源
+# ====================================================================
+# 唯一真相。Python 线（tools/src/center_src.py，tomllib）与 Go 线
+# （go:embed + BurntSushi/toml）都只是本文件的解释器。
+# 改这里 = 两线同步；代码里不再保留字面数据表。
+# 加载失败 / 自校验不过 = 拒绝启动，绝不内置兜底。
+#
+# 分阶段抽取进度（见 docs/device-model-抽取清单.md）—— S1-S5 全部完成（2026-10-23）：
+#   S1 ✅ 场景排除 / 内置场景 / 分组别名
+#   S2 ✅ 出厂表 42 + 初始化设备级 1
+#   S3 ✅ 名字表 208 + 可写白名单 80 + 值域
+#   S4 ✅ 组态分组名（ApoEffect Canvas）+ 端点定义
+#   S5 ✅ 闸门基线从 TOML 派生（init_manifest_gate 等）
+#
+# 自校验基线（两线共同断言，漂移即拒绝启动）：
+#   scene.exclude = 6   scene.unproven = 35   scene.builtin = 6   group_alias = 10
+#   names = 208（generic 112 + oem 96）   writable = 80（render 65 + capture 15）
+#   factory = 42   init_device = 1   profile_groups = 53
+
+[meta]
+schema_version = 1
+device = "iKF"
+
+# ---------------------------------------------------------------- 场景
+[scene]
+# 「预设」档 = FactoryDefault.xml；「默认」= 原「原厂默认」（2026-10-20 改名）。
+# 名字必须与 EnsureSeedScenes 播种的文件名一致。
+factory_profile = "预设"
+factory_scene = "默认"
+
+# 内置场景名单：源包自带 + 播种。★ builtin 判定按名字、不按目录：
+# 便携包下用户自建场景与内置档同住 CPL\profile，按目录一刀切会把用户场景
+# 也标成内置（2026-10-19 真机确认过这个坑）。
+builtin = ["默认", "音乐", "电影", "UserDefine", "UserDefineFormwork", "HiFi"]
+
+# 设备级状态：个人听音 / 硬件事实，进场景会被系统回滚或触发端点重建。
+# ★ DevSampleRateControl 最要命：写它触发 USB 重协商 → 端点重建 →
+#   采集端会话值全清（「应用场景后麦克风页整体不同步」的根因）。
+exclude = [
+    "VolumeControl",            # 主音量：个人听音状态，写入被系统通路回滚
+    "VolumeScalarControl",      # 标量形态同上
+    "MuteControl",              # 静音
+    "AAVolumeControl",          # 模拟功放音量
+    "DevSampleRateControl",     # 设备采样率：触发端点重建
+    "Speaker_Channel_Setting",  # 设备级声道拓扑，设备页自选
+]
+
+# APO 未实现 / 未验证生效的家族：不进场景（2026-10-19 用户拍板）。
+unproven = [
+    # SS 虚拟环绕家族（总开关 + 8 方位角 + 8 距离）
+    "Enable_SS_LFX",
+    "SS_C_ANGLE", "SS_LF_ANGLE", "SS_RF_ANGLE", "SS_LS_ANGLE",
+    "SS_RS_ANGLE", "SS_LB_ANGLE", "SS_RB_ANGLE", "SS_LFE_ANGLE",
+    "SS_C_DIST", "SS_LF_DIST", "SS_RF_DIST", "SS_LS_DIST",
+    "SS_RS_DIST", "SS_LB_DIST", "SS_RB_DIST", "SS_LFE_DIST",
+    # Dolby 家族
+    "Enable_DHDVS_LFX", "DHDVS_USEDH", "DH_Mode", "DVS_Mode",
+    # 动态低音 / 音频增艳 / 语音清晰度
+    "Enable_BM_GFX", "BM_Slider_BassLevel", "BM_Slider_Frequency",
+    "Enable_AUDIOBRILLIANT_LFX", "AUDIOBRILLIANT_LEVEL",
+    "Enable_VOICECLARITY_LFX", "VOICECLARITY_LEVEL",
+    "VOICECLARITY_NOISESUPP_LEVEL",
+    # 环绕增强：CXearSurrMaxLib 有实体，但 A/B 未测到生效（前置条件依赖）
+    "Enable_SURRSENS_LFX",
+    # 虚拟低音 / SonicMapper / DDL / PLIIX / NeoPC
+    "Enable_VIRTUALBASS_LFX", "Enable_SonicMapper",
+    "Enable_DDL_GFX", "Enable_PLIIX_LFX", "Enable_NEOPC_LFX",
+]
+
+# ---------------------------------------------------------------- 分组别名
+# 旧版工具写出过的分组名 → 归一到现在的 Canvas 名。
+# ★ 只用于读：用户已存下来的旧场景不该因改名而显示成「其他」。
+
+[group_alias]
+Volume = "SpeakerVolume"
+Environment = "SpeakerEM"
+Karaoke = "SpeakerKaraoke"
+KeyShift = "SpeakerKaraoke"
+SamplingRate = "SpeakerSamplingRate"
+ChannelCopy = "SpeakerSetting"
+XearSurroundSpeakers = "SpeakerVirtual"
+NoiseReduction = "MicInNoiseReduction"
+XearMagicVoice = "MicInXearMagicVoice"
+AAVolume = "MicInVolume"
+
+
+# ---------------------------------------------------------------- 出厂表（42）
+
+# source=factory；与「默认」档交集 25 项零冲突，冲突时以本表为准（解释器规则）。
+# EQ 十条 = 官方预设全 0 平直曲线（XearAudioCenter_x64.exe @0x14018a090 索引 11，
+# 静态反编译真值）。渲染 36 + 采集 6。
+
+[[factory]]
+ep = "render"
+name = "Enable_EQ_GFX"
+val = "1"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider1"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider2"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider3"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider4"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider5"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider6"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider7"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider8"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider9"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "EQ_Slider10"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_C_ANGLE"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_C_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_LF_ANGLE"
+val = "-32"
+
+[[factory]]
+ep = "render"
+name = "SS_LF_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_RF_ANGLE"
+val = "32"
+
+[[factory]]
+ep = "render"
+name = "SS_RF_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_LS_ANGLE"
+val = "-90"
+
+[[factory]]
+ep = "render"
+name = "SS_LS_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_RS_ANGLE"
+val = "90"
+
+[[factory]]
+ep = "render"
+name = "SS_RS_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_LB_ANGLE"
+val = "-148"
+
+[[factory]]
+ep = "render"
+name = "SS_LB_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_RB_ANGLE"
+val = "148"
+
+[[factory]]
+ep = "render"
+name = "SS_RB_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "SS_LFE_ANGLE"
+val = "180"
+
+[[factory]]
+ep = "render"
+name = "SS_LFE_DIST"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "Enable_SS_LFX"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "Enable_KEYSHIFT_GFX"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "KEYSHIFT_LEVEL"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "Enable_VOCALCANCEL_GFX"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "VOCALCANCEL_LEVEL"
+val = "50"
+
+[[factory]]
+ep = "render"
+name = "Enable_RFX_GFX"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "RFX_ENVIRONMENT"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "RFX_ROOMSIZE"
+val = "0"
+
+[[factory]]
+ep = "render"
+name = "Enable_Channel_COPY_LFX"
+val = "0"
+
+[[factory]]
+ep = "capture"
+name = "Enable_NOISEREDUCTION_LFX"
+val = "0"
+
+[[factory]]
+ep = "capture"
+name = "NoiseReduction_Level"
+val = "14"
+
+[[factory]]
+ep = "capture"
+name = "Enable_MAGICVOICE"
+val = "0"
+
+[[factory]]
+ep = "capture"
+name = "MagicVoice_Selection"
+val = "1"
+
+[[factory]]
+ep = "capture"
+name = "Enable_MICECHO"
+val = "0"
+
+[[factory]]
+ep = "capture"
+name = "MICECHO_Level"
+val = "0"
+
+
+# ---------------------------------------------------------------- 初始化设备级
+
+# scope=device：任何触发都校正（拓扑是硬件事实，不是用户偏好）。
+# 写后回读 3×200ms 是解释器规则，不在数据里。
+
+[[init_device]]
+ep = "render"
+name = "Speaker_Channel_Setting"
+val = "2"
+notes = "本机耳机为立体声；4/6/8 是驱动默认值作祟"
+
+# ----------------------------------------------------------------
+# 属性名表（208 = generic 112 + oem 96）
+# ----------------------------------------------------------------
+# osConfLib.dll 的两张属性名字符串表（实测导出）。S3 起这里是唯一真源：
+# Go 侧 names.go、Python 侧 GENERIC_NAMES/OEM_NAMES、构建注入
+# __GENERIC__/__OEM__ 全部由本节派生；tools/propnames.json 退役。
+# 表归属决定 pValue 约定（generic→数值/枚举，oem→结构化载荷），
+# 务必与驱动侧逐项一致——顺序即下标，不许重排。
+[names]
+generic = [
+
+  "Enable_EQ_GFX",
+  "EQ_Slider1",
+  "EQ_Slider2",
+  "EQ_Slider3",
+  "EQ_Slider4",
+  "EQ_Slider5",
+  "EQ_Slider6",
+  "EQ_Slider7",
+  "EQ_Slider8",
+  "EQ_Slider9",
+  "EQ_Slider10",
+  "Enable_BM_GFX",
+  "BM_Slider_Frequency",
+  "BM_LargeSpeaker",
+  "SpeakerDelay_C",
+  "SpeakerDelay_S",
+  "SpeakerDelay_B",
+  "Enable_DDL_GFX",
+  "Enable_DHDVS_LFX",
+  "DH_Mode",
+  "DVS_Mode",
+  "Enable_SURRSENS_LFX",
+  "Enable_SURRSENS_USEHP",
+  "SURRSENS_EXPFACTOR",
+  "ENABLE_NEOPC_FOR_SURRSENS",
+  "ENABLE_SURRSENS_BASSENHANCEMENT",
+  "SURRSENS_BASSENHANCEMENT_GAIN",
+  "ENABLE_SURRSENS_DIALOGCLARITY",
+  "SURRSENS_DIALOGCLARITY_GAIN",
+  "Enable_PLIIX_LFX",
+  "PLIIX_SLIDER_DIMENSION",
+  "PLIIX_SLIDER_CENTERWIDTH",
+  "PLIIX_MODE",
+  "PLIIX_PANORAMA",
+  "Enable_NEOPC_LFX",
+  "NEOPC_SLIDER_DIMENSION",
+  "NEOPC_SLIDER_CENTERGAIN",
+  "NEOPC_MODE",
+  "Enable_SS_LFX",
+  "SS_LF_ANGLE",
+  "SS_C_ANGLE",
+  "SS_RF_ANGLE",
+  "SS_RS_ANGLE",
+  "SS_RB_ANGLE",
+  "SS_LB_ANGLE",
+  "SS_LS_ANGLE",
+  "SS_LF_DIST",
+  "SS_C_DIST",
+  "SS_RF_DIST",
+  "SS_RS_DIST",
+  "SS_RB_DIST",
+  "SS_LB_DIST",
+  "SS_LS_DIST",
+  "SS_LFE_DIST",
+  "Enable_VOCALCANCEL_GFX",
+  "VOCALCANCEL_LEVEL",
+  "Enable_KEYSHIFT_GFX",
+  "KEYSHIFT_LEVEL",
+  "Enable_MICARRAY_LFX",
+  "MICARRAY_BEAMWIDTH",
+  "Enable_RFX_GFX",
+  "RFX_ENVIRONMENT",
+  "RFX_ROOMSIZE",
+  "Enable_SMART_VOLUME_GFX",
+  "Speaker_Channel_Setting",
+  "Enable_Channel_COPY_LFX",
+  "Enable_SwapLfeCn_LFX",
+  "Enable_SwapSrBk_LFX",
+  "SS_LFE_ANGLE",
+  "DHDVS_USEDH",
+  "BM_Slider_BassLevel",
+  "Enable_CONLAB_HPSPK_LFX",
+  "CONLAB_HPSPK_USEHP",
+  "CONLAB_HPSPK_ROOMSIZE",
+  "ENC_SELFCALIB",
+  "MagicVoice_Selection",
+  "Enable_SURRMAX_FOR_HPSPK",
+  "Enable_MAGICVOICE",
+  "Enable_NOISEREDUCTION_LFX",
+  "Enable_ENC_LFX",
+  "SURRSENS_CONTENTTYPE",
+  "SURRSENS_SPEAKERANGLE",
+  "SURRSENS_MIXLFE",
+  "Enable_MICECHO",
+  "MICECHO_Level",
+  "CONLAB_HPSPK_SFX",
+  "CONLAB_HPSPK_SPKANGLE",
+  "CONLAB_HPSPK_MODE",
+  "CONLAB_DIPOLE_SPK",
+  "CONLAB_DIPOLE_SRC",
+  "CONLAB_DIPOLE_ALPHA",
+  "Enable_AEC_LFX",
+  "Enable_PCEEv4_LFX",
+  "Enable_AUDIOBRILLIANT_LFX",
+  "AUDIOBRILLIANT_LEVEL",
+  "Enable_VOICECLARITY_LFX",
+  "VOICECLARITY_LEVEL",
+  "VOICECLARITY_NOISESUPP_LEVEL",
+  "Enable_VIRTUALBASS_LFX",
+  "VIRTUALBASS_Mode",
+  "VIRTUALBASS_Level",
+  "VIRTUALBASS_CutOffFrequency",
+  "Enable_ADAPTIVEVOLUME_GFX",
+  "ADAPTIVEVOLUME_LEVEL",
+  "ADAPTIVEVOLUME_MODE",
+  "Enable_UltraPCIIPlus",
+  "DTSUPCII_Boost_Level",
+  "Enable_SonicMapper",
+  "Enable_VOCALEFFECT_LFX",
+  "VOCALEFFECT_LEVEL",
+  "Enable_DHV2_LFX",
+  "NoiseReduction_Level"
+,
+]
+oem = [
+
+  "GetMaxVol",
+  "GetMinVol",
+  "GetVolStep",
+  "GetAAMaxVol",
+  "GetAAMinVol",
+  "GetAAVolStep",
+  "VolumeControl",
+  "MuteControl",
+  "AAVolumeControl",
+  "AAMuteControl",
+  "DefaultDeviceControl",
+  "DevFormatControl",
+  "DevChannelNumControl",
+  "DevSampleRateControl",
+  "DevBitDepthControl",
+  "DevChanMaskControl",
+  "OemChannelNumControl",
+  "OemSampleRateControl",
+  "OemBitDepthControl",
+  "OemChanMaskControl",
+  "GetChannelPeakMeter",
+  "GetPeakMeter",
+  "GetMeterChannelCount",
+  "IsSupportFormat",
+  "DolbyDigitalLiveControl",
+  "XearSurround71Control",
+  "DTSInteractiveControl",
+  "EndpointEnableControl",
+  "AAVolumeScalarControl",
+  "VolumeScalarControl",
+  "GetFirmwareVer",
+  "GetDriverVer",
+  "GetDirectXVer",
+  "GetAudioCodecName",
+  "GetSpectrumData",
+  "SpectrumControl",
+  "IsSupportDolbyDigitalLive",
+  "IsSupportXearSurround71",
+  "IsSupportDTSInteractive",
+  "AmplifierControl",
+  "EXControl",
+  "GFSControl",
+  "IsShareADC",
+  "ADCSelectorControl",
+  "HWEQBassControl",
+  "HWEQTrebleControl",
+  "GetSupportFeature",
+  "GetDeviceFriendlyName",
+  "GetDeviceID",
+  "GetExtraInfo",
+  "GetSymbolicLink",
+  "GetSpeakerShiftVolumeLevel",
+  "GetSpeakerShiftDistanceByDB",
+  "BoostControl",
+  "GetDolbyPCEEv4ExecutionFilePath",
+  "DolbyPCEEv4Control",
+  "DolbyPCEEv4Profile",
+  "AGCControl",
+  "HPAmplifierControl",
+  "DeviceSpecificControl",
+  "OutputTerminalTypeControl",
+  "ThirdPartyFeatureControl",
+  "ASUS_U3Plus_GetSpectrumControl",
+  "MixWithWaveControl",
+  "RecordingPreviewControl",
+  "HWENCControl",
+  "DolbyHPV2EffectControl",
+  "VirtualSurroundEffectControl",
+  "SoundRadarControl",
+  "DTSUPCII_GetDefaultPropertiesForProfile",
+  "DTSUPCII_Bass_Enable",
+  "DTSUPCII_Bass_Level",
+  "DTSUPCII_S2_Enable",
+  "DTSUPCII_S2_Mode",
+  "DTSUPCII_S2_VoiceGain",
+  "DTSUPCII_S2_StageExpansion",
+  "DTSUPCII_LEQ_Enable",
+  "DTSUPCII_LEQ_LF_Level",
+  "DTSUPCII_LEQ_HF_Level",
+  "DTSUPCII_Boost_Enable",
+  "DTSUPCII_Symmetry_Enable",
+  "DTSUPCII_ADE_Enable",
+  "DTSUPCII_HWVol_Control",
+  "GetAANum",
+  "GetAAInfo",
+  "GetAAMaxVolEx",
+  "GetAAMinVolEx",
+  "GetAAVolStepEx",
+  "AAVolumeControlEx",
+  "AAVolumeScalarControlEx",
+  "AAMuteControlEx",
+  "MicPositionControl",
+  "DTSAPO4_Enable",
+  "DTSAPO4_GetOpModeList",
+  "DTSAPO4_OpModeControl",
+  "SpeakerShifterControl"
+,
+]
+
+# ----------------------------------------------------------------
+# 可写白名单（80 = render 62 + capture 12 + SS×16 + EQ×10 + 声道×2）
+# ----------------------------------------------------------------
+# 全部经实机「写入→读回」往返验证。S3 起唯一真源，两线白名单/值域/离散
+# 全由本节派生。字段：
+#   ep    render=扬声器链  capture=麦克风链（麦克风参数打渲染端点必 ret=2）
+#   t     bool | int | float —— 与两线 kind/TBool…/「bool」… 一一对应
+#   lo/hi 数值钳制区间；缺省 = 不钳制（如 SS_*_DIST，驱动自己管）
+#   choices 离散取值白名单（驱动对非法值返回 0x10003，先在应用层收口）
+# ★ 不登记 = /api/params 报 w=false = 界面控件点不动（铁律 1）。
+# ★ '#' 名是虚拟参数（声道索引），不进 208 表、不进 .profile。
+# 历史真值注释（GFSControl 恢复登记、SURRSENS 绑定更正、声道拓扑证伪等）
+# 完整保留在 git 历史与当日日志里；此处只留每条的行内短注。
+
+[[writable]]
+ep = "render"
+name = "Enable_EQ_GFX"
+t = "bool"
+notes = "均衡器总开关"
+
+[[writable]]
+ep = "render"
+name = "Enable_SS_LFX"
+t = "bool"
+notes = "虚拟环绕（声场扩展）"
+
+[[writable]]
+ep = "render"
+name = "Enable_RFX_GFX"
+t = "bool"
+notes = "环境音效"
+
+[[writable]]
+ep = "render"
+name = "Enable_VOCALCANCEL_GFX"
+t = "bool"
+notes = "人声消除"
+
+[[writable]]
+ep = "render"
+name = "Enable_KEYSHIFT_GFX"
+t = "bool"
+notes = "升降 Key"
+
+[[writable]]
+ep = "render"
+name = "MuteControl"
+t = "bool"
+notes = "render=扬声器静音 / capture=麦克风静音"
+
+[[writable]]
+ep = "render"
+name = "GFSControl"
+t = "bool"
+notes = "GFS 开关（HKCU/.../Hook/EnableGFS 读写接口；2026-10-22 恢复登记）"
+
+[[writable]]
+ep = "render"
+name = "VOCALCANCEL_LEVEL"
+t = "int"
+lo = 0
+hi = 100
+notes = "人声消除强度"
+
+[[writable]]
+ep = "render"
+name = "KEYSHIFT_LEVEL"
+t = "int"
+lo = -4
+hi = 4
+notes = "升降 Key 档位"
+
+[[writable]]
+ep = "render"
+name = "RFX_ENVIRONMENT"
+t = "int"
+lo = 0
+hi = 27
+notes = "环境类型（裸驱动接受 0..40 无钳制，界面按原面板 0..27 收口）"
+
+[[writable]]
+ep = "render"
+name = "RFX_ROOMSIZE"
+t = "int"
+lo = 0
+hi = 2
+notes = "房间大小 0=大 1=中 2=小（Tag 反序）"
+
+[[writable]]
+ep = "render"
+name = "VolumeControl"
+t = "float"
+notes = "render=主音量(dB) / capture=麦克风音量(dB)"
+
+[[writable]]
+ep = "render"
+name = "VolumeScalarControl"
+t = "float"
+lo = 0
+hi = 1
+notes = "标量音量 0..1；'#0/#1'=逐声道虚拟参数"
+
+[[writable]]
+ep = "render"
+name = "Enable_Channel_COPY_LFX"
+t = "bool"
+notes = "声道复制"
+
+[[writable]]
+ep = "render"
+name = "Enable_AUDIOBRILLIANT_LFX"
+t = "bool"
+notes = "Xear Audio Brilliant 开关"
+
+[[writable]]
+ep = "render"
+name = "AUDIOBRILLIANT_LEVEL"
+t = "int"
+lo = 0
+hi = 6
+notes = "增艳强度"
+
+[[writable]]
+ep = "render"
+name = "Enable_SMART_VOLUME_GFX"
+t = "bool"
+notes = "Xear Smart Volume 开关"
+
+[[writable]]
+ep = "render"
+name = "Enable_BM_GFX"
+t = "bool"
+notes = "Xear Dynamic Bass 开关"
+
+[[writable]]
+ep = "render"
+name = "BM_Slider_BassLevel"
+t = "int"
+lo = 0
+hi = 10
+notes = "低音强度"
+
+[[writable]]
+ep = "render"
+name = "BM_Slider_Frequency"
+t = "int"
+lo = 100
+hi = 400
+notes = "低音截止 Hz"
+
+[[writable]]
+ep = "render"
+name = "Enable_VOICECLARITY_LFX"
+t = "bool"
+notes = "Xear Voice Clarity 开关"
+
+[[writable]]
+ep = "render"
+name = "VOICECLARITY_LEVEL"
+t = "int"
+lo = 0
+hi = 6
+notes = "清晰度强度"
+
+[[writable]]
+ep = "render"
+name = "VOICECLARITY_NOISESUPP_LEVEL"
+t = "int"
+lo = 0
+hi = 20
+notes = "通信降噪 dB"
+
+[[writable]]
+ep = "render"
+name = "Enable_CONLAB_HPSPK_LFX"
+t = "bool"
+notes = "Xear Surround Headphone 开关"
+
+[[writable]]
+ep = "render"
+name = "CONLAB_HPSPK_MODE"
+t = "int"
+lo = 0
+hi = 1
+notes = "0=音乐/游戏 1=电影"
+
+[[writable]]
+ep = "render"
+name = "CONLAB_HPSPK_ROOMSIZE"
+t = "int"
+lo = 0
+hi = 2
+notes = "0=大 1=中 2=小（Tag 反序）"
+
+[[writable]]
+ep = "render"
+name = "Enable_SURRSENS_LFX"
+t = "bool"
+notes = "Xear Surround Max 开关（第 48 轮更正：非 SURRMAX_FOR_HPSPK）"
+
+[[writable]]
+ep = "render"
+name = "CONLAB_HPSPK_SFX"
+t = "int"
+lo = 0
+hi = 3
+notes = "声场扩展"
+
+[[writable]]
+ep = "render"
+name = "CONLAB_HPSPK_SPKANGLE"
+t = "int"
+lo = 5
+hi = 30
+notes = "扬声器角度（步进 5）"
+
+[[writable]]
+ep = "render"
+name = "Enable_DHDVS_LFX"
+t = "bool"
+notes = "Dolby 环绕总开关"
+
+[[writable]]
+ep = "render"
+name = "DHDVS_USEDH"
+t = "int"
+lo = 0
+hi = 1
+notes = "0=VS 1=HP"
+
+[[writable]]
+ep = "render"
+name = "DVS_Mode"
+t = "int"
+lo = 0
+hi = 1
+notes = "0=Reference 1=Wide"
+
+[[writable]]
+ep = "render"
+name = "DH_Mode"
+t = "int"
+lo = 0
+hi = 2
+notes = "0=Studio 1=Cinema 2=Hall"
+
+[[writable]]
+ep = "render"
+name = "Speaker_Channel_Setting"
+t = "int"
+choices = [2, 4, 6, 8]
+notes = "声道配置，Tag 即声道数；切换不打断在播流（已证伪）"
+
+[[writable]]
+ep = "render"
+name = "Enable_SwapLfeCn_LFX"
+t = "bool"
+notes = "中置/重低音互换"
+
+[[writable]]
+ep = "render"
+name = "Enable_SwapSrBk_LFX"
+t = "bool"
+notes = "侧置/后置互换"
+
+[[writable]]
+ep = "render"
+name = "DevSampleRateControl"
+t = "int"
+choices = [44100, 48000]
+notes = "采样率，只接受 44100/48000（其余 0x10003）"
+
+[[writable]]
+ep = "capture"
+name = "VolumeControl"
+t = "float"
+notes = "render=主音量(dB) / capture=麦克风音量(dB)"
+
+[[writable]]
+ep = "capture"
+name = "VolumeScalarControl"
+t = "float"
+lo = 0
+hi = 1
+notes = "标量音量 0..1；'#0/#1'=逐声道虚拟参数"
+
+[[writable]]
+ep = "capture"
+name = "MuteControl"
+t = "bool"
+notes = "render=扬声器静音 / capture=麦克风静音"
+
+[[writable]]
+ep = "capture"
+name = "Enable_NOISEREDUCTION_LFX"
+t = "bool"
+notes = "环境降噪"
+
+[[writable]]
+ep = "capture"
+name = "NoiseReduction_Level"
+t = "int"
+lo = 8
+hi = 20
+notes = "降噪强度"
+
+[[writable]]
+ep = "capture"
+name = "Enable_MAGICVOICE"
+t = "bool"
+notes = "魔音变声"
+
+[[writable]]
+ep = "capture"
+name = "MagicVoice_Selection"
+t = "int"
+lo = 0
+hi = 3
+notes = "魔音类型（怪兽/卡通/男人/女人）"
+
+[[writable]]
+ep = "capture"
+name = "Enable_MICECHO"
+t = "bool"
+notes = "麦克风回音"
+
+[[writable]]
+ep = "capture"
+name = "MICECHO_Level"
+t = "int"
+lo = -12
+hi = 12
+notes = "回音电平"
+
+[[writable]]
+ep = "capture"
+name = "AGCControl"
+t = "bool"
+notes = "Microphone Boost"
+
+[[writable]]
+ep = "capture"
+name = "AAVolumeControl"
+t = "float"
+lo = -23
+hi = 8
+notes = "模拟功放音量 dB"
+
+[[writable]]
+ep = "capture"
+name = "DevSampleRateControl"
+t = "int"
+choices = [44100, 48000]
+notes = "采样率，只接受 44100/48000（其余 0x10003）"
+
+[[writable]]
+ep = "capture"
+name = "Enable_AEC_LFX"
+t = "bool"
+notes = "回音消除（apoMicInAEC，第 62 轮）"
+
+[[writable]]
+ep = "capture"
+name = "Enable_ENC_LFX"
+t = "bool"
+notes = "通话降噪（apoMicInENC，第 62 轮）"
+
+[[writable]]
+ep = "capture"
+name = "Enable_MICARRAY_LFX"
+t = "bool"
+notes = "麦克风收音（apoMicInBeamForming，第 62 轮）"
+
+[[writable]]
+ep = "render"
+name = "SS_C_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+notes = "虚拟音箱中置角度（±180 为规范化区间，驱动不钳位）"
+
+[[writable]]
+ep = "render"
+name = "SS_C_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "SS_LF_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+
+[[writable]]
+ep = "render"
+name = "SS_LF_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "SS_RF_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+
+[[writable]]
+ep = "render"
+name = "SS_RF_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "SS_LS_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+
+[[writable]]
+ep = "render"
+name = "SS_LS_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "SS_RS_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+
+[[writable]]
+ep = "render"
+name = "SS_RS_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "SS_LB_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+
+[[writable]]
+ep = "render"
+name = "SS_LB_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "SS_RB_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+
+[[writable]]
+ep = "render"
+name = "SS_RB_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "SS_LFE_ANGLE"
+t = "int"
+lo = -180
+hi = 180
+notes = "虚拟音箱 LFE 角度（官方默认 180 落在边界）"
+
+[[writable]]
+ep = "render"
+name = "SS_LFE_DIST"
+t = "int"
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider1"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider2"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider3"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider4"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider5"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider6"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider7"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider8"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider9"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "EQ_Slider10"
+t = "int"
+lo = -20
+hi = 20
+
+[[writable]]
+ep = "render"
+name = "VolumeScalarControl#0"
+t = "float"
+lo = 0
+hi = 1
+
+[[writable]]
+ep = "render"
+name = "VolumeScalarControl#1"
+t = "float"
+lo = 0
+hi = 1
+
+# ----------------------------------------------------------------
+# 分组映射 / 标签 / 展示顺序 / 端点元数据（S4）
+# ----------------------------------------------------------------
+# 组名 = 官方 ApoEffect 分组名（= 页面 Canvas 名，exe 里 0x186A08~0x1875E0
+# 那张 101 串页面名表同一套「端点族前缀 + 页名」命名）。
+# profile_groups：属性名 → 组；"EQ_Slider" 是**前缀键**（groupOf 先查精确名
+# 再查前缀），SS_*_ANGLE/_DIST 走解释器前缀规则，都不逐个铺。
+# label 的合并描述口径：一张官方页住多个模块时按「页」合并（Karaoke、
+# Setting、MicInVol），拆开反而与官方 .profile 对不上。
+
+[profile_groups.render]
+"MuteControl" = "SpeakerVolume"
+"VolumeControl" = "SpeakerVolume"
+"VolumeScalarControl" = "SpeakerVolume"
+"Enable_EQ_GFX" = "SpeakerEQ"
+"EQ_Slider" = "SpeakerEQ"
+"Enable_RFX_GFX" = "SpeakerEM"
+"RFX_ENVIRONMENT" = "SpeakerEM"
+"RFX_ROOMSIZE" = "SpeakerEM"
+"Enable_VOCALCANCEL_GFX" = "SpeakerKaraoke"
+"VOCALCANCEL_LEVEL" = "SpeakerKaraoke"
+"Enable_KEYSHIFT_GFX" = "SpeakerKaraoke"
+"KEYSHIFT_LEVEL" = "SpeakerKaraoke"
+"DevSampleRateControl" = "SpeakerSamplingRate"
+"Enable_Channel_COPY_LFX" = "SpeakerSetting"
+"GFSControl" = "GFS"
+"Enable_AUDIOBRILLIANT_LFX" = "SpeakerXearAudioBrilliant"
+"AUDIOBRILLIANT_LEVEL" = "SpeakerXearAudioBrilliant"
+"Enable_BM_GFX" = "SpeakerXearDynamicBass"
+"BM_Slider_BassLevel" = "SpeakerXearDynamicBass"
+"BM_Slider_Frequency" = "SpeakerXearDynamicBass"
+"Enable_SMART_VOLUME_GFX" = "SpeakerXearSmartVolume"
+"Enable_VOICECLARITY_LFX" = "SpeakerXearVoiceClarity"
+"VOICECLARITY_LEVEL" = "SpeakerXearVoiceClarity"
+"VOICECLARITY_NOISESUPP_LEVEL" = "SpeakerXearVoiceClarity"
+"Enable_CONLAB_HPSPK_LFX" = "SpeakerXearSurroundHeadPhone"
+"CONLAB_HPSPK_MODE" = "SpeakerXearSurroundHeadPhone"
+"CONLAB_HPSPK_ROOMSIZE" = "SpeakerXearSurroundHeadPhone"
+"CONLAB_HPSPK_SFX" = "SpeakerXearSurroundSpeakers"
+"CONLAB_HPSPK_SPKANGLE" = "SpeakerXearSurroundSpeakers"
+"Enable_SURRSENS_LFX" = "SpeakerSurroundMax"
+"Enable_DHDVS_LFX" = "SpeakerDolbyHPVS"
+"DHDVS_USEDH" = "SpeakerDolbyHPVS"
+"DVS_Mode" = "SpeakerDolbyHPVS"
+"DH_Mode" = "SpeakerDolbyHPVS"
+"Enable_SS_LFX" = "SpeakerVirtual"
+"Speaker_Channel_Setting" = "SpeakerSetting"
+"Enable_SwapLfeCn_LFX" = "SpeakerSetting"
+"Enable_SwapSrBk_LFX" = "SpeakerSetting"
+
+[profile_groups.capture]
+"VolumeControl" = "MicInVolume"
+"VolumeScalarControl" = "MicInVolume"
+"MuteControl" = "MicInVolume"
+"AAVolumeControl" = "MicInVolume"
+"Enable_NOISEREDUCTION_LFX" = "MicInNoiseReduction"
+"NoiseReduction_Level" = "MicInNoiseReduction"
+"Enable_MAGICVOICE" = "MicInXearMagicVoice"
+"MagicVoice_Selection" = "MicInXearMagicVoice"
+"AGCControl" = "MicInAGC"
+"DevSampleRateControl" = "MicInSamplingRate"
+"Enable_MICECHO" = "MicEcho"
+"MICECHO_Level" = "MicEcho"
+"Enable_AEC_LFX" = "MicInAEC"
+"Enable_ENC_LFX" = "MicInENC"
+"Enable_MICARRAY_LFX" = "MicInBeamForming"
+
+# 组名 → 界面短标签（场景详情副行）。SpeakerQuarter/DesktopMic 两组只读
+# （用于把官方 FactoryDefault.xml 读好看，我们从不写它们）。
+[group_label]
+SpeakerVolume = "音量"
+SpeakerEQ = "EQ"
+SpeakerEM = "环境声"
+SpeakerKaraoke = "人声消除与变调"
+SpeakerSamplingRate = "采样率"
+SpeakerSetting = "声道设定"
+SpeakerVirtual = "虚拟环绕"
+SpeakerXearSurroundHeadPhone = "耳机环绕"
+SpeakerXearSurroundSpeakers = "环绕扬声器"
+SpeakerSurroundMax = "环绕增强"
+SpeakerDolbyHPVS = "Dolby 环绕"
+SpeakerXearAudioBrilliant = "音频增艳"
+SpeakerXearDynamicBass = "动态低音"
+SpeakerXearSmartVolume = "智能音量"
+SpeakerXearVoiceClarity = "语音清晰度"
+GFS = "GFS"
+MicInVolume = "麦克风音量"
+MicInNoiseReduction = "降噪"
+MicInXearMagicVoice = "魔音"
+MicEcho = "回音"
+MicInAGC = "自动增益"
+MicInAEC = "回音消除"
+MicInENC = "通话降噪"
+MicInBeamForming = "麦克风收音"
+MicInSamplingRate = "麦克风采样率"
+SpeakerQuarterSetting = "四声道设定"
+DesktopMicSamplingRate = "桌面麦克风采样率"
+General = "其他"
+
+# 渲染分组展示顺序（照官方面板菜单）；采集端整体排后（rank+1000）。
+# 表外的自定义分组 rank=base+500，排已知组之后。
+[display]
+group_order = [
+  "SpeakerVolume",
+  "SpeakerEQ",
+  "SpeakerEM",
+  "SpeakerVirtual",
+  "SpeakerXearSurroundHeadPhone",
+  "SpeakerXearSurroundSpeakers",
+  "SpeakerSurroundMax",
+  "SpeakerDolbyHPVS",
+  "SpeakerKaraoke",
+  "SpeakerXearAudioBrilliant",
+  "SpeakerXearDynamicBass",
+  "SpeakerXearSmartVolume",
+  "SpeakerXearVoiceClarity",
+  "SpeakerSetting",
+  "SpeakerSamplingRate",
+  "GFS",
+  "MicInVolume",
+  "MicInNoiseReduction",
+  "MicInAGC",
+  "MicInXearMagicVoice",
+  "MicEcho",
+  "MicInAEC",
+  "MicInENC",
+  "MicInBeamForming",
+  "MicInSamplingRate",
+  "SpeakerQuarterSetting",
+  "DesktopMicSamplingRate"
+]
+
+# 端点 → 官方 Endpoint 名 / DataFlow（.profile 的 <EffectGroup> 头）
+[profile_endpoint]
+render = ["Speakers", "Out"]
+capture = ["Mic", "In"]
+
+# 数值类型 → ValueType 文本（官方用 .NET 类型名）
+[profile_value_type]
+bool = "System.UInt32"
+int = "System.Int32"
+float = "System.Single"

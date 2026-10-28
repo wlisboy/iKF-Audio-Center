@@ -90,168 +90,26 @@ type wspec struct {
 	choices []int
 }
 
-// writable —— 按端点分表。
+// writable —— 按端点分表，S3 起真源 = model/device-model.toml [[writable]]
+// （80 = render 65 + capture 15，装载时自校验，含 SS×16/EQ×10/声道×2 显式展开）。
 //
 // 注意 VolumeControl / VolumeScalarControl / MuteControl 在**两个端点上都有**，
 // 语义分别是扬声器音量与麦克风音量，所以必须分开登记。
-var writable = map[string]map[string]wspec{
-	EpRender: {
-		"Enable_EQ_GFX":          {kind: TBool},
-		"Enable_SS_LFX":          {kind: TBool},
-		"Enable_RFX_GFX":         {kind: TBool},
-		"Enable_VOCALCANCEL_GFX": {kind: TBool},
-		"Enable_KEYSHIFT_GFX":    {kind: TBool},
-		// 原面板 MainWindow 的 EnableGX 复选框 / 环境页的 Hook 开关
-		"MuteControl": {kind: TBool},
-		// ★ 2026-10-19：GFSControl 从白名单摘除 —— 它是 HKCU\SOFTWARE\C-Media
-		// \Hook\EnableGFS 的读写接口，该键由**官方程序**安装并维护；新框架
-		// 环境下整棵 HKCU\SOFTWARE\C-Media 不存在，真机实测读回 0x10004、
-		// 写不进（writable_probe_test 复现）。不可写入的不做成参数（用户拍板），
-		// 界面「全景音效」开关同步移除。若将来做官方键迁移再回来。
-		"VOCALCANCEL_LEVEL":   {kind: TInt, lo: 0, hi: 100, hasRange: true},
-		"KEYSHIFT_LEVEL":      {kind: TInt, lo: -4, hi: 4, hasRange: true},
-		"RFX_ENVIRONMENT":     {kind: TInt, lo: 0, hi: 27, hasRange: true}, // 裸驱动实测接受 0..40 无钳制；界面按原面板定义的 0..27 收口
-		"RFX_ROOMSIZE":        {kind: TInt, lo: 0, hi: 2, hasRange: true},
-		"VolumeControl":       {kind: TFloat},
-		"VolumeScalarControl": {kind: TFloat, lo: 0, hi: 1, hasRange: true},
-		// 原面板「喇叭设定」页的声道复制；实测 0/1 可写且生效
-		"Enable_Channel_COPY_LFX": {kind: TBool},
-		// ---- A 档 Xear 音效族（第 46 轮移植）----
-		// 值域逐条取自官方面板 .cml 的 Slider Minimum/Maximum；可写性由
-		// port_probe.py 逐项「写→读回」实测（wret=0 且 ret=0）。
-		// ★ 不登记在这里 = /api/params 报 w=false = 界面控件点不动。
-		"Enable_AUDIOBRILLIANT_LFX":    {kind: TBool}, // Xear Audio Brilliant
-		"AUDIOBRILLIANT_LEVEL":         {kind: TInt, lo: 0, hi: 6, hasRange: true},
-		"Enable_SMART_VOLUME_GFX":      {kind: TBool}, // Xear Smart Volume
-		"Enable_BM_GFX":                {kind: TBool}, // Xear Dynamic Bass
-		"BM_Slider_BassLevel":          {kind: TInt, lo: 0, hi: 10, hasRange: true},
-		"BM_Slider_Frequency":          {kind: TInt, lo: 100, hi: 400, hasRange: true},
-		"Enable_VOICECLARITY_LFX":      {kind: TBool}, // Xear Voice Clarity
-		"VOICECLARITY_LEVEL":           {kind: TInt, lo: 0, hi: 6, hasRange: true},
-		"VOICECLARITY_NOISESUPP_LEVEL": {kind: TInt, lo: 0, hi: 20, hasRange: true},
-		// ---- B 档 Xear 环绕族（第 47 轮移植，第 48 轮更正一处绑定）----
-		// 官方三张环绕页的实际控件远少于参数表：Surround Max 只有开关 BtnEnableSM，
-		// SURRSENS_* 12 项官方从无界面。值域取自 .cml 的 RadioButton Tag。
-		"Enable_CONLAB_HPSPK_LFX": {kind: TBool},                              // Xear Surround Headphone
-		"CONLAB_HPSPK_MODE":       {kind: TInt, lo: 0, hi: 1, hasRange: true}, // 0=音乐/游戏 1=电影
-		"CONLAB_HPSPK_ROOMSIZE":   {kind: TInt, lo: 0, hi: 2, hasRange: true}, // 0=大 1=中 2=小（Tag 反序）
-		// ★★ 第 48 轮更正：「环绕增强」原绑 Enable_SURRMAX_FOR_HPSPK 是**绑错了** ——
-		// 该名字在 XearAudioCenter_x64.exe 里出现 0 次（只在 osConfLib.dll 参数表里），
-		// 官方面板从不用它。Surround Max 页真正的开关是 Enable_SURRSENS_LFX，
-		// 它与 Enable_DHDVS_LFX / Enable_SS_LFX / Enable_PLIIX_LFX 同列。
-		"Enable_SURRSENS_LFX": {kind: TBool}, // Xear Surround Max（第 48 轮更正）
-		// Xear Surround Speaker 页的两根滑杆（官方耳机菜单同样有这张页）。
-		// ★ 绑定为「控件名↔参数名同名 + exe 字符串表同块」推断。
-		"CONLAB_HPSPK_SFX":      {kind: TInt, lo: 0, hi: 3, hasRange: true},  // 声场扩展
-		"CONLAB_HPSPK_SPKANGLE": {kind: TInt, lo: 5, hi: 30, hasRange: true}, // 扬声器角度
-		// ---- C 档 Dolby Headphone / Dolby Virtual Speaker（第 48 轮移植）----
-		// 官方页 apoSpeakerDolbyHPVS.cml（耳机菜单里有）。控件→参数由 exe 字符串表坐实：
-		//   总开关→Enable_DHDVS_LFX · VS/HP 二选一→DHDVS_USEDH · Reference/Wide→DVS_Mode
-		//   · Studio/Cinema/Hall→DH_Mode。档位数按 .cml 里 RadioButton 个数定。
-		"Enable_DHDVS_LFX": {kind: TBool},                              // Dolby 环绕总开关
-		"DHDVS_USEDH":      {kind: TInt, lo: 0, hi: 1, hasRange: true}, // 0=VS 1=HP
-		"DVS_Mode":         {kind: TInt, lo: 0, hi: 1, hasRange: true}, // 0=Reference 1=Wide
-		"DH_Mode":          {kind: TInt, lo: 0, hi: 2, hasRange: true}, // 0=Studio 1=Cinema 2=Hall
-		// ---- E 档 声道配置与声道互换（第 50 轮移植）----
-		// 官方「设定」页 apoSpeakerSetting.cml 实际渲染的控件（这是耳机 / 扬声器 /
-		// SPDIF 三个 Setting 菜单项**共用的唯一布局**：exe 用 `%sapo%s.cml` 拼页面
-		// 文件名，而 CPL 里只有这一个 apo*Setting.cml）。
-		// 配对依据 = XearAudioCenter_x64.exe 字符串表里控件名与参数名**紧邻**：
-		//   …WooferCenterSwap | Enable_SwapLfeCn_LFX | SideBackSwap | Enable_SwapSrBk_LFX…
-		// ★ 同一页里 ChannelCopy 与 3 根 SpeakerDelay 滑杆**整块被注释掉**
-		//   （AreaTimeDelay 还带 Visibility="Hidden"）⟹ 官方没做界面，不移植。
-		//   「可写」不等于「该移植」：三项延迟实测全部可写（见 E 档报告）。
-		// ★ 声道配置不加「会中断播放」确认框：旧结论「改声道会重初始化端点」已证伪
-		//   —— 当年 stream_kill.py 把 Enable_SS_LFX=0 与 Speaker_Channel_Setting=2
-		//   捆在同一次写入，逐项归因后真凶是 XearSurround71Control。
-		//   实测 2→8→6→2 全程在播流不断、端点混音格式恒 8 声道。
-		"Speaker_Channel_Setting": {kind: TInt, choices: []int{2, 4, 6, 8}}, // 声道配置（Tag 即声道数）
-		"Enable_SwapLfeCn_LFX":    {kind: TBool},                            // 中置/重低音声道互换
-		"Enable_SwapSrBk_LFX":     {kind: TBool},                            // 侧置/后置声道互换
-		// 原面板「取样频率」页。实测只接受 44100 / 48000，其余返回 0x10003。
-		"DevSampleRateControl": {kind: TInt, choices: []int{44100, 48000}},
-	},
-	EpCapture: {
-		// 原面板 apoMicInVol / apoMicInNoiseReduction / apoMicInXearMagicVoice /
-		// apoMicInKaraoke 页，全部实测可写且生效
-		"VolumeControl":             {kind: TFloat},
-		"VolumeScalarControl":       {kind: TFloat, lo: 0, hi: 1, hasRange: true},
-		"MuteControl":               {kind: TBool},
-		"Enable_NOISEREDUCTION_LFX": {kind: TBool},
-		"NoiseReduction_Level":      {kind: TInt, lo: 8, hi: 20, hasRange: true},
-		"Enable_MAGICVOICE":         {kind: TBool},
-		"MagicVoice_Selection":      {kind: TInt, lo: 0, hi: 3, hasRange: true},
-		"Enable_MICECHO":            {kind: TBool},
-		"MICECHO_Level":             {kind: TInt, lo: -12, hi: 12, hasRange: true},
-		"AGCControl":                {kind: TBool},
-		"AAVolumeControl":           {kind: TFloat, lo: -23, hi: 8, hasRange: true},
-		"DevSampleRateControl":      {kind: TInt, choices: []int{44100, 48000}},
-		// ---- 第 62 轮 · 麦克风专项三开关（官方 MenuMicIn 菜单实有页）----
-		// 绑定证据：cml 控件 BtnEnableAEC/BtnEnableENC/BtnEnableBeamForming +
-		// exe 串表 MicInAECHandler/MicInENCHandler 同簇；参数名唯一对应；
-		// port_probe 实测 capture 端点「写→读回」全通（ret0=2 是从未写过）。
-		// ★ 同族的 MICARRAY_BEAMWIDTH / ENC_SELFCALIB / RecordingPreviewControl
-		//   在官方 exe 里 0 引用 ⟹ 官方没给控件，不做（红线）。与 Python 侧
-		//   WRITABLE[EP_CAPTURE] 逐字段对齐。
-		"Enable_AEC_LFX":      {kind: TBool}, // 回音消除（apoMicInAEC）
-		"Enable_ENC_LFX":      {kind: TBool}, // 通话降噪（apoMicInENC）
-		"Enable_MICARRAY_LFX": {kind: TBool}, // 麦克风收音（apoMicInBeamForming）
-	},
-}
-
-func init() {
-	// 音箱方位 / 距离（Xear Surround Speaker 一族的 SS_*_ANGLE / SS_*_DIST）。
-	//
-	// ★ 实测更正（2026-10-14）：这 16 项此前被判「本机不支持」，那是**只读探测**
-	// 得出的错误结论。实际是「写后即可读」：没写过时读返回 2（存在但无值），
-	// 写一次就变成可读（ret=0）且跨进程持久；驱动不做值域校验，负数照收
-	// （实测写 SS_LF_ANGLE=-32 读回 -32，写 SS_C_ANGLE=200 也读回 200）。
-	// 所以界面上的「拖动音箱」必须真写，不能替硬件下「不支持」的结论。
-	//
-	// 值域：角度按几何意义收在 ±180；距离的单位未从驱动侧确认，**不设 hasRange**
-	// （= 不钳制），由驱动自己决定。
-	//
-	// ★★ 第 49 轮（D 档 7.1 虚拟音箱摆位）补齐的另一半证据：
-	//   官方页 apoSpeakerVirtual.cml 的控件是 开关 + 4 个模式单选钮 + Reset +
-	//   8 个可拖拽音箱 + 8 根**只读** dB 条 —— **没有角度/距离滑杆**，
-	//   这 16 项就是那张页唯一的可写落点。
-	//   ① 官方默认值（官方安装态 --dump 快照，界面 base 逐值照抄）：
-	//        LF=-32 · C=0 · RF=32 · RS=90 · RB=148 · LB=-148 · LS=-90 · LFE=180
-	//   ② 驱动**不钳位**：写 ±999 / ±360 一律原样回读 ⟹ lo/hi 是本面板的
-	//      规范化区间，不是驱动上下限。
-	//   ③ ★ 官方页那 4 个模式（顺时钟环绕 / 逆时钟环绕 / 手动旋转 / 手动平移）
-	//      **不是驱动属性**：__Manual / __Clockwise / __CounterClockwise /
-	//      __WiseArround 原始读取 ret=-1；同块的 SpeakerShifterControl 虽是属性
-	//      但载荷恒为 0，写 0…6 角度不动。⟹ 纯界面动作，**绝不能登记**。
-	for _, sp := range []string{"C", "LF", "RF", "LS", "RS", "LB", "RB", "LFE"} {
-		writable[EpRender]["SS_"+sp+"_ANGLE"] = wspec{kind: TInt, lo: -180, hi: 180, hasRange: true}
-		writable[EpRender]["SS_"+sp+"_DIST"] = wspec{kind: TInt}
+// 历史逐条真值注释（GFSControl 恢复登记、SURRSENS 绑定更正、声道切换证伪、
+// SS 规范化区间、DevSampleRate 离散收口等）随数据走，见 TOML 与当日日志。
+var writable = func() map[string]map[string]wspec {
+	kindOf := map[string]int{"bool": TBool, "int": TInt, "float": TFloat}
+	out := map[string]map[string]wspec{EpRender: {}, EpCapture: {}}
+	for _, w := range modelData.Writable {
+		sp := wspec{kind: kindOf[w.T], choices: w.Choices}
+		if w.Lo != nil && w.Hi != nil {
+			sp.lo, sp.hi, sp.hasRange = *w.Lo, *w.Hi, true
+		}
+		out[w.Ep][w.Name] = sp
 	}
+	return out
+}()
 
-	for i := 1; i <= 10; i++ {
-		writable[EpRender][fmt.Sprintf("EQ_Slider%d", i)] = wspec{kind: TInt, lo: -20, hi: 20, hasRange: true}
-	}
-
-	// ★★ 第 52 轮（H 档）：**逐声道音量** —— 名字里带 "#<声道索引>" 的虚拟参数。
-	//
-	// 背景：PropertyControl 的 pValue 是二级指针，*pValue → int32 声道索引；
-	// 早期实现只按需要写死 -1。第 52 轮用「改索引再读回」验证它是**真参数**：
-	//   VolumeScalarControl idx=0 → 0.500000   idx=1 → 0.500000
-	//   idx=2..7                 → ret=0x10004（该声道不存在）
-	//   写 idx=0=0.30 / idx=1=0.70 → 互不影响地读回 0.30 / 0.70
-	// 索引语义与官方 apoSpeakerVol.cml 的 Slider Tag 一致：
-	//   0=FL 1=FR 2=FC 3=LFE 4=BL 5=BR 6=SL 7=SR
-	// 本机 iKF 耳机端点是**立体声端点**：只有 0/1 存在；把
-	// Speaker_Channel_Setting 切到 4/6/8 也不会展开（h_probe3 实测）。
-	// ★ "#" 名不是驱动属性，profileSave 显式跳过；groupOf 先剥后缀再查表。
-	// ★ 不进 allNames（那是 208 项真实属性），只在 ParamMapEp 里额外补出来。
-	for cn := range channelParams {
-		writable[EpRender][cn] = wspec{kind: TFloat, lo: 0, hi: 1, hasRange: true}
-	}
-}
-
-// channelParams 逐声道音量的虚拟参数名 → 声道索引（第 52 轮，H 档）。
-// 与 Python 侧 CHANNEL_PARAMS 逐项一致。
 var channelParams = map[string]int{
 	"VolumeScalarControl#0": 0, // FrontLeft
 	"VolumeScalarControl#1": 1, // FrontRight
@@ -672,6 +530,13 @@ func (d *Driver) openLocked() bool {
 	cands = append(cands, sharedCpls()...)
 
 	var tried []string
+	// ★ 2026-10-26：循环里有三个不同的失败点（LoadLibrary / ConfLibInit /
+	// 设备枚举为 0），以前统一报"加载失败"。VM 实证（2026-10-26 00:02）：
+	// 插上耳机立刻启动程序时，重试 3 次失败发生在设备还在枚举的窗口里
+	// （设备管理器 00:02:59 才"已启动设备"，应用 00:03:14 自愈）——真实
+	// 原因多半是"设备数为 0"而非加载失败。failWhy 记录最后一次尝试
+	// （通常是便携包自带 CPL）真实失败在哪一步，随 errMsg 进按天日志。
+	failWhy := ""
 	seen := map[string]bool{}
 	for _, cpl := range cands {
 		if cpl == "" || seen[cpl] {
@@ -694,6 +559,9 @@ func (d *Driver) openLocked() bool {
 
 		mod := syscall.NewLazyDLL(dll)
 		if err := mod.Load(); err != nil {
+			// 常见：126 依赖缺失、32 ERROR_SHARING_VIOLATION（杀软扫描占住
+			// 文件）、1115 DLL 初始化失败 —— 数字码比文字好 grep。
+			failWhy = fmt.Sprintf("加载 DLL 失败（%v）", err)
 			continue
 		}
 		d.confInit = mod.NewProc("ConfLibInit")
@@ -709,6 +577,7 @@ func (d *Driver) openLocked() bool {
 		d.showAsio = mod.NewProc("ShowAsioPanel")
 
 		if r, _, _ := d.confInit.Call(); int32(r) != 0 {
+			failWhy = fmt.Sprintf("ConfLibInit 返回 %d", int32(r))
 			continue
 		}
 		d.createLst.Call()
@@ -717,12 +586,19 @@ func (d *Driver) openLocked() bool {
 		d.getCount.Call(0, uintptr(unsafe.Pointer(&cnt)))
 		runtime.KeepAlive(&cnt)
 		if cnt <= 0 {
+			failWhy = "设备枚举为 0（耳机未插入或系统还在枚举 USB 设备）"
+			/* ★ 2026-10-22：Init 成功就必须配对撤销。以前这里直接 continue，
+			   驱动没装时启动重试 4 次就留下 4 次未配对的 ConfLibInit，之后
+			   Close 只撤 1 次 —— 净残留 3 次。实测本机（设备在线）重复 Init
+			   无害，但这是明确的资源管理缺口，不能靠"没崩"继续放着。 */
+			d.confUnini.Call()
 			continue
 		}
 		dev := make([]byte, 32)
 		r, _, _ := d.getByID.Call(0, 0, uintptr(unsafe.Pointer(&dev[0])))
 		runtime.KeepAlive(dev)
 		if int32(r) != 0 {
+			d.confUnini.Call()
 			continue
 		}
 		d.devKeep = dev
@@ -752,7 +628,11 @@ func (d *Driver) openLocked() bool {
 	}
 
 	if len(tried) > 0 {
-		d.errMsg = fmt.Sprintf("耳机驱动组件加载失败（%s）。请重新安装 iKF headset 驱动，并确认耳机已插入后重试。", tried[0])
+		msg := tried[len(tried)-1]
+		if failWhy != "" {
+			msg += "，" + failWhy
+		}
+		d.errMsg = fmt.Sprintf("耳机驱动组件未就绪（%s）。请重新安装 iKF headset 驱动，并确认耳机已插入后重试。", msg)
 	} else {
 		d.errMsg = "未检测到耳机驱动。请先安装 iKF headset 驱动，并确认耳机已连接到电脑，然后重新打开本程序。"
 	}
@@ -768,7 +648,70 @@ func (d *Driver) Close() {
 			}()
 		}
 		d.ready = false
+		/* ★ 2026-10-21：指针必须一起清。以前只清 ready，Close→Open 之后
+		   若新设备枚举不出采集端点，capReady/capPtr 还留着上一轮的旧值 ——
+		   那是已经作废的设备上下文（Close 已 ConfLibUnInit），再拿去
+		   PropertyControl 就是悬垂指针。reopen 让这条路径变成常规路径，
+		   所以在这里一次性归零。 */
+		d.devPtr, d.capPtr = 0, 0
+		d.devKeep, d.capKeep = nil, nil
+		d.capReady = false
+		d.devCnt, d.capCnt = 0, 0
+		/* ★ 2026-10-22：常量缓存一起清。Close 之后设备可能换了/驱动重装了，
+		   沿用上一轮 slowConst 的读数（如 GetDirectXVer）没有意义。 */
+		d.constMu.Lock()
+		d.constCache = nil
+		d.constMu.Unlock()
 	})
+}
+
+// Reopen 松开旧上下文再重新枚举端点。
+//
+// ★ 2026-10-21（用户拍板）：装完驱动立刻打开主程序时，音频端点可能还在
+// pnputil /restart-device 的重建窗口期里，openLocked 会一次失败。以前
+// 界面就此永久停在「未连接驱动」，唯一的出路是彻底关掉重开。Reopen 给
+// 前端一个自恢复入口（POST /api/driver/reopen），与 RunSetup 里装完驱动
+// 那一步 close→open 完全同路。
+//
+// ★ 2026-10-22（虚拟机上暴露，用户实测）：装完驱动再点「重新检测」，出现的
+// 是「麦克风 + 自定义场景」不可用、其余正常，而且**退出重开就好**。
+//
+// 原因是端点重建不是原子的：渲染端点先就绪、采集端点（麦克风）后到。
+// openLocked 一次就返回的话渲染侧全通、采集侧全 -9（ptrFor 里 capReady
+// 为 false），界面就是"一半能用"。场景墙同步空掉，因为 CPL 路径跟着一起没落地。
+//
+// ★ 重试判据不能用「上一轮有没有采集端点」：主程序启动时驱动根本没装，
+// 上一轮必然没有，判据恒不成立 —— 第一次修就栽在这里（一次都没重试）。
+// 现在只认「本轮连上了但采集端点缺失」，重试到拿到为止。
+func (d *Driver) Reopen() bool {
+	ok := false
+	for i := 0; i < 5; i++ {
+		if i > 0 {
+			ms := 400 << uint(i-1)
+			if ms > 1600 {
+				ms = 1600
+			}
+			time.Sleep(time.Duration(ms) * time.Millisecond)
+		}
+		d.Close()
+		ok = d.Open()
+		if !ok {
+			/* 完全没连上（驱动没装/端点整个没起来）：只再给一次机会
+			   （400ms）就够了。等满 5 轮 = 4.4 秒，用户点一下「重新检测」
+			   干等 4 秒才被告知没驱动，这个体验不能要。 */
+			if i >= 1 {
+				return false
+			}
+			continue
+		}
+		// 采集端点还没起来 → 端点重建没结束，这里才值得多等几轮
+		// （400/800/1600/1600ms）
+		if !d.capReady && i < 4 {
+			continue
+		}
+		return true
+	}
+	return ok
 }
 
 // ptrFor 取端点对应的设备上下文指针
@@ -1054,7 +997,7 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 // 官方面板里有、但新界面没登记成可写控件的属性（例如音箱方位的
 // SS_LF_ANGLE / SS_RF_ANGLE 一族），也必须真写一次并把驱动的真实返回码
 // 报出来，而不是在前端直接短路成「本机不支持」。本机这些属性返回 2
-// （存在但不支持），那是硬件给的结论，不是我们替它下的。
+// （存在但从未写过），那是硬件给的结论，不是我们替它下的。
 //
 // kind 为空时按 JSON 解出来的值类型推断（true/false → bool、整数 → int、
 // 其余 → float），前端也可以显式传 kind 覆盖。

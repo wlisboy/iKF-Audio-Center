@@ -1257,13 +1257,22 @@ html.devmode .dock button[data-dev]{display:flex}
           <svg viewBox="0 0 100 100"><circle class="dring" cx="50" cy="50" r="41"/><circle class="dval" cx="50" cy="50" r="41"/></svg>
           <div class="dnum">78</div><div class="dlab">音量</div>
         </div>
-        <div class="dial" data-dial="bass" data-val="45">
+        <!-- ★ 2026-10-22（用户拍板「吸附到驱动档位」）：这两个旋钮的
+             data-tiers 是**驱动能分出的档数**，不是界面随便定的 ——
+               动态低音 BM_Slider_BassLevel 0..10 ⟹ 10 档（11 个位置，步长 10）
+               语音清晰 VOICECLARITY_LEVEL 0..6  ⟹ 6 档（7 个位置，步长约 16.7）
+             拨盘刻度 0..100 只是显示用的归一化量，驱动表示不了 45 这种值：
+             写 45 进去被四舍五入成 5（bass）/3（clear），回读再乘回来就变
+             50 —— 用户看到的就是「数字自己变了」。有 tiers 就只落在真实档位
+             上，显示的数字 = 真正生效的值。主音量 VolumeScalarControl 是
+             0..1 的浮点（步进 0.01），全量程可表示，故不设 tiers。 -->
+        <div class="dial" data-dial="bass" data-val="50" data-tiers="10">
           <svg viewBox="0 0 100 100"><circle class="dring" cx="50" cy="50" r="41"/><circle class="dval" cx="50" cy="50" r="41"/></svg>
-          <div class="dnum">45</div><div class="dlab">动态低音</div>
+          <div class="dnum">50</div><div class="dlab">动态低音</div>
         </div>
-        <div class="dial" data-dial="clear" data-val="45">
+        <div class="dial" data-dial="clear" data-val="50" data-tiers="6">
           <svg viewBox="0 0 100 100"><circle class="dring" cx="50" cy="50" r="41"/><circle class="dval" cx="50" cy="50" r="41"/></svg>
-          <div class="dnum">30</div><div class="dlab">语音清晰</div>
+          <div class="dnum">50</div><div class="dlab">语音清晰</div>
         </div>
       </div>
       <div class="row" style="margin-top:6px">
@@ -1524,6 +1533,13 @@ html.devmode .dock button[data-dev]{display:flex}
              （内嵌 WASAPI 监听可写可开，与 data-p 开关默认注一致）。 -->
         <button class="sw" id="listenSw" data-label="麦克风监听"
           title="麦克风监听 · 可写"></button>
+      </div>
+      <!-- ★ 2026-10-24：监听增益滑杆（1.0-4.0×，实时）。麦克风原始电平
+           偏低（系统「侦听此设备」同口径），全声道写入后可调到舒适量。 -->
+      <div class="slider ctl-sub" id="listenGainRow" hidden>
+        <span style="font-size:11.5px;color:var(--t2);white-space:nowrap">监听增益</span>
+        <input type="range" id="listenGain" min="100" max="400" step="25" value="100">
+        <span class="v" id="listenGainVal">1</span>
       </div>
       <div class="row">
         <div><div class="nm">录音采样率</div></div>
@@ -1888,7 +1904,10 @@ var S = {
      所以这里也只做界面：'rot' 拖动改角度、'move' 拖动改距离，
      顺/逆时钟按钮整体旋转，重置回官方默认。 */
   spkMode:'rot',
-  active:-1, sel:5, hit:null, pre:'平直',
+  /* ★ 2026-10-22：初值 '平直' 是错的 —— PRE 里没有这个键（官方叫「预设」），
+     于是芯片一个都不高亮，而芯片初始化又硬编码亮了第 0 个「舞曲」。
+     现在初值取「预设」（EQ 全 0 就是官方索引 11），且由 syncEqChips 反查刷新。 */
+  active:-1, sel:5, hit:null, pre:'预设',
   eq:[0,0,0,0,0,0,0,0,0,0], mic:0.4, wave:[]
 };
 /* 官方频点标签取自 apoSpeakerEQ.cml 的 10 个 TextBlock（30/60/120/250/500/1K/2K/4K/8K/16K）。 */
@@ -1914,6 +1933,9 @@ var HZ  = [30,60,120,250,500,1000,2000,4000,8000,16000];
    频段序：0=30Hz … 9=16kHz，与 EQ_Slider1..10 ↔ Hz30..Hz16K 的配对一致
      （见 FUN_140164170 / FUN_1401647f0 的静态初始化）。 */
 var PRE = {
+  /* ★ 2026-10-24（用户拍板）：「预设」放第一 —— 它是默认/出厂态，最常用。
+     官方索引仍是键注释里的编号，与驱动写入无关（写入是 10 段值）。 */
+  /* 官方索引 11 Default  */ '预设':    [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
   /* 官方索引 0  Dance    */ '舞曲':    [  5,  2,  0,-10, -5,  0,  6, 12, 11, 10],
   /* 官方索引 8  Bass     */ '低音':    [ 11,  7,  3,  0,  0, -6,-10,-10, -2, -2],
   /* 官方索引 7  Treble   */ '高音':    [-10,-11,-12, -6,  2,  8, 13, 13, 11, 14],
@@ -1924,9 +1946,42 @@ var PRE = {
   /* 官方索引 2  Metal    */ '重金属':  [ 12,  7, -3,  4, 13,  8,  3, -3,  8, 12],
   /* 官方索引 1  Rap      */ '饶舌乐':  [-13, -9, -4,  2,  8, 12,  2,-11, -2,  8],
   /* 官方索引 9  Classic  */ '古典乐':  [  0,  7, -1, -7,-12, -8,  0, 10,  4, -5],
-  /* 官方索引 10 Vocal    */ '声乐':    [-13, -8,  0,  6, 14,  4, -4, -7, -8,-10],
-  /* 官方索引 11 Default  */ '预设':    [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+  /* 官方索引 10 Vocal    */ '声乐':    [-13, -8,  0,  6, 14,  4, -4, -7, -8,-10]
 };
+
+/* ★ 2026-10-22：预设芯片的高亮必须由**当前 10 段值反查**得出，不许硬编码。
+   旧实现把第 0 个芯片（Object.keys(PRE)[0] = '舞曲'，官方索引 0）写成默认
+   高亮，于是「默认场景」（EQ 全 0 = 官方索引 11「预设」）在均衡页上亮的是
+   「舞曲」——用户看到的正是这一处。三条规则：
+     ① 逐项相等才算命中（不做「最接近」匹配，避免把自定义曲线认成某个预设）；
+     ② 命中多个（理论上不会）取第一个；一个都不中 = 自定义，全部不高亮；
+     ③ S.pre 与芯片高亮永远由同一个函数写，不许两处各写一套。 */
+function preOf(eq){
+  var names = Object.keys(PRE), out = '';
+  for (var k = 0; k < names.length; k++){
+    var cur = PRE[names[k]], same = true;
+    for (var i = 0; i < 10; i++){
+      if (Math.round(+(eq[i] || 0)) !== cur[i]){ same = false; break; }
+    }
+    if (same){ out = names[k]; break; }
+  }
+  return out;
+}
+/* 把 S.eq 的反查结果刷到 S.pre 与芯片高亮上。custom 为真时强制「自定义」。 */
+function syncEqChips(forceCustom){
+  var hit = forceCustom ? '' : preOf(S.eq);
+  S.pre = hit || '自定义';
+  var box = document.getElementById('eqChips');
+  if (!box) return hit;
+  var chips = box.querySelectorAll('.chip');
+  for (var i = 0; i < chips.length; i++){
+    /* ★ 2026-10-24：hit 为空（自定义组合）时点亮末位"自定义"芯片 ——
+       自定义场景带的 EQ 此前在右下角无任何显示。 */
+    var isCustom = chips[i].getAttribute('data-custom') === '1';
+    chips[i].classList.toggle('on', isCustom ? (hit === '') : (chips[i].textContent === hit));
+  }
+  return hit;
+}
 
 var stage = document.getElementById('stage');
 
@@ -2462,8 +2517,14 @@ function profToast(msg, bad){
 function renderProfile(){
   var PC = window.PROFILES;
   if (!PC || !PC.list){
+    /* ★ 2026-10-21（用户拍板）：主程序启动时 Open 只试一次 —— 装完驱动
+       立刻打开、端点还在重建窗口期时，这里会一直空着且无路可退。补一个
+       重新检测入口（桥接层 document 级的 [data-reconnect] 委托处理）。 */
     return '<text x="640" y="400" text-anchor="middle" font-size="17" fill="var(--t3)">'
-         + '未连接驱动 · 读不到场景列表</text>';
+         + '未连接驱动 · 读不到场景列表</text>'
+         + '<text x="640" y="430" text-anchor="middle" font-size="13" '
+         + 'fill="var(--accent)" style="cursor:pointer" data-reconnect="1">'
+         + '点此重新检测</text>';
   }
   var list = PC.list || [], dead = PC.dead || {};
   /* 第一张永远是「当前状态」：它让「我现在的设置不属于任何场景」
@@ -2770,7 +2831,29 @@ document.querySelectorAll('.thm button').forEach(function(b){
    2) setPointerCapture：指针拖出窗口也能继续收到 move / up，
       音量旋钮贴着面板底边，向下拖很容易拖出窗口。
    3) 支持滚轮，且每次数值变化都派发 dialchange，
-      让桥接层按「变化即写」而不是只等 pointerup。 */
+      让桥接层按「变化即写」而不是只等 pointerup。
+   4) ★ 2026-10-22 档位吸附（data-tiers）：驱动量程比拨盘窄时
+      （动态低音 0..10、语音清晰 0..6），45 这种中间值是**写不进去**的，
+      写进去被四舍五入，回读再换算回来就成了 50 ⟹ 界面「自己变」。
+      有 tiers 就只落在真实档位上（见上方 .dial 的注释），
+      拖拽 / 滚轮 / 首帧全走 dialSnap，显示值恒等于生效值。
+      滚轮按**档**走而不是按百分比走 —— 否则滚一格（3）吸回原档，
+      看起来像滚轮失灵。 */
+function dialSnap(d, v){
+  var t = +d.dataset.tiers || 0;
+  v = Math.max(0, Math.min(100, v));
+  if (!(t > 0)) return Math.round(v);
+  var i = Math.max(0, Math.min(t, Math.round(v * t / 100)));
+  return Math.round(i * 100 / t);
+}
+function dialStep(d, dir, fine){
+  var t = +d.dataset.tiers || 0;
+  if (t > 0){
+    var i = Math.round(+d.dataset.val * t / 100) + dir;
+    return Math.round(Math.max(0, Math.min(t, i)) * 100 / t);
+  }
+  return +d.dataset.val + dir * (fine ? 1 : 3);
+}
 function paintDial(d){
   var r = 41, C = 2*Math.PI*r, v = +d.dataset.val;
   var arc = d.querySelector('.dval');
@@ -2781,7 +2864,7 @@ function paintDial(d){
 document.querySelectorAll('.dial').forEach(function(d){
   paintDial(d);
   function setVal(v){
-    v = Math.round(Math.max(0, Math.min(100, v)));
+    v = dialSnap(d, v);
     if (v === +d.dataset.val) return;
     d.dataset.val = v;
     paintDial(d);
@@ -2790,8 +2873,7 @@ document.querySelectorAll('.dial').forEach(function(d){
   d.addEventListener('wheel', function(e){
     e.preventDefault();
     /* deltaY < 0 是向上滚，音量应该变大 */
-    var step = e.shiftKey ? 1 : 3;
-    setVal(+d.dataset.val + (e.deltaY < 0 ? step : -step));
+    setVal(dialStep(d, e.deltaY < 0 ? 1 : -1, e.shiftKey));
   }, {passive:false});
   d.addEventListener('pointerdown', function(e){
     e.preventDefault();
@@ -2818,13 +2900,26 @@ rr.addEventListener('input', function(){
 });
 
 /* 预设 */
-document.getElementById('eqChips').innerHTML = Object.keys(PRE).map(function(k,i){
-  return '<button class="chip'+(i===0?' on':'')+'">'+k+'</button>';
-}).join('');
+/* ★ 2026-10-24：末位追加"自定义"芯片 —— 自定义场景（Profile）带的 EQ
+   组合不在 PRE 表里，preOf 反查为空时此前整个芯片区全灰，用户看不到
+   "当前 EQ 来自自定义场景"。现在 hit 为空即点亮"自定义"。 */
+document.getElementById('eqChips').innerHTML = Object.keys(PRE).map(function(k){
+  return '<button class="chip">'+k+'</button>';
+}).join('') + '<button class="chip" data-custom="1" title="当前 EQ 不匹配任何内置预设（多来自自定义场景或手动调节）">自定义</button>';
+  /* 高亮不在这里硬编码 —— 交给 syncEqChips() 按当前 S.eq 反查。
+     旧写法把第 0 个芯片（'舞曲'，官方索引 0）直接点亮，默认场景（EQ 全 0）
+     因此在均衡页上显示「舞曲」，与初始化目标不符。 */
+  syncEqChips();
   document.getElementById('eqChips').addEventListener('click', function(e){
     var c = e.target.closest('.chip'); if (!c) return;
-    document.querySelectorAll('#eqChips .chip').forEach(function(x){ x.classList.toggle('on', x===c); });
+    if (c.getAttribute('data-custom') === '1'){
+      /* "自定义"只是当前状态的指示灯：EQ 值来自自定义场景或手动调节，
+         点它不改变任何值 —— 想调去下面的十段推子。 */
+      syncEqChips(); render(); hud();
+      return;
+    }
     S.pre = c.textContent; S.eq = PRE[c.textContent].slice();
+    syncEqChips();
     render(); hud();
   });
 
@@ -2852,6 +2947,9 @@ document.getElementById('eqChips').innerHTML = Object.keys(PRE).map(function(k,i
       var i = +inp.dataset.i;
       S.eq[i] = Math.max(-20, Math.min(20, Math.round(+inp.value)));
       inp.value = S.eq[i];
+      /* ★ 2026-10-22：推子也是改 S.eq 的入口，芯片高亮必须跟着反查走，
+         否则拖完全 0 还亮着「舞曲」。 */
+      syncEqChips();
       render(); hud();
     });
     eqFadersBuilt = true;
@@ -2939,8 +3037,8 @@ stage.addEventListener('pointerdown', function(e){
       var p = loc(ev);
       S.eq[i] = Math.max(-20, Math.min(20, Math.round((EG.mid-p.y)/EG.amp*20)));
       render(); hud();
-      document.querySelectorAll('#eqChips .chip').forEach(function(x){ x.classList.remove('on'); });
-      S.pre = '自定义';
+      /* ★ 2026-10-22：拖曲线同样走反查（拖回全 0 会重新点亮「预设」）。 */
+      syncEqChips();
     }
     function up3(){ window.removeEventListener('pointermove',mv3); window.removeEventListener('pointerup',up3); }
     window.addEventListener('pointermove',mv3); window.addEventListener('pointerup',up3);
@@ -4713,7 +4811,7 @@ var VIS = (function(){
         d.moved = true;
         /* 确认是拖拽了才捕获：指针滑出按钮之后 pointermove 仍然送过来，
            否则拖到两颗之间的空隙里就断线了。
-           此刻指针还在源按钮里（阈值只有 6px），捕获不会影响 click ——
+           此刻指针还在源按钮里（阈值只有 6px），捕获不会影响 click —— 
            拖拽本来就要抑制 click。 */
         try{ themeEl.setPointerCapture(e.pointerId); }catch(err){}
         d.el.classList.add('drag-src');

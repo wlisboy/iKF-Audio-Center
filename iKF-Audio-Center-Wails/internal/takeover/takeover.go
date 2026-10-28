@@ -83,7 +83,7 @@ func ExePath() (string, error) {
 // 因此 Write 必须能在「键被删」的残局上从零重建：CreateKey（RegCreateKeyExW
 // 会自动补齐中间路径）而非 OpenKey，并把官方安装器写过的显示元数据补回来，
 // 否则控制面板里出现的是一个无名空项。元数据逐字取自卸载前实读（见
-// 内部取证报告）。
+// 工具/卸载审计-2026-10-20.md）。
 
 // clsidRoot 官方控制面板 CLSID 根键与官方安装器写过的显示元数据。
 const clsidRoot = `CLSID\{125C480D-543D-49C8-8840-4D28400ED72A}`

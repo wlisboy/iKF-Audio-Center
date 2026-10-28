@@ -100,8 +100,9 @@ func main() {
 		// 稳定性修复：UAC 点「否」原来是无声退出（退出码 1223），
 		// 看起来就是「双击没反应」。给一句明确的回执。
 		if code == 1223 {
-			msgBox("已取消管理员授权，未做任何改动。\n\n（驱动组件的安装与卸载需要管理员权限；"+
-				"想继续请重新运行本程序并在 UAC 上点「是」。）", "iKF-驱动管理", mbOK|mbIconInfo)
+			// 2026-10-23（用户定稿）：短句 + 官方语气，去掉括号里的长解释
+			msgBox("操作已取消，未做任何改动\n\n"+
+				"如需继续，请重新运行本程序", "iKF-驱动管理", mbOK|mbIconInfo)
 		}
 		os.Exit(code)
 	}
@@ -183,7 +184,11 @@ func main() {
 	}
 
 	// 2026-10-20（用户定稿）：完成弹窗按固定四行/单行版式，尾部无句号。
-	done := "\n\n现在可以打开 iKF Audio Center"
+	// 2026-10-23：卸载成功不再追加「现在可以打开…」——卸载语境里这句没有意义。
+	done := ""
+	if !out.sel.uninstall {
+		done = "\n\n现在可以打开 iKF Audio Center"
+	}
 	if !out.ok {
 		if p := writeLog(); p != "" {
 			out.detail += "\n\n原始输出已写入：\n" + p
@@ -199,16 +204,12 @@ func main() {
 // 一句说清要等多久；不再出现「发布项」「绑定到耳机上」这类内部措辞。
 func progressLabels(sel optSel) (string, string, string) {
 	if sel.uninstall {
-		return "正在卸载驱动组件", "正在从系统驱动库移除驱动…",
+		return "正在卸载驱动组件", "正在移除中…",
 			"此过程通常需要几秒，请勿关闭窗口。"
 	}
-	sub := "正在写入系统驱动库…"
-	switch {
-	case sel.untakeover:
-		sub = "正在写入系统驱动库并还原开机入口…"
-	case sel.takeover:
-		sub = "正在写入系统驱动库并设置开机自启…"
-	}
+	// 2026-10-23（用户定稿）：副标只说「正在做什么」，不展开细节；安装全程
+	// 不提「开机自启」——要不要自启由清单勾选决定（失败只落日志）。
+	sub := "正在写入中…"
 	return "正在安装驱动组件", sub,
 		"此过程约需 10–30 秒，请勿关闭窗口。"
 }
@@ -225,10 +226,10 @@ func runAction(s *drvState, dry bool, sel optSel) (string, bool) {
 	var detail string
 	var ok bool
 	if sel.uninstall {
-		setStatus("正在从系统驱动库移除…")
+		setStatus("正在移除中…")
 		detail, ok = s.uninstall()
 	} else {
-		setStatus("正在写入系统驱动库…")
+		setStatus("正在写入中…")
 		detail, ok = s.install()
 	}
 	if ok && !sel.uninstall && sel.restart && !has("--no-restart") {
@@ -239,15 +240,12 @@ func runAction(s *drvState, dry bool, sel optSel) (string, bool) {
 			detail += "\n未重启音频设备"
 		}
 	}
-	// P5-3：接管 / 撤销接管（仅安装模式）。本程序启动即提权，两处
-	// HKLM/HKCR 注册表直写即可，不用再弹 UAC。
+	// P5-3：接管（仅安装模式）。本程序启动即提权，注册表直写即可。
+	// 2026-10-23（用户定稿）：完成提示不再提「开机自启」，成败只落日志。
 	if ok && !sel.uninstall && sel.takeover {
-		setStatus("正在接管开机自启与控制面板项…")
-		if _, err := takeover.Write(); err == nil {
-			detail += "\n已设置开机自启"
-		} else {
+		setStatus("正在设置开机自启…")
+		if _, err := takeover.Write(); err != nil {
 			note("takeover.Write 失败: %v", err)
-			detail += "\n未设置开机自启"
 		}
 	}
 	if ok && !sel.uninstall && sel.untakeover {

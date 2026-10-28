@@ -71,7 +71,7 @@ func TestBuiltinMark(t *testing.T) {
 		want       bool
 	}{
 		{true, "默认", true}, // 2026-10-20 改名（原「原厂默认」）
-		{true, "游戏", true},
+		{true, "游戏", false}, // ★ 2026-10-24：移出 builtin 名单（普通场景）
 		{true, "音乐", true},
 		{true, "电影", true},
 		{true, "UserDefine", true},

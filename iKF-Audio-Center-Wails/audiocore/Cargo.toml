@@ -1,0 +1,21 @@
+[package]
+name = "ikf-audio"
+version = "0.1.0"
+edition = "2021"
+
+# P1-S1 骨架：纯 std，只验证 cdylib 链路（版本/自检两个 ABI）。
+# S2 loopback 时引入 windows-rs（Media_Audio / Devices_Enumeration 等 features），
+# 历史决策见 docs/P1-音频Rust化-扫描清单.md。
+
+[lib]
+name = "ikf_audio"
+crate-type = ["cdylib"]
+
+[profile.release]
+# 音频热路径：小而稳优先，不追求极限优化
+opt-level = 2
+lto = true
+panic = "abort"
+
+[dependencies]
+windows = { version = "0.62.2", features = ["Win32_Media_Audio", "Win32_Devices_Enumeration", "Win32_System_Com", "Win32_Media_KernelStreaming", "Win32_System_SystemServices", "Win32_UI_Shell_PropertiesSystem", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
