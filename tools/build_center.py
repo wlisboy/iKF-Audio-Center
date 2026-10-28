@@ -5,7 +5,7 @@
 
 把三样东西合成一个单文件程序：
   1. tools/src/center_src.py   —— Python 主体（驱动桥接 + HTTP 服务）
-  2. design/iKF-Audio-Center-1610.html —— 已完成的设计稿
+  2. design/audio-center.html —— 已完成的设计稿
   3. 本文件里的 BRIDGE_JS      —— 注入设计稿的驱动桥接层
 
 用法：
@@ -20,7 +20,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "src", "center_src.py")
-DESIGN = os.path.join(ROOT, "design", "iKF-Audio-Center-1610.html")
+DESIGN = os.path.join(ROOT, "design", "audio-center.html")
 # ★ S3 起属性名清单改由 device-model.toml [names] 承载（源文件运行时装载），
 # propnames.json 退役 —— 构建不再注入 __GENERIC__/__OEM__。
 OUT = os.path.join(ROOT, "iKF-Audio-Center.py")
