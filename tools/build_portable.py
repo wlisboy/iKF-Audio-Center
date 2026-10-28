@@ -12,6 +12,7 @@
       iKF-Audio-Center.exe          主程序：只管运行
                                       （driver.go 的 localCpls 优先读同目录）
       iKF-驱动管理.exe               驱动管理：只管装/卸驱动，自提权
+      iKFTool.exe                   日志诊断：只读（环境/完整性/崩溃取证）
       CPL/                          运行期资源 —— d.cpl 指向这里
         Driver/x64/vista/osConfLib.dll      208 项参数的唯一入口
         sound/*.wav                         8 个声道测试音
@@ -104,6 +105,20 @@ def build_setup(out):
     print("+ %s" % " ".join(cmd))
     if subprocess.run(cmd, cwd=APP, env=go_env()).returncode or not os.path.isfile(dst):
         sys.exit("编译驱动管理程序失败")
+    return dst
+
+
+IKFTOOL_NAME = "iKFTool.exe"  # 日志诊断工具（只读，不占单实例）
+
+
+def build_ikftool(out):
+    """编译 iKFTool 并入包。2026-10-28 起 build_portable 负责——此前它是
+    10-25 手工放进包里的，一次全量重建就把手工件清掉了（已踩坑）。"""
+    dst = os.path.join(out, IKFTOOL_NAME)
+    cmd = ["go", "build", "-trimpath", "-ldflags", "-s -w", "-o", dst, "./ikftool"]
+    print("+ %s" % " ".join(cmd))
+    if subprocess.run(cmd, cwd=APP, env=go_env()).returncode or not os.path.isfile(dst):
+        sys.exit("编译 iKFTool 失败")
     return dst
 
 
@@ -237,6 +252,7 @@ def main():
 
     if not args.no_build:
         build_setup(args.out)
+        build_ikftool(args.out)
 
     print("已生成：%s" % args.out)
     for sub in ("", "CPL", "driver"):

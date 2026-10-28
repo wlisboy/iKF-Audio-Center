@@ -46,6 +46,11 @@ def main():
     # 完全离线构建：依赖都在本地 module cache 里
     env["GOPROXY"] = "off"
     env["GOSUMDB"] = "off"
+    # 可复现构建：不把 VCS 提交信息嵌进二进制，否则每次 commit 后重建
+    # exe 哈希都会漂移（2026-10-28 实测：功能零改动、仅提交数变化，
+    # 哈希即从 ab92884f… 漂到 61c9056c…）。GOFLAGS 对 wails 内部的
+    # go build 同样生效。
+    env["GOFLAGS"] = "-buildvcs=false" + (" " + env["GOFLAGS"] if env.get("GOFLAGS") else "")
 
     print("=" * 68)
     print(" 1/2  生成前端资源")
