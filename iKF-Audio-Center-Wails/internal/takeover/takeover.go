@@ -103,7 +103,12 @@ const nsPath = `SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel\
 // ensureControlPanelMeta 重建 CLSID 根的显示元数据与 NameSpace 登记。
 // 全部「缺了才写」（官方卸载删掉的补回来，还在的绝不覆盖——比如 Command
 // 指向新程序后这里不会碰它）。需要管理员，调用方自理。
-func ensureControlPanelMeta() error {
+//
+// DefaultIcon 例外（2026-10-28）：官方值 %WINDIR%\CM108B.ico 只有官方
+// setup 会装（OemIcon\CM108B.ico → C:\Windows），纯 INF 装驱动不产生它；
+// 值存在但文件不存在 = 控制面板项空白图标。因此图标按「缺了或指空文件
+// 都算缺失」处理，由调用方按接管/回滚分别补值（iconFor）。
+func ensureControlPanelMeta(icon string) error {
 	k, _, err := registry.CreateKey(registry.CLASSES_ROOT, clsidRoot, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
 		return fmt.Errorf("重建 CLSID 根键失败：%w", err)
@@ -118,16 +123,17 @@ func ensureControlPanelMeta() error {
 	}
 	k.Close()
 
-	// DefaultIcon（官方卸载实测会保留，但缺了图标就没了——一并兜底）
-	ki, _, err := registry.CreateKey(registry.CLASSES_ROOT, clsidRoot+`\DefaultIcon`, registry.SET_VALUE)
+	ki, _, err := registry.CreateKey(registry.CLASSES_ROOT, clsidRoot+`\DefaultIcon`, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
 		return fmt.Errorf("重建 DefaultIcon 失败：%w", err)
 	}
-	if v, _, err := ki.GetStringValue(""); err != nil || v == "" {
-		_ = ki.SetStringValue("", `C:\Windows\CM108B.ico`)
+	defer ki.Close()
+	v, _, err := ki.GetStringValue("")
+	if err != nil || v == "" || !iconUsable(v) {
+		if err := ki.SetStringValue("", icon); err != nil {
+			return err
+		}
 	}
-	ki.Close()
-
 	// NameSpace 登记
 	kn, _, err := registry.CreateKey(registry.LOCAL_MACHINE, nsPath, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
@@ -138,6 +144,25 @@ func ensureControlPanelMeta() error {
 	}
 	kn.Close()
 	return nil
+}
+
+// iconUsable 判断图标值是否可用：非空，且指向存在的文件（可带 ,index 后缀）。
+// Control Panel 对不存在的图标文件显示空白项 —— 必须按缺失对待。
+func iconUsable(v string) bool {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return false
+	}
+	path := v
+	if i := strings.LastIndex(v, ","); i >= 0 {
+		path = v[:i]
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // Write 实际改写两处注册表指向本程序，返回成功改写的项数。
@@ -163,7 +188,9 @@ func Write() (int, error) {
 	// 2) 控制面板项：官方卸载会把 Shell 子树整棵删掉（2026-10-20 实测），
 	//    必须 CreateKey 从零重建（RegCreateKeyExW 自动补齐中间路径），
 	//    并补回官方显示元数据 —— 否则控制面板里是无名空项。
-	if err := ensureControlPanelMeta(); err != nil {
+	//    图标传本程序自身（内嵌资源，文件必存在）；若官方 CM108B.ico 在，
+	//    ensureControlPanelMeta 不会碰它（保留官方观感）。
+	if err := ensureControlPanelMeta(exe); err != nil {
 		return n, err
 	}
 	k2, _, err := registry.CreateKey(registry.CLASSES_ROOT, ClsidCmd,
@@ -193,7 +220,7 @@ func UndoWrite() (int, error) {
 		return 0, err
 	}
 
-	if err := ensureControlPanelMeta(); err != nil {
+	if err := ensureControlPanelMeta(`C:\Windows\CM108B.ico`); err != nil {
 		return 1, err
 	}
 	k2, _, err := registry.CreateKey(registry.CLASSES_ROOT, ClsidCmd,
