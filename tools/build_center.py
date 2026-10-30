@@ -1876,7 +1876,16 @@ BRIDGE_JS = r"""
        实测确认过：应用自带的「原厂默认」后必然误报。
 
      比对只做在基线里有的键上，且当前读数必须 r===0（读得到）——
-     读不到就不下结论，宁可漏报不可误报。 */
+     读不到就不下结论，宁可漏报不可误报。
+
+     ★ 2026-10-30 根修（用户报障「没动任何设置，已修改未保存自己亮」）：
+       r===0 但 v 为空串 = 已知驱动读抖动（lastscene.go / initmanifest.go /
+       initstate.go 三处都有「重读一次」兜底，注释原文「--dump 同款」）。
+       /api/params 每项只读一次、没有重读保护 —— 一次抖动就把空串当真值
+       写进基线，下一轮读数回到真值必然「比对失败」，脏标记随机自己亮起。
+       应用场景后的 __resync 要连读 100+ 项，恰是抖动高发时刻，所以
+       自定义场景（全量快照 80 项）最容易被击中。口径与后端一致：
+       空值 = 本轮没读到，跳过该键，不下任何结论。 */
   function profSnapshotBaseline(){
     var ref = PROFILES.ref;
     if (!ref || !ref.pairs){ PROFILES.base = null; return; }
@@ -1887,6 +1896,7 @@ BRIDGE_JS = r"""
       if (i < 0) continue;
       row = profParams(k.slice(0, i))[k.slice(i + 1)];
       if (!row || row.r !== 0) continue;
+      if (row.v === '' || row.v === null || row.v === undefined) continue;
       if (!base) base = {};
       base[k] = profNorm(row.v);
     }
@@ -1905,7 +1915,9 @@ BRIDGE_JS = r"""
         if (i < 0) continue;
         var row = profParams(k.slice(0, i))[k.slice(i + 1)];
         if (!row || row.r !== 0) continue;        /* 读不到就不断言 */
-        if (profNorm(row.v) !== base[k]){ dirty = true; break; }
+        var nv = profNorm(row.v);
+        if (nv === '') continue;                  /* 读抖动空值：本轮不断言 */
+        if (nv !== base[k]){ dirty = true; break; }
       }
     }
     if (dirty === PROFILES.dirty) return;
