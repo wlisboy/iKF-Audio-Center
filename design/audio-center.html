@@ -92,7 +92,13 @@ body{
    元素铺满窗口，内部图形按 16:10 等比缩放并居中，空白处透明，
    于是画面比例永不走形，而两侧也不会再留边。 */
 #stage{position:absolute;inset:0;width:100%;height:100%;z-index:1;
+  /* ★ 2026-10-31 e2e 实测修复：SVG 默认 visiblePainted 命中 —— 画了形状的
+     地方（径向光斑等装饰）会拦截 pointer 事件，恰好压在面板控件上时
+     （如声音页「耳机环绕」开关、均衡页部分预设芯片）真实鼠标点击被
+     svg#stage 吃掉，控件点不动。装饰层整体关掉命中，交互节点白名单恢复。 */
+  pointer-events:none;
   touch-action:none;user-select:none;-webkit-user-select:none}
+#stage .spk,#stage .ringhit,#stage .eqnode,#stage .pcard{pointer-events:visiblePainted}
 #stage .spk{cursor:grab}
 #stage .spk:active{cursor:grabbing}
 #stage .ringhit{fill:none;stroke:transparent;stroke-width:34;cursor:ns-resize}
