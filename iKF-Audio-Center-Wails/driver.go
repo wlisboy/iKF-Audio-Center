@@ -829,10 +829,10 @@ func (d *Driver) Read(name string) (ret int, val string) {
 }
 
 // ReadEp 在指定端点上读。ep = "render" / "capture"
+// ★ 健壮性审计 #4（2026-10-31）：原来的调用侧 ptrFor 预检已删 —— 它在
+// HTTP goroutine 上裸读 d.ready/capPtr，与工作线程上的 Open/Close 构成
+// 数据竞争。pcLocked 在工作线程上会复检并同样返回 -9，行为不变。
 func (d *Driver) ReadEp(ep, name string) (ret int, val string) {
-	if _, ok := d.ptrFor(ep); !ok {
-		return -9, ""
-	}
 	if hazard[name] {
 		return -2, ""
 	}
@@ -880,10 +880,9 @@ func (d *Driver) Write(name string, value interface{}) map[string]interface{} {
 }
 
 // WriteEp 在指定端点上写。
+// ★ 健壮性审计 #4：调用侧 ptrFor 预检已删（理由同 ReadEp）—— 端点缺失
+// 由 pcLocked 复检返回 -9，下方统一转成原样的友好文案。
 func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interface{} {
-	if _, ok := d.ptrFor(ep); !ok {
-		return map[string]interface{}{"ok": false, "error": "耳机未连接或驱动未就绪", "ret": -9}
-	}
 	sp, ok := spec(ep, name)
 	if !ok {
 		return map[string]interface{}{"ok": false, "error": "当前设备不支持该设置", "ret": -1}
@@ -900,14 +899,27 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 		switch v := value.(type) {
 		case string:
 			s := strings.ToLower(strings.TrimSpace(v))
-			on = s == "1" || s == "true" || s == "on" || s == "yes"
+			switch s {
+			case "1", "true", "on", "yes":
+				on = true
+			case "0", "false", "off", "no", "":
+				on = false
+			default:
+				// ★ 健壮性审计 #7：原来未识别的串静默当「关」写 0 ——
+				// 传错值的人看到的是成功。改成与 TInt/TFloat 同口径报错。
+				return map[string]interface{}{"ok": false, "ret": -1,
+					"error": fmt.Sprintf("布尔值不合法：%v", value)}
+			}
 		case bool:
 			on = v
 		default:
 			// JSON 解出来是 float64；内部调用可能是 int / int32 …
-			if f, err := toFloat(value); err == nil {
-				on = f != 0
+			f, err := toFloat(value)
+			if err != nil {
+				return map[string]interface{}{"ok": false, "ret": -1,
+					"error": fmt.Sprintf("布尔值不合法：%v", value)}
 			}
+			on = f != 0
 		}
 		n := int32(0)
 		if on {
@@ -961,8 +973,11 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 
 	// 值未变化时视为成功，不打扰驱动。
 	// 实测 MuteControl 重复写同值会返回 0x10003，但语义上这是一次成功的无操作。
+	// ★ 健壮性审计 #8：TFloat 原来拿 "%f" 生成的 target（"0.500000"）与驱动
+	// 回读原文（"0.5"）做字符串比较，永远不等 → 滑杆每次都白打一轮写+读回。
+	// 浮点改按数值比较（valueUnchanged），其余仍按原文比较。
 	if !noopSkip[name] {
-		if r0, cur := d.ReadEp(ep, name); r0 == 0 && cur == target {
+		if r0, cur := d.ReadEp(ep, name); r0 == 0 && valueUnchanged(cur, target, sp.kind) {
 			return map[string]interface{}{"ok": true, "ret": 0, "value": cur, "read_ret": 0, "noop": true}
 		}
 	}
@@ -976,6 +991,13 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 		}()
 		ret, _ = d.pc(ep, name, true, payload)
 	}()
+	// ★ 健壮性审计 #6 说明：这个 recover 只拦得住 Go 层 panic。DLL 内部的
+	// 访问违例会直接终止整个进程（见本文件 hazard 段注释），根本走不到
+	// ret=-3 —— 文案里的「访问异常」只对理论上的 Go panic 成立，保留仅为
+	// 契约稳定，别把它当成安全网。
+	if ret == -9 {
+		return map[string]interface{}{"ok": false, "error": "耳机未连接或驱动未就绪", "ret": -9}
+	}
 	if ret == -3 {
 		return map[string]interface{}{"ok": false, "error": "写入触发访问异常", "ret": -3}
 	}
@@ -989,6 +1011,20 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 		"ok": ret == 0 && r2 == 0, "ret": int(ret),
 		"value": back, "read_ret": r2,
 	}
+}
+
+// valueUnchanged noop 跳过的「值未变」判定（健壮性审计 #8）：
+// 字符串相等直接过；浮点再按数值比一次（驱动回读格式与 %f 不一致）。
+func valueUnchanged(cur, target string, kind int) bool {
+	if cur == target {
+		return true
+	}
+	if kind != TFloat {
+		return false
+	}
+	a, ea := strconv.ParseFloat(strings.TrimSpace(cur), 64)
+	b, eb := strconv.ParseFloat(strings.TrimSpace(target), 64)
+	return ea == nil && eb == nil && a == b
 }
 
 // WriteAuto 先走白名单；未命中但属于 208 项时改走 WriteRaw。
@@ -1241,11 +1277,6 @@ func (d *Driver) ShowAsio() map[string]interface{} {
 		return map[string]interface{}{"ok": false, "error": "ASIO 面板调用异常", "ret": -3}
 	}
 	return map[string]interface{}{"ok": ret == 0, "ret": int(ret)}
-}
-
-// ParamMap 全部 208 项 → {name: {r, v, w, t}}
-func (d *Driver) ParamMap() map[string]map[string]interface{} {
-	return d.ParamMapEp(EpRender)
 }
 
 // ParamMapEp 指定端点的全量参数表。w 只在该端点确实可写时为 true。

@@ -162,6 +162,18 @@ func (m *MicRecorder) startRustInner() map[string]interface{} {
 		return map[string]interface{}{"ok": false, "error": cstr(st.err[:])}
 	}
 	m.mu.Lock()
+	if m.rustH != 0 {
+		// ★ 健壮性审计 #3（同 loopback）：等设备就绪期间另一个 Start 抢先
+		// 占位 —— 收掉自己这路多余的会话，不覆盖对方的句柄，按已在录返回。
+		m.mu.Unlock()
+		audioDLL.NewProc("ikf_recorder_close").Call(h)
+		m.mu.Lock()
+		st, _ = recStatusViaRust(m.rustH)
+		m.mu.Unlock()
+		return map[string]interface{}{"ok": true, "already": true,
+			"file": cstr(st.file[:]), "rate": int(st.rate), "ch": int(st.ch),
+			"dev": cstr(st.dev[:])}
+	}
 	m.rustH = h
 	m.running = true
 	m.file = cstr(st.file[:])

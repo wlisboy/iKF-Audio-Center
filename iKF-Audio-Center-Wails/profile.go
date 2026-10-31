@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 // 组态（特效组态）—— 完整复刻官方的 Profile 系统。
@@ -316,10 +318,12 @@ func kindOfValueType(vtype, name string) string {
 	return "int"
 }
 
-// coerce 组态文件里的文本值 → 数值。不合法返回 (0, false)
+// coerce 组态文件里的文本值 → 数值。不合法返回 (nil, false)。
+// ★ 健壮性审计 #9：原来用 Sscanf("%f")，"1abc" 会被当 1 收下 —— 场景档里
+// 手滑的脏值静默变形。换 strconv.ParseFloat，整串必须合法。
 func coerce(val, kind string) (interface{}, bool) {
-	var f float64
-	if _, err := fmt.Sscanf(strings.TrimSpace(val), "%f", &f); err != nil {
+	f, err := strconv.ParseFloat(strings.TrimSpace(val), 64)
+	if err != nil {
 		return nil, false
 	}
 	switch kind {
@@ -501,37 +505,42 @@ func buildCML(name, desc string) string {
 
 // ---------------------------------------------------------------- 语言资源
 
-var langCache map[string]string
-
 // langMap CPL/lang/zh-CN/*.xaml → {ml_键: 中文}。
 // .cml 里 Tooltip 常直接写资源键（例如内置组态 HiFi 的 Tooltip 是
 // ml_PanelProfile_HiFi），官方 UI 靠 XAML 资源字典解析。
+// ★ 健壮性审计 #4：langCache 原是裸全局，Profiles/ProfileRename 两个
+//   HTTP goroutine 并发首建会数据竞争 —— 收进 sync.Once（首个调用方的
+//   d.cpl 生效，与原「先到先缓存」语义一致）。
+var (
+	langOnce sync.Once
+	langCache map[string]string
+)
+
 func langMap(d *Driver) map[string]string {
-	if langCache != nil {
-		return langCache
-	}
-	out := map[string]string{}
-	if d != nil && d.cpl != "" {
-		dir := filepath.Join(d.cpl, "lang", "zh-CN")
-		if entries, err := os.ReadDir(dir); err == nil {
-			var names []string
-			for _, e := range entries {
-				if !e.IsDir() && strings.HasSuffix(strings.ToLower(e.Name()), ".xaml") {
-					names = append(names, e.Name())
+	langOnce.Do(func() {
+		out := map[string]string{}
+		if d != nil && d.cpl != "" {
+			dir := filepath.Join(d.cpl, "lang", "zh-CN")
+			if entries, err := os.ReadDir(dir); err == nil {
+				var names []string
+				for _, e := range entries {
+					if !e.IsDir() && strings.HasSuffix(strings.ToLower(e.Name()), ".xaml") {
+						names = append(names, e.Name())
+					}
 				}
-			}
-			sort.Strings(names)
-			re := regexp.MustCompile(`x:Key="([^"]+)"\s*>([^<]*)<`)
-			for _, fn := range names {
-				txt := readText(filepath.Join(dir, fn))
-				for _, m := range re.FindAllStringSubmatch(txt, -1) {
-					out[m[1]] = strings.TrimSpace(m[2])
+				sort.Strings(names)
+				re := regexp.MustCompile(`x:Key="([^"]+)"\s*>([^<]*)<`)
+				for _, fn := range names {
+					txt := readText(filepath.Join(dir, fn))
+					for _, m := range re.FindAllStringSubmatch(txt, -1) {
+						out[m[1]] = strings.TrimSpace(m[2])
+					}
 				}
 			}
 		}
-	}
-	langCache = out
-	return out
+		langCache = out
+	})
+	return langCache
 }
 
 // langText 把 ml_* 资源键还原成官方中文；不是键就原样返回
@@ -677,6 +686,27 @@ func (d *Driver) profilePath(name string) (string, string, bool) {
 
 var reBadName = regexp.MustCompile(`[\\/:*?"<>|]`)
 
+// reservedSceneName 系统保留的场景名（健壮性审计 #2，2026-10-31）：
+// 「预设」= FactoryDefault.xml 保留字（既有口径）；「默认」= 一键还原基线，
+// 被覆盖后 EnsureSeedScenes 的幂等检查（项数够就不重建）不会自愈 ——
+// 一次 API 调用就能把它静默毁掉。前端 profFactory() 只挡 UI，这里后端收口。
+// 注意「音乐/电影」**不在**名单里：列表里它们是普通可编辑卡（覆盖/改名/
+// 删除均可，删除由播种自愈），收严反而改变既有设计行为。
+func reservedSceneName(name string) bool {
+	return name == profileFactory || name == profileFactoryScene
+}
+
+// writeAtomic 先写同名 .tmp 再 rename（健壮性审计 #5）：进程在写入中途
+// 被杀（崩溃/断电/杀软）不会留下截断的场景 XML —— 空档/缺项档会让
+// 场景识别与脏标记静默失真。同目录 rename 是原子替换。
+func writeAtomic(path string, data []byte) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 // ProfileSave 把当前全部可写参数快照成组态，写出 .profile + .cml（官方格式）
 func (d *Driver) ProfileSave(name, desc string) map[string]interface{} {
 	name = strings.TrimSpace(name)
@@ -688,9 +718,9 @@ func (d *Driver) ProfileSave(name, desc string) map[string]interface{} {
 		return map[string]interface{}{"ok": false, "ret": -1,
 			"error": "文件名不合法 (不可包含 /\\:*?\"<>| 字符)"}
 	}
-	if name == profileFactory {
+	if reservedSceneName(name) {
 		return map[string]interface{}{"ok": false, "ret": -1,
-			"error": fmt.Sprintf("「%s」是默认场景，不能覆盖", profileFactory)}
+			"error": fmt.Sprintf("「%s」是系统保留的场景名，不能覆盖", name)}
 	}
 
 	var snap []snapRow
@@ -732,13 +762,13 @@ func (d *Driver) ProfileSave(name, desc string) map[string]interface{} {
 	if desc == "" {
 		desc = name
 	}
-	if err := os.WriteFile(filepath.Join(dir, name+".profile"),
-		[]byte(buildProfileXML(name, snap)), 0o644); err != nil {
+	if err := writeAtomic(filepath.Join(dir, name+".profile"),
+		[]byte(buildProfileXML(name, snap))); err != nil {
 		return map[string]interface{}{"ok": false, "ret": -3,
 			"error": fmt.Sprintf("写入失败：%s", err)}
 	}
-	if err := os.WriteFile(filepath.Join(dir, name+".cml"),
-		[]byte(buildCML(name, desc)), 0o644); err != nil {
+	if err := writeAtomic(filepath.Join(dir, name+".cml"),
+		[]byte(buildCML(name, desc))); err != nil {
 		return map[string]interface{}{"ok": false, "ret": -3,
 			"error": fmt.Sprintf("写入失败：%s", err)}
 	}
@@ -1068,9 +1098,9 @@ func (d *Driver) ProfileRename(oldName, newName string) map[string]interface{} {
 		return map[string]interface{}{"ok": false, "ret": -1,
 			"error": `文件名不合法 (不可包含 /\:*?"<>| 字符)`}
 	}
-	if newName == profileFactory {
+	if reservedSceneName(newName) {
 		return map[string]interface{}{"ok": false, "ret": -1,
-			"error": fmt.Sprintf("「%s」是默认场景，不能占用这个名字", profileFactory)}
+			"error": fmt.Sprintf("「%s」是系统保留的场景名，不能占用", newName)}
 	}
 	if newName == oldName {
 		return map[string]interface{}{"ok": true, "ret": 0,
@@ -1108,14 +1138,15 @@ func (d *Driver) ProfileRename(oldName, newName string) map[string]interface{} {
 	safe := strings.ReplaceAll(xmlEscape(newName), "$", "$$")
 	body = reProfileNameAttr.ReplaceAllString(body, "${1}"+safe+"${2}")
 
-	if err := os.WriteFile(filepath.Join(wdir, newName+".profile"),
-		[]byte(body), 0o644); err != nil {
+	if err := writeAtomic(filepath.Join(wdir, newName+".profile"),
+		[]byte(body)); err != nil {
 		return map[string]interface{}{"ok": false, "ret": -6,
 			"error": fmt.Sprintf("写入失败：%s", err)}
 	}
-	if err := os.WriteFile(filepath.Join(wdir, newName+".cml"),
-		[]byte(buildCML(newName, desc)), 0o644); err != nil {
+	if err := writeAtomic(filepath.Join(wdir, newName+".cml"),
+		[]byte(buildCML(newName, desc))); err != nil {
 		os.Remove(filepath.Join(wdir, newName+".profile"))
+		os.Remove(filepath.Join(wdir, newName+".cml.tmp"))
 		return map[string]interface{}{"ok": false, "ret": -6,
 			"error": fmt.Sprintf("写入失败：%s", err)}
 	}
@@ -1384,9 +1415,9 @@ func MigrateProfileGroups(d *Driver) (int, int) {
 			if err := os.WriteFile(p+".bak", raw, 0o644); err != nil {
 				continue
 			}
-			if err := os.WriteFile(p, []byte(out), 0o644); err != nil {
-				continue
-			}
+		if err := writeAtomic(p, []byte(out)); err != nil {
+			continue
+		}
 			files++
 			tags += n
 		}
@@ -1444,17 +1475,17 @@ func EnsureSeedScenes(d *Driver) {
 			//（音量/采样率，见 sceneExclude）时升级重建。
 			// 播种档 builtin，UI 禁止用户改，升级重建无害。
 			old := profileItems(readText(p))
-			if len(old) >= len(snap) && !hasExcludedItem(old) {
-				os.WriteFile(filepath.Join(wdir, s.Name+".cml"),
-					[]byte(buildCML(s.Name, s.Desc)), 0o644)
-				continue
-			}
-		}
-		if err := os.WriteFile(p, []byte(buildProfileXML(s.Name, snap)), 0o644); err != nil {
+		if len(old) >= len(snap) && !hasExcludedItem(old) {
+			writeAtomic(filepath.Join(wdir, s.Name+".cml"),
+				[]byte(buildCML(s.Name, s.Desc)))
 			continue
 		}
-		os.WriteFile(filepath.Join(wdir, s.Name+".cml"),
-			[]byte(buildCML(s.Name, s.Desc)), 0o644)
+	}
+	if err := writeAtomic(p, []byte(buildProfileXML(s.Name, snap))); err != nil {
+		continue
+	}
+	writeAtomic(filepath.Join(wdir, s.Name+".cml"),
+		[]byte(buildCML(s.Name, s.Desc)))
 		log.Printf("[播种] 已写入「%s」", s.Name)
 	}
 	// 原厂默认：直接落出厂值表，不再快照当前驱动状态。
@@ -1482,9 +1513,9 @@ func EnsureSeedScenes(d *Driver) {
 			needWrite = len(old) < len(fsnap) || hasExcludedItem(old)
 		}
 		if needWrite {
-			if err := os.WriteFile(p, []byte(buildProfileXML(profileFactoryScene, fsnap)), 0o644); err == nil {
-				os.WriteFile(filepath.Join(wdir, profileFactoryScene+".cml"),
-					[]byte(buildCML(profileFactoryScene, "出厂默认值 · 一键还原")), 0o644)
+			if err := writeAtomic(p, []byte(buildProfileXML(profileFactoryScene, fsnap))); err == nil {
+				writeAtomic(filepath.Join(wdir, profileFactoryScene+".cml"),
+					[]byte(buildCML(profileFactoryScene, "出厂默认值 · 一键还原")))
 			}
 		}
 	}

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -32,6 +33,10 @@ var (
 	audioDLL   *windows.LazyDLL
 	audioState atomic.Int32 // 0=未探测 1=就绪 -1=不可用（缺失/ABI 错配/自检失败）
 	audioVer   atomic.Pointer[string]
+	// ★ 健壮性审计 #10：首探互斥。原来是「查 atomic 就做」，两个 goroutine
+	// 并发首探会各自 LoadLibrary 一遍并竞写 audioDLL —— 后果良性（同一文件）
+	// 但仍是数据竞争。双检锁收口。
+	audioMu sync.Mutex
 )
 
 // audioDLLCandidates 按优先级返回候选路径。
@@ -53,6 +58,11 @@ func audioDLLCandidates() []string {
 // audioProbe 找到并加载 DLL、协商 ABI、跑自检。只成功一次，失败缓存。
 func audioProbe() bool {
 	if st := audioState.Load(); st != 0 {
+		return st == 1
+	}
+	audioMu.Lock()
+	defer audioMu.Unlock()
+	if st := audioState.Load(); st != 0 { // 双检：并发首探只做一次
 		return st == 1
 	}
 	for _, p := range audioDLLCandidates() {

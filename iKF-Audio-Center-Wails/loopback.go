@@ -306,6 +306,21 @@ func (l *Loopback) startRustInner(device string) map[string]interface{} {
 		time.Sleep(20 * time.Millisecond)
 	}
 	l.mu.Lock()
+	if l.rustH != 0 {
+		// ★ 健壮性审计 #3（2026-10-31）：等端点友好名期间另一个 Start 抢先
+		// 占位 —— 自己这路会话是多余的。不覆盖对方的句柄（否则那路就此
+		// 遗弃：采集线程跑到进程退出，端点一直被占用），立即收掉自己这路
+		//（句柄注册表保证 close 安全），按「已在跑」返回占位方的状态。
+		l.mu.Unlock()
+		audioDLL.NewProc("ikf_loopback_close").Call(h)
+		l.mu.Lock()
+		st, _ = lbStatusViaRust(l.rustH)
+		l.mu.Unlock()
+		return map[string]interface{}{"ok": true, "already": true,
+			"rate": int(st.rate), "ch": int(st.ch), "format": cstr(st.kind[:]),
+			"dev": cstr(st.dev[:]), "bits": int(st.bits),
+			"tag": st.rawTag, "sub": st.subTag}
+	}
 	l.rustH = h
 	l.devSel = device
 	l.running = true
@@ -346,9 +361,6 @@ func (l *Loopback) stopRust() map[string]interface{} {
 	}
 	return map[string]interface{}{"ok": true}
 }
-
-// frames 记账字段（Status 展示用；真实值在 DLL 侧，statusRust 拉取覆盖）。
-var _ = struct{}{}
 
 func (l *Loopback) statusRust() map[string]interface{} {
 	// ★破坏性检测 P0-3：DLL 调用与字段读取全程持锁 —— 原实现拿完 h 就

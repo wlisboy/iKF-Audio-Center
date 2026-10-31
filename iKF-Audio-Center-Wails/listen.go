@@ -126,6 +126,18 @@ func (l *MicListen) startRustInner() map[string]interface{} {
 		st, _ := lisStatusViaRust(h)
 		if cstr(st.dev[:]) != "" {
 			l.mu.Lock()
+			if l.rustH != 0 {
+				// ★ 健壮性审计 #3（同 loopback）：另一个 Start 抢先占位，
+				// 收掉自己这路多余的会话，按已在听返回。
+				l.mu.Unlock()
+				audioDLL.NewProc("ikf_listen_close").Call(h)
+				l.mu.Lock()
+				st2, _ := lisStatusViaRust(l.rustH)
+				l.mu.Unlock()
+				return map[string]interface{}{"ok": true, "already": true,
+					"dev": cstr(st2.dev[:]), "out": cstr(st2.out[:]),
+					"rate": int(st2.rate), "ch": int(st2.ch)}
+			}
 			l.rustH = h
 			l.running = true
 			l.devName = cstr(st.dev[:])
@@ -139,6 +151,18 @@ func (l *MicListen) startRustInner() map[string]interface{} {
 			// 超时也返回成功（会话已开），名字后到
 			st, _ := lisStatusViaRust(h)
 			l.mu.Lock()
+			if l.rustH != 0 {
+				// ★ 健壮性审计 #3（同 loopback）：另一个 Start 抢先占位，
+				// 收掉自己这路多余的会话，按已在听返回。
+				l.mu.Unlock()
+				audioDLL.NewProc("ikf_listen_close").Call(h)
+				l.mu.Lock()
+				st2, _ := lisStatusViaRust(l.rustH)
+				l.mu.Unlock()
+				return map[string]interface{}{"ok": true, "already": true,
+					"dev": cstr(st2.dev[:]), "out": cstr(st2.out[:]),
+					"rate": int(st2.rate), "ch": int(st2.ch)}
+			}
 			l.rustH = h
 			l.running = true
 			l.rate, l.ch = int(st.rate), int(st.ch)

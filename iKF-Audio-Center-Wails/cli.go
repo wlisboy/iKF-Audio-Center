@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -177,11 +178,17 @@ func roundTrip() {
 
 // serveHTTP 用普通 net/http 暴露同一套 /api/*，便于用 curl 做契约回归。
 // 正常运行时不会走到这里 —— 那时服务跑在 Wails 的内部 scheme 上，不占端口。
+//
+// ★ 健壮性审计 #1（2026-10-31）：这套 API 无任何鉴权，能改设备参数、删场景。
+//   以前 `--serve :18500`（文档写法）里 ":host" 会绑 0.0.0.0 = 局域网裸奔。
+//   现在默认强制回环：host 为空/0.0.0.0/:: 一律改绑 127.0.0.1；只有**显式**
+//   写出非回环 IP 才按原样绑定，并打一条醒目警告。
 func serveHTTP(addr string) {
 	idx, err := assets.ReadFile("frontend/dist/index.html")
 	if err != nil {
 		log.Fatalf("内嵌前端资源缺失：%v", err)
 	}
+	addr = serveAddrLoopback(addr)
 	api := &API{}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +206,41 @@ func serveHTTP(addr string) {
 	})
 	log.Printf("HTTP 服务已启动：http://%s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
+}
+
+// serveAddrLoopback 把监听地址收口到回环（健壮性审计 #1）。
+// 接受 ":端口"、"host:端口"、"端口" 三种写法。host 为空 / 0.0.0.0 / ::
+// （= 绑全部网卡）一律改回 127.0.0.1；只有显式写出非回环 IP 或主机名
+// 才放行原样绑定 —— 那是调用者明知故犯，留一条警告即可。
+func serveAddrLoopback(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		// 裸端口写法（如 "18500"）；裸 IP（无端口）直接报错说清写法
+		s := strings.TrimSpace(addr)
+		if net.ParseIP(s) != nil {
+			log.Fatalf("--serve 缺少端口：%q（写法如 --serve 127.0.0.1:18500）", addr)
+		}
+		host, port = "", s
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		if p, err := strconv.Atoi(port); err != nil || p < 1 || p > 65535 {
+			log.Fatalf("--serve 地址无法解析：%q（写法如 :18500 或 127.0.0.1:18500）", addr)
+		}
+		return net.JoinHostPort("127.0.0.1", port)
+	}
+	if isLoopbackHost(host) {
+		return net.JoinHostPort(host, port)
+	}
+	log.Printf("[安全] --serve 显式指定了非回环地址 %q：/api/* 将无鉴权暴露给网络，请确认这是有意的", addr)
+	return net.JoinHostPort(host, port)
+}
+
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // ---------------------------------------------------------------- 回环自检
