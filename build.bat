@@ -14,10 +14,9 @@ rem      rebuilds release\iKF-Audio-Center-Portable.
 rem    * Step 4 auto-stashes your own scene files and puts them back.
 rem    * Needs: python / go / wails on PATH; cargo is optional (missing
 rem      cargo = exe degrades to the go audio path).
-rem    * Preview pages are NOT built here any more; run
-rem      tools\build_preview.py manually if you need them.
-rem    * Every step is appended to build.log next to this file, so a
-rem      vanished window still leaves a trace of where it stopped.
+rem    * Preview pages are NOT built here; run tools\build_preview.py.
+rem    * Console stays terse (one line per step); full tool output goes
+rem      to build.log, and is shown on the console only on failure.
 rem
 rem  ------------------------------------------------------------
 rem  !! BATCH GOTCHA - DO NOT REGRESS (2026-10-22)
@@ -38,8 +37,8 @@ if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "APP=%ROOT%\iKF-Audio-Center-Wails"
 set "OUT=%ROOT%\release\iKF-Audio-Center-Portable"
 set "LOG=%ROOT%\build.log"
+set "SCRATCH=%ROOT%\build.step.log"
 set "EXE=%APP%\build\bin\iKF-Audio-Center.exe"
-set "PEXE=%OUT%\iKF-Audio-Center.exe"
 set "DLL=%APP%\audiocore\target\release\ikf_audio.dll"
 
 set "SRC=%~1"
@@ -47,15 +46,12 @@ if not defined SRC set "SRC=%ROOT%\..\iKF headset\WIN10(WHQL)\SoftwareDriver"
 
 if exist "%LOG%" copy /y "%LOG%" "%LOG%.prev" >nul
 >"%LOG%" echo [%DATE% %TIME%] rebuild start
+>>"%LOG%" echo   src: %SRC%
+if exist "%SCRATCH%" del "%SCRATCH%" >nul
 set "T_START=%TIME%"
 set "T_STEP=%TIME%"
 
-echo ============================================================
-echo  iKF Audio Center - portable rebuild
-echo ============================================================
-echo   root : %ROOT%
-echo   src  : %SRC%
-echo.
+echo iKF Audio Center - portable rebuild
 
 rem ---------- toolchain ----------
 set "PY="
@@ -67,18 +63,13 @@ if defined PY (
 if not defined PY goto :no_python
 where go >nul 2>nul || goto :no_go
 where wails >nul 2>nul || goto :no_wails
-echo [ok] toolchain: python / go / wails
-echo.
 
 rem ---------- driver source (step 4) ----------
 rem checked up front on purpose: fail in 2s instead of after 3 steps
 if exist "%SRC%" goto :src_ok
-echo [FAIL] driver source folder not found:
-echo        %SRC%
-echo.
-echo        Either pass it explicitly:
-echo          build.bat "D:\path\to\SoftwareDriver"
-echo        or put it at the default place above.
+echo [FAIL] driver source not found:
+echo   %SRC%
+echo   pass it explicitly: build.bat "D:\path\to\SoftwareDriver"
 goto :fail
 :src_ok
 
@@ -91,17 +82,15 @@ rem we join at :rust_collect right after step 2 (before wails build).
 rem Quoting is verified - do not "simplify" the (call echo %%^errorlevel%%).
 set "CARGO_FLAG=%ROOT%\build.cargo.done"
 set "CARGO_LOG=%ROOT%\build.cargo.log"
-set "CARGO_RC=skipped"
 if exist "%CARGO_FLAG%" del "%CARGO_FLAG%" >nul
 where cargo >nul 2>nul
 if errorlevel 1 (
-    echo [2b/4] cargo not on PATH - skipping rust build, exe will degrade
+    echo [2b/4] cargo not found - go audio path
     >>"%LOG%" echo [2b/4] cargo missing - skipped
     rem no flag -> the join step below skips waiting entirely
     set "CARGO_FLAG="
     goto :rust_started
 )
-echo [2b/4] cargo build --release (background)  -^> audiocore\target\release\ikf_audio.dll
 >>"%LOG%" echo [2b/4] cargo build audiocore (background)
 pushd "%APP%\audiocore"
 start "rustbuild" /b cmd /c "cargo build --release > "%CARGO_LOG%" 2>&1 & (call echo %%^errorlevel%%)>"%CARGO_FLAG%""
@@ -109,101 +98,86 @@ popd
 :rust_started
 
 rem ---------- 1. design -> Python app ----------
-echo [1/4] build_center.py  -^> iKF-Audio-Center.py
->>"%LOG%" echo [1/4] build_center.py
-%PY% "%ROOT%\tools\build_center.py"
-if errorlevel 1 goto :fail
+set "STEP=[1/4] python app"
+%PY% "%ROOT%\tools\build_center.py" >"%SCRATCH%" 2>&1
+if errorlevel 1 goto :stepfail
+>>"%LOG%" type "%SCRATCH%"
+if not exist "%ROOT%\iKF-Audio-Center.py" goto :stepnoout
 call :mark "build_center"
-if not exist "%ROOT%\iKF-Audio-Center.py" (
-    echo [FAIL] build_center.py did not produce iKF-Audio-Center.py
-    goto :fail
-)
-echo.
+echo %STEP% ok
 
 rem ---------- 2. design + bridge -> frontend dist ----------
-echo [2/4] build_frontend.py  -^> frontend\dist\index.html
->>"%LOG%" echo [2/4] build_frontend.py
-%PY% "%APP%\tools\build_frontend.py"
-if errorlevel 1 goto :fail
+set "STEP=[2/4] frontend"
+%PY% "%APP%\tools\build_frontend.py" >"%SCRATCH%" 2>&1
+if errorlevel 1 goto :stepfail
+>>"%LOG%" type "%SCRATCH%"
+if not exist "%APP%\frontend\dist\index.html" goto :stepnoout
 call :mark "build_frontend"
-if not exist "%APP%\frontend\dist\index.html" (
-    echo [FAIL] build_frontend.py did not produce frontend\dist\index.html
-    goto :fail
-)
-echo.
+echo %STEP% ok
 
 rem ---------- 2c. join background cargo ----------
 if not defined CARGO_FLAG goto :rust_done
-echo [2b/4] waiting for background cargo build...
+if exist "%CARGO_FLAG%" goto :rust_collect
+echo [2b/4] waiting for rust audiocore
 :rust_wait
 if exist "%CARGO_FLAG%" goto :rust_collect
 rem 10 min watchdog: a hung cargo must not wedge the build forever
 ping -n 2 127.0.0.1 >nul
 set /a CARGO_WAIT+=1
 if %CARGO_WAIT% lss 600 goto :rust_wait
-echo [2b/4] WARN cargo wait timed out - exe will degrade to go path
+echo [WARN] rust wait timeout - go audio path
 >>"%LOG%" echo [2b/4] cargo wait timeout
 goto :rust_done
 
 :rust_collect
 set /p CARGO_RC=<"%CARGO_FLAG%"
-type "%CARGO_LOG%"
 >>"%LOG%" type "%CARGO_LOG%"
 if not "%CARGO_RC%"=="0" (
-    echo [2b/4] WARN rust build failed - exe will degrade to go path
+    type "%CARGO_LOG%"
+    echo [WARN] rust build failed - go audio path
     >>"%LOG%" echo [2b/4] rust build failed
     goto :rust_done
 )
 call :mark "cargo(bg)"
 if not exist "%DLL%" (
-    echo [2b/4] WARN dll not produced - exe will degrade to go path
+    echo [WARN] rust dll missing - go audio path
     goto :rust_done
 )
-echo [2b/4] ok
 :rust_done
 if exist "%CARGO_FLAG%" del "%CARGO_FLAG%" >nul
 if exist "%CARGO_LOG%" del "%CARGO_LOG%" >nul
-echo.
 
 rem ---------- 3. wails build -> exe ----------
-echo [3/4] build.py  -^> build\bin\iKF-Audio-Center.exe
->>"%LOG%" echo [3/4] build.py
-%PY% "%APP%\tools\build.py"
-if errorlevel 1 goto :fail
-call :mark "wails_build"
-if not exist "%EXE%" (
-    echo [FAIL] wails build did not produce the exe
-    goto :fail
-)
+set "STEP=[3/4] wails build"
+%PY% "%APP%\tools\build.py" >"%SCRATCH%" 2>&1
+if errorlevel 1 goto :stepfail
+>>"%LOG%" type "%SCRATCH%"
+if not exist "%EXE%" goto :stepnoout
 if exist "%DLL%" (
     copy /y "%DLL%" "%APP%\build\bin\ikf_audio.dll" >nul
     >>"%LOG%" echo [3/4] ikf_audio.dll copied to build/bin
 )
-echo.
+call :mark "wails_build"
+echo %STEP% ok
 
 rem ---------- 4. portable package ----------
-echo [4/4] build_portable.py  -^> release\iKF-Audio-Center-Portable
->>"%LOG%" echo [4/4] build_portable.py
-%PY% "%ROOT%\tools\build_portable.py" --src "%SRC%"
-if errorlevel 1 goto :portable_fail
+set "STEP=[4/4] portable package"
+%PY% "%ROOT%\tools\build_portable.py" --src "%SRC%" >"%SCRATCH%" 2>&1
+if errorlevel 1 goto :stepfail
+>>"%LOG%" type "%SCRATCH%"
 call :mark "build_portable"
+echo %STEP% ok
 
 :summary
 echo.
 rem total wall time since build start, not since the last step
 set "T_STEP=%T_START%"
 call :mark "TOTAL"
-echo ============================================================
-echo  Done.
-echo ============================================================
-if exist "%EXE%" for %%f in ("%EXE%") do echo   exe     : %%~zf bytes
-if exist "%PEXE%" (
-    for %%f in ("%PEXE%") do echo   portable: %%~zf bytes
-    set /a CNT=0
-    for /r "%OUT%" %%f in (*) do set /a CNT+=1
-    echo   files   : !CNT!
-)
-echo.
+set /a CNT=0
+for /r "%OUT%" %%f in (*) do set /a CNT+=1
+echo Build OK - %ELAPSED%s - !CNT! files
+echo   %OUT%
+if exist "%SCRATCH%" del "%SCRATCH%" >nul
 >>"%LOG%" echo DONE
 pause
 exit /b 0
@@ -238,6 +212,18 @@ if %D% lss 0 set /a D+=86400
 endlocal & set "%~1=%D%"
 exit /b 0
 
+rem a build step returned an error: show its captured output
+:stepfail
+echo %STEP% failed
+>>"%LOG%" type "%SCRATCH%"
+type "%SCRATCH%"
+goto :fail
+
+rem a build step "succeeded" but its output file is missing
+:stepnoout
+echo %STEP% failed - expected output missing
+goto :fail
+
 :no_python
 echo [FAIL] python not found on PATH.
 goto :fail
@@ -250,18 +236,10 @@ goto :fail
 echo [FAIL] wails not found on PATH.
 goto :fail
 
-:portable_fail
-echo.
-echo [FAILED] build_portable.py returned an error.
-echo          If it failed while deleting the release folder, close
-echo          iKF-Audio-Center.exe / iKF driver manager first, then retry.
-goto :fail
-
 :fail
+if exist "%SCRATCH%" del "%SCRATCH%" >nul
 >>"%LOG%" echo FAILED
 echo.
-echo [FAILED] rebuild stopped. See the message above.
-echo          Log: %LOG%
-echo.
+echo BUILD FAILED - full log: %LOG%
 pause
 exit /b 1
