@@ -2148,6 +2148,12 @@ BRIDGE_JS = r"""
       var n = $('profName'), d = $('profDesc');
       var name = n ? n.value.trim() : '';
       if (!name){ toast('请先填写场景名称', true); return; }
+      /* 与后端 profileSaveConflicts 同一口径的前端预检（save/rename
+         都要走 —— 后端才是真闸，这里只是免一次往返的即时提示）。 */
+      if (/^(EQ_Slider([1-9]|10)|UserDefine|UserDefineFormwork)$/.test(name)){
+        toast('「' + name + '」与内置场景资源同名，换一个名字', true);
+        return;
+      }
 
       if (PROFILES.mode === 'rename'){
         var from = PROFILES.editName;
