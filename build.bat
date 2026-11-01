@@ -13,6 +13,8 @@ rem  * do not simplify (call echo %%^errorlevel%%) - verified pattern
 rem ============================================================
 setlocal enabledelayedexpansion
 chcp 65001 >nul
+rem keep python stdout UTF-8 too, or it emits GBK into a UTF-8 console/log
+set "PYTHONUTF8=1"
 cd /d "%~dp0"
 title iKF Audio Center - portable rebuild
 
