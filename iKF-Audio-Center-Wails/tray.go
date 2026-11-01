@@ -376,9 +376,8 @@ func showTrayMenu() {
 	item(mfString, cmdShowHide, "显示主界面")
 	item(mfString, cmdMute, "静音 / 取消静音")
 	item(mfSeparator, 0, "")
-	// 入口状态（P5-1'）：便携包被移动后，「修复开机入口」把自启与面板项
-	// 拉回当前目录；入口已存在时也要求「可写也要可删」）
-	// 提供删除 —— Run 值与 CLSID 命令值一并删掉，不再开机自启。
+	// 入口状态：便携包被移动后，「修复开机入口」把自启与面板项
+	// 拉回当前目录（要求可写也要可删）—— Run 值与 CLSID 命令值一并删掉，
 	// 隐藏启动（/h /d）时不弹提示框，增删都靠这里兜底。
 	if st := readEntryStatus(); st.OK() {
 		item(mfString, cmdEntryDel, "禁止开机启动")

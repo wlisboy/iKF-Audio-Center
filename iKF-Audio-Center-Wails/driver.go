@@ -89,7 +89,7 @@ type wspec struct {
 	choices []int
 }
 
-// writable —— 按端点分表，S3 起真源 = model/device-model.toml [[writable]]
+// writable —— 按端点分表，真源 = model/device-model.toml [[writable]]
 // （80 = render 65 + capture 15，装载时自校验，含 SS×16/EQ×10/声道×2 显式展开）。
 //
 // 注意 VolumeControl / VolumeScalarControl / MuteControl 在**两个端点上都有**，
@@ -892,8 +892,8 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 			case "0", "false", "off", "no", "":
 				on = false
 			default:
-				// ★ 未识别的串不能静默当「关」写 0 ——
-				// 传错值的人看到的是成功。改成与 TInt/TFloat 同口径报错。
+				// 未识别的串不能静默当「关」写 0 ——
+				// 传错值的人看到的是成功。与 TInt/TFloat 同口径报错。
 				return map[string]interface{}{"ok": false, "ret": -1,
 					"error": fmt.Sprintf("布尔值不合法：%v", value)}
 			}

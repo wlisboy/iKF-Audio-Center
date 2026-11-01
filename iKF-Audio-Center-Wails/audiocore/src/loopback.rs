@@ -6,7 +6,7 @@
 //! 逐条复刻的行为（改语义 = 破坏双跑对比，不许）：
 //!   * 共享模式**必须**用 GetMixFormat 初始化
 //!   * Initialize: SHARED | LOOPBACK，200ms 缓冲（100ns 单位），周期参数 0
-//!   * 5ms 轮询而非 EVENTCALLBACK（事件驱动回环历史版本返回 E_INVALIDARG）
+//!   * 5ms 轮询而非 EVENTCALLBACK（事件驱动回环返回 E_INVALIDARG）
 //!   * 每轮最多 64 个包；SILENT 标志或空指针 → 写静音
 //!   * downmix 只取前左/前右平均；四种格式 + 未知格式写静音
 //!   * GetNextPacketSize 失败 → 会话结束，err = "回环流已中断"
@@ -121,7 +121,7 @@ unsafe impl Send for LbHandles {}
 pub struct LoopbackSession {
     pub state: Arc<LoopbackState>,
     /// ★Arc 共享：capture_loop 与 spectrum/level/close 必须是**同一个**
-    /// Spectrum 实例——S5 前版曾用局部实例导致"采集在跑、频谱全零"的断链。
+    /// Spectrum 实例——局部实例会让采集与频谱断链（采集在跑、频谱全零）。
     spec: Arc<Mutex<Spectrum>>,
     stop: Arc<AtomicBool>,
     th: Option<std::thread::JoinHandle<()>>,

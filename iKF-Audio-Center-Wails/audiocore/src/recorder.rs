@@ -128,7 +128,7 @@ pub fn downmix_to_pcm16(raw: &[u8], frames: usize, src_ch: usize, block_align: u
     // ★max-abs 下混（与 spectrum.rs 同策略）：全声道平均会把信号稀释
     // 1/ch（8ch 端点上音乐只剩 1/8 音量≈无声——实测）；max-abs 对
     // 任何声道分布都不稀释。单声道源等价原行为。
-    // ★破坏性检测 P0-2：block_align/ch 与实际 buffer 不一致时越界 panic
+    // ★格式漂移防御：block_align/ch 与实际 buffer 不一致时越界 panic
     // → abort → 0xC0000409 无日志。校验按**实际读宽**算（同 spectrum.rs
     // decode_block）：只查 frames*block_align 拦不住 block_align < ch×样本
     // 字节 的格式漂移，校验最后一帧 base + ch×宽度 ≤ raw.len 覆盖全部帧。
@@ -457,12 +457,12 @@ mod tests {
         assert_eq!(&pcm[4..6], &pcm[6..8]);
     }
 
-    /// ★破坏性检测 P0-2 回归：格式漂移（block_align < ch×样本字节）时
+    /// 格式漂移（block_align < ch×样本字节）回归：
     /// downmix_to_pcm16 必须返回 None，不得越界 panic（→ 0xC0000409）。
     #[test]
     fn downmix_format_drift_returns_none() {
         // 声明 float32 8ch（读宽 32B）但 block_align=8、buffer=3×8：
-        // frames*block_align ≤ raw.len 的旧校验会放行，逐帧读必越界。
+        // 按 frames*block_align 校验会放行，逐帧读必越界。
         let raw = [0u8; 24];
         assert!(downmix_to_pcm16(&raw, 3, 8, 8, 3, 32).is_none());
         assert!(downmix_to_pcm16(&raw, 3, 2, 8, 0xFF, 8).is_none());

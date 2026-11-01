@@ -87,8 +87,8 @@ func selfTest() {
 	fmt.Printf("可读     : %d\n", ok)
 	/* ret=2 的实测含义是
 	   「存在但从未写过」（卸载/重装驱动清空 FxProperties 后全变 2，
-	   写一次就回 0），不是本机不支持。同一件事两套说法，和界面上
-	   麦克风页徽章那处一起改成「未写入」。 */
+	   写一次就回 0），不是本机不支持。同一件事两套说法，界面上
+	   麦克风页徽章统一显示「未写入」。 */
 	fmt.Printf("未写入   : %d\n", unsup)
 	fmt.Printf("未找到   : %d\n", notfound)
 	fmt.Printf("需特殊参数: %d\n", broken)

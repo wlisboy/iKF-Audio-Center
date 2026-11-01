@@ -21,8 +21,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "src", "center_src.py")
 DESIGN = os.path.join(ROOT, "design", "audio-center.html")
-# S3 起属性名清单改由 device-model.toml [names] 承载（源文件运行时装载），
-# propnames.json 退役 —— 构建不再注入 __GENERIC__/__OEM__。
+# 属性名清单由 device-model.toml [names] 承载（源文件运行时装载），
+# 构建不注入 __GENERIC__/__OEM__。
 OUT = os.path.join(ROOT, "iKF-Audio-Center.py")
 
 FAVICON = (
@@ -317,9 +317,8 @@ BRIDGE_JS = r"""
 
   /* ---------------- 未开放参数置灰 ----------------
      只把控件调暗是不够的：旋钮上仍显示 45 / 30 这样的数字，
-     看起来像「有值、但拖了没反应」。这里把读数改成「—」、
-     给标签补上「· 不可用」，让「本机调不了」一眼就能看出来，
-     而不是让用户反复拖拽去猜。 */
+     看起来像「有值、但拖了没反应」。置灰时读数显示「—」、标签补上「· 不可用」，
+     让「本机调不了」一眼可见，用户不用反复拖拽去猜。 */
   function dim(el, why){
     if (!el || el.getAttribute('data-dimmed')) return;
     el.setAttribute('data-dimmed', '1');
@@ -578,19 +577,17 @@ BRIDGE_JS = r"""
       dial.title = '主音量 ' + (st.vol_db === null ? '—' : st.vol_db.toFixed(2) + ' dB')
         + ' · 上下拖拽或滚轮调节';
     }
-    /*删除：这里若无条件把「动态低音」「语音清晰」两个旋钮
-       dim() 成「本机 APO 未实现此效果」。那句话在**参数接好线之后就
-       不成立了** —— 两个旋钮现在分别绑 BM_Slider_BassLevel（配 Enable_BM_GFX）
-       与 VOICECLARITY_LEVEL（配 Enable_VOICECLARITY_LFX），两项都已进白名单
-       且 write 探测通过。留着这句硬置灰的后果是：旋钮带 data-val 却
-       pointerEvents:none —— 数字在、拖不动，正是这一版截图里看到的样子。
-       现在改成**由 syncDials 按驱动实测值决定**：读得到就点亮，读不到才灰。
-       （读数也不再是设计稿写死的 45 / 30，而是驱动的真实值。） */
+    /* 旋钮亮度由 syncDials 按驱动实测值决定：读得到就点亮，读不到才灰。
+       不得无条件 dim()「动态低音」「语音清晰」—— 两旋钮分别绑
+       BM_Slider_BassLevel（配 Enable_BM_GFX）与 VOICECLARITY_LEVEL
+       （配 Enable_VOICECLARITY_LFX），均已进白名单且 write 探测通过；
+       硬置灰的后果是旋钮带 data-val 却 pointerEvents:none ——
+       数字在、拖不动。 */
 
     /* 写回策略：数值一变就写（180ms 防抖），不再只在 pointerup 写。
        音量旋钮贴在面板底边，向下拖很容易把指针拖出窗口 ——
-       旧写法只挂 pointerup，一旦指针在窗口外松开就收不到事件，
-       表现正是「界面数字变了、设备音量没变」。 */
+       只挂 pointerup 时指针在窗口外松开就收不到事件，表现为
+       「界面数字变了、设备音量没变」。 */
     var timer = null, pending = null;
     function flush(){
       if (pending === null) return;
@@ -650,10 +647,10 @@ BRIDGE_JS = r"""
 
      不设那张 SWITCH_MAP。它按「#pg-* 内 button.sw
      的出现顺序」索引着填 data-p，隐患是**界面一改顺序就悄悄错位**；
-     而这轮恰好把四组开关从均衡页搬到了声场页。既然统一处理器本来就
-     支持属性直连，那张表就是纯负担，故删除 —— 顺序不再有任何隐式约束。
+     统一处理器本来就支持属性直连，那张表是纯负担，故删除 ——
+     顺序不再有任何隐式约束。
 
-     语义备忘：**「智能音量」绑 Enable_SMART_VOLUME_GFX，不再绑 GFSControl**。
+     语义备忘：**「智能音量」绑 Enable_SMART_VOLUME_GFX，不绑 GFSControl**。
      查 osConfLib.dll 的字符串表才能确认早先的错判 —— 那个表分成
      两块：功能参数表（Enable_* / *_LEVEL / SS_* …）和**设备控制表**
      （GetDeviceFriendlyName / GetSupportFeature / AmplifierControl /
@@ -664,7 +661,7 @@ BRIDGE_JS = r"""
      官方 Xear Smart Volume 页的开关在功能表里叫 Enable_SMART_VOLUME_GFX，
      且与控件名 EnableSmartVol 在 XearAudioCenter_x64.exe 的字符串表中相邻
      （… EnableGX | Enable_SMART_VOLUME_GFX | SVN | EnableSmartVol …），配对确凿。
-     ★ 当初判它「ret=2 = 本机不支持」是只读探测的误读（见 MEMORY 的 ret 语义）。 */
+     ★ 「ret=2 = 本机不支持」是只读探测的误读（见 MEMORY 的 ret 语义）。 */
   function bindSwitches(st){
     /* 声场页补真实控件（挂在「环境类型」那一组下，
        见 addSpaceSwitch 里的锚点说明）。
@@ -720,14 +717,14 @@ BRIDGE_JS = r"""
       '', ['大房间', '中房间', '小房间']);
     addSpaceSlider('sfxRange', 'CONLAB_HPSPK_SFX', '声场扩展', 0, 3, 1);
     addSpaceSlider('spkRange', 'CONLAB_HPSPK_SPKANGLE', '扬声器角度', 5, 30, 5);
-    /* 这一项
-       该名字在 XearAudioCenter_x64.exe 的字符串表里出现 **0 次**，只在
+    /* Enable_SURRSENS_LFX 的证据链：该页另一个名字在
+       XearAudioCenter_x64.exe 的字符串表里出现 **0 次**，只在
        osConfLib.dll 的参数表（第 136 项）里躺着，官方面板从不用它。
        Surround Max 页真正的总开关是 `Enable_SURRSENS_LFX` —— 它在 exe 与 dll
        里都有，且与 `Enable_DHDVS_LFX` / `Enable_SS_LFX` / `Enable_PLIIX_LFX` /
        `Enable_NEOPC_LFX` 排在同一块，那正是「每个官方页一个 LFX 总开关」的清单。
        （SURRSENS = Surround Sensation，Surround Max 的前身名。）
-       教训与 GFSControl 同类：**名字像 ≠ 就是它**，必须落到 exe 引用上。 */
+       与 GFSControl 同一条纪律：**名字像 ≠ 就是它**，必须落到 exe 引用上。 */
     addSpaceSwitch('Enable_SURRSENS_LFX', '环绕增强', '');
     /* ---- C 档：Dolby Headphone / Dolby Virtual Speaker----
        官方页 apoSpeakerDolbyHPVS.cml（**耳机菜单里有**）控件结构：
@@ -841,13 +838,12 @@ BRIDGE_JS = r"""
         });
       });
     }
-    /* 旧版「GFS 模式 0–7」下拉已废弃：静态反编译确认 GFSControl 就是
+    /* GFSControl 不是音效参数：静态反编译确认它是
        HKCU\SOFTWARE\C-Media\Hook\EnableGFS 这个 DWORD 的读写接口
        （osConfLib.dll 分发表 ID 0x10029 → FUN_180011ff0，内部只做
-       RegQueryValueExW / RegSetValueExW），它是布尔开关而不是 8 档模式。
-       更正：它**不是**「智能音量」（见 bindSwitches 上方的
-         语义备忘），所以现在界面上不再给它专用入口 —— 参数页仍可读可写。
-       这里兜底清掉残留的旧下拉。 */
+       RegQueryValueExW / RegSetValueExW），布尔开关而非 8 档模式，
+       也不属于任何官方页的控件 —— 参数页保留读写，界面不留专用入口，
+       兜底清掉可能残留的旧下拉。 */
     var gfs = $('gfsSel');
     if (gfs){
       var oldRow = gfs.closest('.row');
@@ -1082,15 +1078,14 @@ BRIDGE_JS = r"""
         var lab = $(cfg[1]);
         if (lab) lab.textContent = cfg[3](+d.v);
       } else if (!d || !d.w){
-        /* 判据由 `d.r !== 0` 改成 `!d.w`，理由同上面的下拉 ——
-           ret=2（存在但从未写过）不该被当成本机不支持而锁死滑杆。
-           新加的「声场扩展 / 扬声器角度」两根滑杆出厂就是 ret=2，
-           照老判据会一上来就被按死。 */
+        /* 置灰判据用 `!d.w` 不用 `d.r !== 0`：ret=2（存在但从未写过）
+           不是本机不支持，锁死滑杆会冤枉「声场扩展 / 扬声器角度」
+           这类出厂就是 ret=2 的项。 */
         dim(el.parentNode, cfg[2] + ' · 当前设备不支持');
       }
     });
 
-    /* 声道配置 chips/ E 档）。
+    /* 声道配置 chips（E 档）。
        写入值是 Tag 本身（2/4/6/8），所以这里也**不做任何换算**：直接比对数值。
        置灰判据红线 —— 一律用 `!d.w`，**不许**用 `r !== 0`：
        Speaker_Channel_Setting 在本机是 ret=0，但换一台机器完全可能是 ret=2
@@ -1358,11 +1353,11 @@ BRIDGE_JS = r"""
   }
 
   /* 声场页动态补一个开关。
-     改成插入到 #spFxStart 之前，而不是 appendChild ——
-     声场页末尾现在有一组从均衡页挪过来的音效开关，appendChild 会把
-     「虚拟环绕 / 环境音效」排到它们后面，跟同属环境类的「环境类型」
-     隔断。锚在 #spFxStart（那条 border-top 所在的行）之前，
-     两次调用天然保序：第二次插在第一次的后面。 */
+     插入到 #spFxStart 之前而不是 appendChild：声场页末尾还有一组
+     均衡页迁来的音效开关，appendChild 会把「虚拟环绕 / 环境音效」排到
+     它们后面，跟同属环境类的「环境类型」隔断。锚在 #spFxStart
+     （那条 border-top 所在的行）之前，两次调用天然保序：第二次插在
+     第一次的后面。 */
   /* 静态滑杆（设计稿里就写好的）+ 动态补的滑杆，统一一份配置。
      补 AUDIOBRILLIANT_LEVEL：官方 Xear Audio Brilliant 页除开关外
      还有一根 Brilliant强度 滑杆（0~6）——只有开关、强度没入口。 */
@@ -1711,8 +1706,7 @@ BRIDGE_JS = r"""
        中央场景墙（设计稿的 renderProfile()，数据来自这里的 PROFILES）
        只做「点一下整套切过去」；右侧面板只做管理：状态与脏标记 /
        场景详情 / 新建 · 覆盖 · 改名 · 删除。
-       旧版底部那排「原厂默认 / 游戏 / 音乐 / 电影」chip 其实全部是
-       「把当前状态存成它」的保存动作，却长得像场景名，已删除。
+       「把当前状态存成它」类按钮长得像场景名、极易误点，不放这里。
 
      ★ 只展示真快照：官方档一律隐藏 —— 「预设」只是本机驱动拒收的
        恢复出厂指令、「HiFi」是 0 参数空壳，都没有快照意义。
@@ -1761,7 +1755,7 @@ BRIDGE_JS = r"""
     return null;
   }
 
-  /* 出厂档（驱动自带 + 自建「默认」， 改名）不给改名 / 删除：
+  /* 出厂档（驱动自带 + 自建「默认」）不给改名 / 删除：
      它是回到基线的唯一入口，删掉就再也回不去了。 */
   function profFactory(sel){
     return !sel || sel.builtin || sel.name === '默认';
@@ -2478,9 +2472,9 @@ BRIDGE_JS = r"""
          显示旧选择（否则读数撒谎）——清空并重渲染下拉。 */
       var eps = $('eqProfSel');
       if (eps && eps.value !== ''){ eps.value = ''; }
-      /* 读回 10 段值后必须反查预设，芯片与 S.pre 跟着走。
-         旧实现只更新 S.eq，芯片停在初始化时硬编码的第 0 个「舞曲」上 ——
-         默认场景（全 0 = 官方索引 11「预设」）因此在均衡页显示「舞曲」。 */
+      /* 读回 10 段值后必须反查预设，芯片与 S.pre 跟着走：
+         否则芯片停在硬编码的第 0 个「舞曲」上 ——
+         默认场景（全 0 = 官方索引 11「预设」）在均衡页显示「舞曲」。 */
       if (typeof syncEqChips === 'function') syncEqChips();
     }
 

@@ -4,15 +4,13 @@ package main
 
 // audio_lb.go —— Loopback 的 Rust 路径（ikf_audio.dll 会话 ABI）绑定。
 //
-// S2 切流策略：双路径共存，Rust 路径由环境变量 IKF_AUDIO_RUST=1 显式启用，
-// 默认仍走 Go 路径。真机对比验收后再翻转默认（切流 = 删开关，删 Go 路径
-// 在 S5 清退阶段做）。
+// Rust 是回环的唯一实现路径：DLL 缺失/ABI 错配时 audioProbe 失败，
+// startRustInner 明确报错，不做静默降级。
 //
 // 会话句柄：open 返回 DLL 侧 Box<LoopbackSession> 的裸指针，存进
 // Loopback.rustH；close 由 DLL 回收（含采集线程 join 与字段清零）。
 
 import (
-	"os"
 	"unsafe"
 )
 
@@ -45,8 +43,6 @@ func cstr(b []byte) string {
 	}
 	return string(b)
 }
-
-func audioRustWanted() bool { return os.Getenv("IKF_AUDIO_RUST") != "0" }
 
 // lbDevicesViaRust 端点枚举。行格式 "id\tname\tdef\n"（def ∈ {0,1}）。
 func lbDevicesViaRust() (map[string]interface{}, bool) {

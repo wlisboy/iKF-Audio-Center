@@ -344,7 +344,7 @@ html[data-viz="1"] .brand,html[data-viz="1"] .devpill,html[data-viz="1"] .hud{po
    **浅底**（Glacier Day #D8E6EA / Porcelain Teal / Daybreak Lime），
    浅底配色配深色舞台，地形圆盘外圈会撞出一道亮暗分界线。
 
-   改成：舞台颜色 = 当前配色的 fog 色。地形外缘本来就是混到 fog、
+   舞台颜色 = 当前配色的 fog 色：地形外缘本来就是混到 fog、
    半径 75 之外 alpha 归零（片元着色器 distFade = 1-smoothstep(40,75,·)），
    所以舞台取 fog 是无缝的。JS 换配色时把 fog 的 sRGB 值写进 --viz-stage，
    一块纯色矩形铺满画布区（画布区 = 窗口去掉 380px 侧栏，右边界正好压在
@@ -767,13 +767,12 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
 .vm-it em{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* 实时预览条：颜色停靠点与着色器里「能量 → 颜色」的映射同序
-   （雾 = 舞台底色 → 冷 = 低能量/外圈 → 暖 = 主色 → 强调 = 界面）。
-   旧版没有这一块，改完一个色必须回头看地形才知道效果。 */
+   （雾 = 舞台底色 → 冷 = 低能量/外圈 → 暖 = 主色 → 强调 = 界面）。 */
 .vm-prev{height:38px;border-radius:11px;border:1px solid var(--line);
   margin-bottom:12px;background:var(--ghost)}
 
-/* 字段区：两列，标签列固定 46px。固定宽度是对齐的关键 ——
-   旧版用 flex 让每个格子自己算，结果右边界参差。
+/* 字段区：两列，标签列固定 46px —— 对齐的关键就是固定宽度，
+   自适应宽度会让右边界参差。
    ★ 两列不等宽（1 : 1.4）而不是 1 : 1：三行配对是
        底色 | 雾色      两个都只有「标签 + 色块」，窄列绰绰有余
        暖色 | 冷色      同上
@@ -863,8 +862,7 @@ html[data-viz="1"] .rail::-webkit-scrollbar{width:0;height:0;display:none}
    改版的出发点是：「应用」和「保存」必须分在两个空间里。
    中央舞台只负责「点一下切过去」（场景卡），右侧面板只负责
    「管理」（状态 / 详情 / 新建 / 覆盖 / 改名 / 删除）。
-   旧版底部那排「原厂默认 · 游戏 · 音乐 · 电影」chip 长得像场景名、
-   实际是「把当前状态存成它」的动作，是这块最容易误点的地方，已删除。
+   「把当前状态存成它」类按钮长得像场景名、极易误点，不放这里。
 
    ★ 改这里的数字必须重跑 tmp/diag_panel.js —— 场景页的内容高度和
      其它页差很多，它是唯一能判断「会不会顶到读数区」的依据。 */
@@ -1029,7 +1027,7 @@ html.devmode .dock button[data-dev]{display:flex}
 
 /* 虚拟环绕摆位工具条（桥接层 addSpaceVssEditor 注入）：
    「旋转 | 平移」分段胶囊 + 逆时钟/顺时钟/重置三颗图标圆钮。
-   替代旧版「两个 chip + 一排文字按钮」。id 由桥接层依赖，样式在这里。 */
+   id 由桥接层依赖，样式在这里。 */
 .vss-tools{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .vss-sep{width:1px;height:16px;background:var(--line);flex:0 0 auto}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;
@@ -1049,7 +1047,7 @@ html.devmode .dock button[data-dev]{display:flex}
 
 /* EQ 面板重设计：宽松化 + 十段竖推子 + 自定义方案次卡
    + 面板加高（曲线在窗口左侧，面板向下延伸不遮挡）。
-   ★ 加高幅度以 hud 底边为限：205 曾让卡片顶(177)越过读数区底(180) 3px，
+   ★ 加高幅度以 hud 底边为限：205 时卡片顶(177)越过读数区底(180) 3px，
      212 → 卡片顶 184，留 4px 呼吸缝。 */
 .panel:has(#pg-eq.on){max-height:calc(100vh - 212px)}
 /* 设备页读数区较高（驱动状态三行文本），与卡片顶仅 2px 余量——
@@ -1089,7 +1087,7 @@ html.devmode .dock button[data-dev]{display:flex}
   <!-- 浅色主题下给地形垫的深色「舞台」，只在 html[data-theme=light][data-viz=1] 下显示 -->
   <div class="vizplate"></div>
   <!-- 律动空间的操作提示：进来浮出、5 秒淡出、一动手就消失（见 .vhint 的注释）。
-       从标题副标里搬出来的 —— 副标改成功能说明，这串交互提示没地方放。 -->
+       标题副标留给功能说明，交互提示单独放这里。 -->
   <div class="vhint" id="vizHint">拖拽转视角 · 滚轮缩放 · 双击复位 · 点击生成涟漪</div>
 
   <div class="brand">
@@ -1228,9 +1226,8 @@ html.devmode .dock button[data-dev]{display:flex}
 
       <!-- 「耳机录音」—— 录耳机里正在播放的
            声音（渲染端点 WASAPI loopback 采集），写 16bit 立体声 WAV 到
-           「音乐\iKF Audio Center\」。原麦克风页「录音机」（录麦克风）废弃
-           移除；副标状态行也删。
-           ★ 入口由按钮改成**开关**；录音中底部弹出
+           「音乐\iKF Audio Center\」。录音入口只挂声音页。
+           ★ 入口做成开关；录音中底部弹出
            灵动岛（脉冲红点 + EQ 跳柱 + 实时计时，点岛即停），停止后岛
            展开成「已保存」卡片：文件名 + 所在目录 +「打开文件夹」（资源
            管理器 /select 选中该 WAV，走新端点 POST /api/recorder/open）。
@@ -1493,10 +1490,10 @@ html.devmode .dock button[data-dev]{display:flex}
            字段写入（驱动版本=st.driver · 设备 ID=st.hwid 实例路径 ·
            DirectX=st.dx · 音量范围=vol_min…vol_max·步进）。静态值一律「—」，
            不写死、不编造；设计稿独立打开时即显示「—」。
-           ★ 旧 setKv(i) 按位置写的实现已在去重后整体错位（驱动版本曾被写成
-             编解码器名），这就是「读取不对」的根因，桥接层已改按 id 定位。 -->
-      <!-- 二次精简：设备 ID（长实例路径）/ 型号来源 /
-           DirectX 三行对普通用户无用（参数页仍可查），删除；只留两行真值。
+           ★ 各行由桥接层按 id 定位写入；按位置索引会在行增删后整体错位
+             （驱动版本对到编解码器名那类张冠李戴）。 -->
+      <!-- 设备 ID（长实例路径）/ 型号来源 /
+           DirectX 三行对普通用户无用（参数页仍可查），不展示；只留两行真值。
            对应 setKvId 调用保留（元素缺失时为安全空操作）。 -->
       <div class="kv"><span>驱动版本</span><b id="drvVer">—</b></div>
       <div class="kv"><span>音量范围</span><b id="devVol">—</b></div>
@@ -1508,11 +1505,9 @@ html.devmode .dock button[data-dev]{display:flex}
       <!-- 驱动组件：系统里的驱动包由同目录的 iKF-驱动管理.exe 装卸
            （它自提权，主界面因此一次 UAC 都不弹）。 -->
       <div class="ptitle">驱动组件</div>
-      <!-- 录音功能迁出麦克风页——声音页
-           「耳机录音」行接管，录渲染端点回环（耳机里正在播放的声音）。
-           麦克风页不再有任何录音入口。 -->
+      <!-- 录音只挂在声音页「耳机录音」——录渲染端点回环（耳机里正在播放的声音）。
 
-      <!-- 「驱动固件」行已移除 —— 装卸驱动统一交给同目录的
+      <!-- 「驱动固件」行不展示 —— 装卸驱动统一交给同目录的
            iKF-驱动管理.exe（自提权），主界面不再提供驱动安装入口。 -->
 
       <div class="row">
@@ -1616,8 +1611,7 @@ html.devmode .dock button[data-dev]{display:flex}
     <div class="pgroup" id="pg-profile">
       <!-- 这一页拆成「中央场景墙 + 右侧管理」两半。
            中央（#stage 上的 .pcard）只做一件事 —— 点一下应用整套音效；
-           这里只做管理，不再出现任何会让人以为是「场景」的保存按钮。
-           旧版的「原厂默认/游戏/音乐/电影」chip 已删除。 -->
+           这里只做管理，不放任何会让人以为是「场景」的保存按钮。 -->
       <div class="ptitle">当前状态</div>
       <div class="pstate">
         <div class="k">使用中</div>
@@ -1689,7 +1683,7 @@ html.devmode .dock button[data-dev]{display:flex}
 
       <div class="vm-body">
         <!-- 左栏：预设列表。单独成栏、自己滚动 ——「选哪套」和「怎么调」
-             是两件事，旧版把它们上下叠着放，视线要来回跳。 -->
+             是两件事，分开摆视线不用来回跳。 -->
         <div class="vm-side">
           <div class="vm-lbl">预设<i>点一下立即应用</i></div>
           <div class="vm-list" id="vizModalList"></div>
@@ -1725,8 +1719,7 @@ html.devmode .dock button[data-dev]{display:flex}
       </div>
 
       <!-- 底栏：左边是只影响当前这套预设的开关，右边是按主次排的动作。
-           旧版这三个按钮平铺在字段下面，长得跟字段一样重，
-           而它们是「按下去会改数据」的动作，混在属性里看不出区别。 -->
+           动作按钮与属性控件视觉同权会看不出「按下去会改数据」的区别。 -->
       <div class="vm-foot">
         <button class="vm-lk" id="ctFogLink">雾色跟随底色</button>
         <span class="vm-sp"></span>
@@ -2395,7 +2388,7 @@ function profGeom(n){
   /* 列数：下限 3（5 张卡时 3 列 2 行，明显好过 2 列 3 行），
      场景多了才加列，上限 5。加列的唯一约束是别把卡片挤窄 ——
      宽度不够时宁可退回少的列数、让行数涨上去，也不要 120px 的窄条
-     （9 个场景在 1080×674 下曾被算成 2 列 5 行，76px 高的卡只剩图标，
+     （9 个场景在 1080×674 下按 2 列 5 行排，76px 高的卡只剩图标，
      底部统计行还被挤出视口 1px）。
 
      ★ 这个下限从 148 提到 165，是量出来的：12 个场景在 1280×800 下
@@ -2692,10 +2685,10 @@ document.getElementById('dock').addEventListener('click', function(e){
   upd();
 })();
 
-/* 纯视觉开关的乐观翻转。起本文件已没有 [data-sw] 元素了 ——
-   所有真开关都改成 data-p 直连，由桥接层按驱动读回值同步状态
-   （乐观翻转会和它抢状态）。这段留着是给**不需要驱动的装饰性开关**用的：
-   将来往稿子里加一个 [data-sw] 按钮，它就能点。 */
+  /* 纯视觉开关的乐观翻转。所有驱动真开关都走 data-p 直连，由桥接层按
+     驱动读回值同步状态（乐观翻转会和它抢状态）。这段留着是给
+     **不需要驱动的装饰性开关**用的：将来往稿子里加一个 [data-sw] 按钮，
+     它就能点。 */
 document.addEventListener('click', function(e){
   var s = e.target.closest('[data-sw]'); if (s) s.classList.toggle('on');
 });
@@ -3218,7 +3211,7 @@ var VIS = (function(){
 
   /* ---------------- 着色器 ----------------
      与原 MapShaderMaterial 的差异只有三处（语义完全等价）：
-       1. three.js 的 instanceMatrix 只做平移，这里改成一个 vec3 实例属性；
+       1. three.js 的 instanceMatrix 只做平移，这里用一个 vec3 实例属性；
        2. modelMatrix 只是绕 Y 的自转，这里换成一个 uRot 矩阵；
        3. uRipples 结构体数组拆成 4 个平行数组，避免结构体布局差异。 */
   var VERT = [
@@ -4001,8 +3994,8 @@ var VIS = (function(){
 
      ★ 屏幕捕获的两个坑：
      ① **绝不把捕获流接回 actx.destination** —— 回环抓的就是系统输出本身，
-        再接回输出端会形成正反馈啸叫。所以「音量」滑杆没了，改成只作用在分析支路上的
-        「视觉增益」（弱音源时把地形推起来用）。
+        再接回输出端会形成正反馈啸叫。「视觉增益」只作用在分析支路上
+        （弱音源时把地形推起来用），不碰输出链。
      ② analyser 必须能到达 destination 才会被渲染，但直接连过去会出声，
         所以中间串一个 gain=0 的哑接点。 */
   var actx = null, analyser = null, vgain = null, sink = null, srcNode = null;
@@ -4482,9 +4475,8 @@ var VIS = (function(){
   /* 预览条（新增）：把**地形此刻真正用的那套**配色按
      「能量 → 颜色」的顺序铺成一条渐变。停靠点与着色器一致：
        底色（地形低处）→ 雾色（舞台 / 外圈）→ 冷色（只在纯高频露头）
-       → 暖色（主色，低频多的时候一眼看到的就是它）→ 强调色（界面）
-     旧版弹层里没有任何预览，改完一个颜色要抬头看地形才知道效果，
-     而弹层正好盖在画布区上 —— 等于看不到。
+       → 暖色（主色，低频多的时候一眼看到的就是它）→ 强调色（界面）。
+     弹层正好盖在画布区上，没有这条预览时改色看不到效果。
      左侧标的是这套的名字，右侧「正在编辑」标的是字段改的是哪套。 */
   function renderCtPrev(){
     var p = (paletteMode === CUSTOM_ID ? derivePalette(editingCt())

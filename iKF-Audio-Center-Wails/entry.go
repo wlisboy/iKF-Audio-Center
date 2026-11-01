@@ -2,7 +2,7 @@
 
 package main
 
-// 入口状态与手动修复（P5-1'，P5-3 起注册表逻辑在 internal/takeover）
+// 入口状态与手动修复（注册表读写逻辑在 internal/takeover）
 // ====================================================================
 //
 // 前提：交付物是**便携包**（dist\iKF-Audio-Center-Portable 整目录），

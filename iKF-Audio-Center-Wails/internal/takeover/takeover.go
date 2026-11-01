@@ -1,6 +1,6 @@
 //go:build windows
 
-// Package takeover —— 入口接管（P5-3 从主程序 takeover.go/entry.go 抽出）
+// Package takeover —— 入口接管
 // ====================================================================
 //
 // 官方安装器（CmiSetupConfig.dll [ADDREG_64]）写了两个需要接管的入口：

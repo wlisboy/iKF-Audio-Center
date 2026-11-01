@@ -176,7 +176,7 @@ _MODEL = _load_device_model()
 
 # 一、属性名表（从 osConfLib.dll 的字符串表实测导出）
 
-# S3 起真源 = model/device-model.toml [names]（208 = 112+96，装载时自校验）。
+# 真源 = model/device-model.toml [names]（208 = 112+96，装载时自校验）。
 # 构建注入 __GENERIC__/__OEM__ 与 tools/propnames.json 同步退役。
 GENERIC_NAMES = list(_MODEL["names_generic"])
 OEM_NAMES = list(_MODEL["names_oem"])
@@ -200,7 +200,7 @@ ENDPOINTS = (EP_RENDER, EP_CAPTURE)
 #
 # 按端点分表。VolumeControl / VolumeScalarControl / MuteControl
 # 在**两个端点上都有**，语义分别是扬声器音量与麦克风音量，必须分开登记。
-# S3 起真源 = model/device-model.toml [[writable]]（80 条显式展开，
+# 真源 = model/device-model.toml [[writable]]（80 条显式展开，
 # 含 SS×16 / EQ×10 / 声道×2；kind 值域离散全在数据里，装载时自校验）。
 # 历史逐条证据注释（A-E 档移植、第 48/50/62 轮更正等）随数据走。
 WRITABLE = {ep: {} for ep in ENDPOINTS}
@@ -216,9 +216,9 @@ for _w in _MODEL["writable"]:
 # DevSampleRateControl 最要命：写它会触发 USB 重协商 → 端点重建 →
 #   采集端会话值全清，正是「应用场景后麦克风页整体不同步」的根因。
 #   Go 修了，Python 一直没修。
-# S1 起真源 = iKF-Audio-Center-Wails/model/device-model.toml [scene].exclude
+# 真源 = iKF-Audio-Center-Wails/model/device-model.toml [scene].exclude
 SCENE_EXCLUDE = _MODEL["exclude"]
-# S1 起真源 = 同上 [scene].unproven
+# 真源 = 同上 [scene].unproven
 SCENE_UNPROVEN = _MODEL["unproven"]
 
 def excluded_from_scene(name):
@@ -304,7 +304,7 @@ _SLOW_CONST = frozenset(("GetDirectXVer",))
 #   GFSControl              不是参数而是 HKCU\SOFTWARE\C-Media\Hook\EnableGFS
 #                           的读写接口（osConfLib 反编译确认），故按 0/1 布尔处理
 # 取值范围与端点无关，故仍按属性名统一登记。
-# S3 起真源 = TOML [[writable]] 的 lo/hi（缺省 = 不钳制）。
+# 真源 = TOML [[writable]] 的 lo/hi（缺省 = 不钳制）。
 RANGES = {}
 for _w in _MODEL["writable"]:
     if "lo" in _w:
@@ -332,7 +332,7 @@ for _w in _MODEL["writable"]:
 #   所以 profile_save 显式跳过含 "#" 的名字；_group_of 先剥后缀再查分组表。
 # 也**不进 `ALL_NAMES`**（那是 208 项真实属性的名单），只在 param_map
 #   里额外补出来，于是「参数」页不会多出两个假参数行。
-# S3 起真源 = TOML [[writable]] 里带 # 的虚拟参数（名字内 #<声道索引>）。
+# 真源 = TOML [[writable]] 里带 # 的虚拟参数（名字内 #<声道索引>）。
 CHANNEL_PARAMS = {}
 for _w in _MODEL["writable"]:
     if "#" in _w["name"]:
@@ -357,7 +357,7 @@ def _split_channel(name):
 #Speaker_Channel_Setting：官方 .cml 只给了 4 个 RadioButton，
 #   Tag 分别是 2 / 4 / 6 / 8（= 声道数本身，不是档位下标）。实测这 4 个值
 #   写→读回全部原样（wret=0 / ret=0），其它值没有官方依据，一律挡在应用层。
-# S3 起真源 = TOML [[writable]] 的 choices（驱动对非法值返回 0x10003，
+# 真源 = TOML [[writable]] 的 choices（驱动对非法值返回 0x10003，
 # 先在应用层收口；同名字跨端点必须同值，装载时断言）。
 CHOICES = {}
 for _w in _MODEL["writable"]:
@@ -1708,16 +1708,16 @@ class Driver(object):
 # 因此自建组态写入 %APPDATA%\iKF Audio Center\profile\；
 # 读取时两处都扫，驱动自带的内置档照常列出。
 
-PROFILE_FACTORY = _MODEL["factory_profile"]   # 对应 FactoryDefault.xml（S1 起真源=TOML）
+PROFILE_FACTORY = _MODEL["factory_profile"]   # 对应 FactoryDefault.xml（真源=TOML）
 # 自建出厂基线场景名 由「原厂默认」改名「默认」）。
-# S1 起真源 = TOML [scene].factory_scene；与 Go 侧 profileFactoryScene 逐字对应
+# 真源 = TOML [scene].factory_scene；与 Go 侧 profileFactoryScene 逐字对应
 PROFILE_FACTORY_SCENE = _MODEL["factory_scene"]
 # 内置场景名单：源包自带 + Go 侧 EnsureSeedScenes 播种。
 # builtin 判定按名字、不按目录（与 Go 侧 builtinScenes/builtinMark 逐项
 #   对应）：便携包下自建场景与内置档同住 CPL\profile，按目录一刀切
 #   会把场景也标成内置 —— 场景墙的可改可删判定、排序分层全部失真
 #   （Go 侧 实测确认过同样的坑）。
-# S1 起真源 = TOML [scene].builtin（7 项，含 HiFi）。
+# 真源 = TOML [scene].builtin（7 项，含 HiFi）。
 BUILTIN_SCENES = _MODEL["builtin"]
 PROFILE_TEMPLATE = "UserDefineFormwork.cml"
 PROFILE_CURRENT = "UserDefine.cml"
@@ -1738,7 +1738,7 @@ PROFILE_CURRENT = "UserDefine.cml"
 #
 # 与 Go 侧 iKF-Audio-Center-Wails/profile.go 的 factoryDefaults 逐项对应，
 # 改一边必须同步另一边。
-# S2 起真源 = model/device-model.toml [[factory]]（42 项，装载时自校验）。
+# 真源 = model/device-model.toml [[factory]]（42 项，装载时自校验）。
 # 历史真值注释随数据走：EQ 全 0 = 官方预设索引 11（反编译）、
 # RFX_ENVIRONMENT=0 = 官方预设口径（驱动原始出厂是 7，按预设）。
 FACTORY_DEFAULTS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[2])
@@ -1772,17 +1772,17 @@ FACTORY_DEFAULTS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[
 #     · `GFSControl` —— 设备控制（HKCU\SOFTWARE\C-Media\Hook\EnableGFS，
 #仅注册表接口），任何 .cml 里都没有它；
 #     · `MicEcho` —— 旧面板 `CDlgMicEcho` 对话框，官方新面板没有这张页。
-# S4 起真源 = TOML [profile_groups]（53 条含 EQ_Slider 前缀键）。
+# 真源 = TOML [profile_groups]（53 条含 EQ_Slider 前缀键）。
 # 组名出处/前缀规则/合并页口径见 TOML 注释；SS_* 前缀规则在 _group_of。
 PROFILE_GROUPS = {ep: dict(tbl) for ep, tbl in _MODEL["profile_groups"].items()}
 
-# 旧版工具写出过的分组名 → 归一到现在的 Canvas 名。
-# **只用于读**：已经存下来的场景不该因为这次改名而在详情里显示成「其他」。
-# S1 起真源 = TOML [group_alias]（10 条，装载时自校验）。
+# 历史档案里的旧分组名 → 现行 Canvas 名。
+# **只用于读**：已存场景不因改名而在详情里显示成「其他」。
+# 真源 = TOML [group_alias]（10 条，装载时自校验）。
 _GROUP_ALIAS = _MODEL["alias"]
 
 # 端点 → 官方 Endpoint 名 / DataFlow
-# S4 起真源 = TOML [profile_endpoint] / [profile_value_type]。
+# 真源 = TOML [profile_endpoint] / [profile_value_type]。
 PROFILE_ENDPOINT = {ep: (v[0], v[1]) for ep, v in _MODEL["profile_endpoint"].items()}
 PROFILE_VALUE_TYPE = dict(_MODEL["profile_value_type"])
 
@@ -1898,7 +1898,7 @@ def restore_default_scene(drv, force=False):
 #   scope   param / device           —— 执行策略不同：
 #           param  安装级触发全量写，其它触发只补 ret==2（不覆盖调音）
 #           device 任何触发都校正（拓扑是硬件事实，不是偏好）
-# S2 起真源 = TOML [[init_device]]（1 项，拓扑；scope=device 规则在解释器）。
+# 真源 = TOML [[init_device]]（1 项，拓扑；scope=device 规则在解释器）。
 INIT_DEVICE_ITEMS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[2])
                      for kv in _MODEL["init_device"]]
 
@@ -2074,7 +2074,7 @@ def identify_active_scene(drv):
     return ""
 
 def cleanup_legacy_last_applied(drv):
-    """上一轮「恢复上次场景」方案已废弃 —— 顺手删除遗留标记文件。"""
+    """删除废弃方案遗留的 LastApplied.txt 标记文件。"""
     wdir = _profile_write_dir(drv)
     if wdir:
         try:
@@ -2594,12 +2594,12 @@ def _group_of(ep, name):
 # 一张官方页住着多个模块时（Karaoke 页有人声消除+升降调、Setting 页有
 # 声道配置/互换/复制、MicInVol 页有麦克风音量+模拟功放），标签写成合并描述 ——
 # 官方本来就按「页」归属，拆开反而与官方 .profile 对不上。
-# S4 起真源 = TOML [group_label]（28 项，含只读两组）。
+# 真源 = TOML [group_label]（28 项，含只读两组）。
 _GROUP_LABEL = dict(_MODEL["group_label"])
 
 # 渲染端点的分组展示顺序（照官方面板菜单：音量→EQ→环境→环绕一族→人声→
 # Xear 音效族→设定/采样率；采集端点整体排在后面）。
-# S4 起真源 = TOML [display].group_order（27 项；采集端 rank+1000 在 _group_rank）。
+# 真源 = TOML [display].group_order（27 项；采集端 rank+1000 在 _group_rank）。
 _GROUP_ORDER = tuple(_MODEL["display"]["group_order"])
 
 def _profile_ep_of(flow):
@@ -3608,9 +3608,8 @@ def _music_dir():
 class MicRecorder(object):
     """一路耳机录音会话（渲染端点 loopback → 16bit 立体声 WAV）。
 
-    从「麦克风页录音机（录麦克风）」迁移为
-    声音页「耳机录音」——录渲染端点回环，即耳机里正在播放的声音；
-    WAV 落「音乐/iKF Audio Center/」，统一下混立体声。
+    录耳机里正在播放的声音；WAV 落「音乐/iKF Audio Center/」，
+    统一下混立体声。
 
     线程模型与 Loopback 相同：COM 单元状态是线程局部的，采集钉在
     专用线程上。差别是**不自动重试**——录音是用户在场操作，流中断

@@ -1,11 +1,10 @@
-//! ikf-audio —— iKF Audio Center 音频热路径的 Rust 实现（P1）。
+//! ikf-audio —— iKF Audio Center 音频热路径的 Rust 实现。
 //!
-//! S1 骨架：只含 ABI 协商与自检，无任何 COM/WASAPI 代码（S2 起）。
 //! 约定（全库统一）：
 //!   * 所有导出函数 `extern "system"`（stdcall，与 Win32/Go syscall 默认一致）；
 //!   * 所有导出函数不得 panic —— panic="abort" 下没有 catch_unwind 可言，
 //!     兜底是 ensure_panic_hook 落盘留证（见 handle_reg 段之后）；
-//!   * 字符串一律 UTF-8（错误串）/ UTF-16（Windows 端点名，S2 起），与
+//!   * 字符串一律 UTF-8（错误串）/ UTF-16（Windows 端点名），与
 //!     osConfLib.dll / 既有 Go 绑定层的约定逐项对齐。
 //!
 //! ABI 版本策略：`ikf_abi_version` 返回接口纪元。Go 侧加载后先比对，
@@ -19,10 +18,10 @@ pub mod loopback;
 pub mod recorder;
 pub mod spectrum;
 
-/// 接口纪元：接口签名/结构体布局任何变更 +1。S1 = 1。
+/// 接口纪元：接口签名/结构体布局任何变更 +1。
 pub const ABI_VERSION: u32 = 1;
 
-// ---------------- 会话句柄注册表（破坏性检测 P0-1） ----------------
+// ---------------- 会话句柄注册表 ----------------
 // ABI 边界上的 handle 不能是裸 Box 指针：野句柄/双重释放直接 UAF（实测
 // 0xC0000005 / 0xC0000374 堆破坏）。注册表只存**地址值**（查询不解引用）：
 // open 登记、close 注销（第二次 remove 为空 = 幂等返回）、其余导出先查表
@@ -53,10 +52,10 @@ fn reg_has(reg: &OnceLock<Mutex<HashSet<usize>>>, h: usize) -> bool {
     reg_of(reg).contains(&h)
 }
 
-// ---------------- Rust panic 落盘（破坏性检测 P0-2 收尾） ----------------
+// ---------------- Rust panic 落盘 ----------------
 // panic="abort" 下任何 panic 直接 __fastfail（0xC0000409），GUI 进程没有
-// stderr，panic 消息全部丢失 —— 这正是历史报错"查不到故障原因"的直接
-// 原因。hook 在 abort 前把现场追加到本 DLL 旁 log\yyyy-mm-dd.txt —— 与
+// stderr，panic 消息全部丢失 —— 报错「查不到故障原因」的直接原因。
+// hook 在 abort 前把现场追加到本 DLL 旁 log\yyyy-mm-dd.txt —— 与
 // 主程序 setupFileLog 同一份按天日志（ log 目录只
 // 保留按天文件），panic 行自带 [时间][pid] 前缀，与 exe 的行容易区分。
 // 注意 hook 是进程级的：本 DLL 只被自家 exe / 测试进程加载，不存在
@@ -198,7 +197,7 @@ pub extern "system" fn ikf_version(buf: *mut c_char, cap: u32) -> u32 {
 /// 返回 0xF00D 哨兵（明显不是巧合值）。
 #[no_mangle]
 pub extern "system" fn ikf_selftest() -> u32 {
-    // 顺带验证栈上小缓冲写读（S2 的状态结构会依赖同样路径）
+    // 顺带验证栈上小缓冲写读（状态结构的 FFI 传值依赖同样路径）
     let mut probe = [0u8; 16];
     let v = b"ikf-selftest-ok";
     probe[..v.len()].copy_from_slice(v);
@@ -208,7 +207,7 @@ pub extern "system" fn ikf_selftest() -> u32 {
     0xF00D
 }
 
-/// S2 双跑对比护栏：解析解频谱（Go synthSpectrum 的逐字节复刻）。
+/// 双跑对比护栏：解析解频谱（Go synthSpectrum 的逐字节复刻）。
 /// 把 amp 幅度的 937.5 Hz 正弦（bin 中心）按同一算法算成 512 字节频谱，
 /// Go 单测用六组幅度与本函数逐字节对拍 —— 不一致 = 频谱链路漂移。
 /// ★ amp 按位传（u64 = f64 bits）：syscall 整型边界不碰 xmm 寄存器。
@@ -226,7 +225,7 @@ pub extern "system" fn ikf_fft_probe(rate: u32, amp_bits: u64, buf: *mut u8, cap
     0
 }
 
-// ---------------- 会话 ABI（S2 后半） ----------------
+// ---------------- 会话 ABI ----------------
 // 句柄式：open 返回 Box<LoopbackSession> 的裸指针，close 收回。
 // endpoint_id 为 UTF-16（与 Go 侧传 LPWSTR 的习惯一致），空指针 = 默认设备。
 
@@ -353,7 +352,7 @@ pub extern "system" fn ikf_loopback_devices(buf: *mut u8, cap: u32) -> u32 {
     n
 }
 
-// ---------------- 监听 ABI（S3） ----------------
+// ---------------- 监听 ABI ----------------
 
 /// 打开麦克风监听。成功返回句柄；失败 err 写入 UTF-8 错误串（返回 0）。
 #[no_mangle]
@@ -444,7 +443,7 @@ fn copy_status_str(src: &str, dst: &mut [u8]) {
     dst[n] = 0;
 }
 
-// ---------------- 录音 ABI（S4） ----------------
+// ---------------- 录音 ABI ----------------
 
 /// 打开录音会话。wav_path 为 UTF-8 全路径。成功返回句柄；失败 err 写错误串。
 #[no_mangle]

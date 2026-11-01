@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""容错版 .cml 解析器（替代 parse_panel_cml.py）。
+"""容错版 .cml 解析器（与 parse_panel_cml.py 同 schema）。
 
-为什么需要它
-------------
+为什么需要容错
+--------------
 原版 XearAudioCenter 的 .cml 是**手工维护的**，存在标签不配对的情况，例如
 `Skin/FaceLift/apoMicInNoiseReduction.cml` 末尾多出一个 `</Canvas>`。
 用 `xml.etree.ElementTree` 严格解析会整份抛 ParseError，
-调用方（旧脚本）只记一条 error，于是**整页控件凭空消失** ——
+调用方只记一条 error，于是**整页控件凭空消失** ——
 这正是「官方有的东西新面板漏掉」的隐藏来源。
 
-本脚本改成基于标签扫描的容错解析：
+本脚本基于标签扫描做容错解析：
 按 `<Tag .../>` / `<Tag ...>...</Tag>` 逐个抽取元素，不依赖嵌套平衡，
 因此单个畸形标签最多影响它自己，不会拖垮整页。
 
-输出与旧脚本**同一套 schema**（lang_zh / lang_en / panels），
+输出 schema（lang_zh / lang_en / panels）与旧脚本一致，
 下游 panel_catalog.py、make_mapping_table.py 无需改动。
 
 用法：

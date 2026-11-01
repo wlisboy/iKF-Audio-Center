@@ -2,7 +2,7 @@
 
 package main
 
-// 入口接管 —— CLI 落点（P5-3 起逻辑在 internal/takeover 包）
+// 入口接管 —— CLI 落点（逻辑在 internal/takeover 包）
 // ====================================================================
 //
 // 官方安装器写了两个入口（Run\Cm108BSound 开机自启 + CLSID {125C480D}

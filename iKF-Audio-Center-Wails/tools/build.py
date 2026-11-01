@@ -65,8 +65,8 @@ def main():
     print("=" * 68)
     # -webview2 显式声明部署策略，不吃 Wails 默认值（默认恰好也是 download，
     # 但写出来才能防止将来 Wails 漂移；离线整包分发时改 embed）。
-    # -ldflags 不在这里传 -s -w：wails build 自己会加一遍（旧写法产物里
-    # 是 "-s -w -w -s"，无害但重复）。
+    # -ldflags 不在这里传 -s -w：wails build 自己会加一遍，重复传会
+    # 在产物里叠成 "-s -w -w -s"（无害但脏）。
     if run(["wails", "build", "-s", "-skipbindings", "-m", "-nosyncgomod",
             "-nocolour", "-webview2", "download"], APP, env):
         print("编译失败")

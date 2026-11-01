@@ -20,7 +20,7 @@ func TestExcludedFromScene(t *testing.T) {
 		{"MuteControl", true},
 		{"AAVolumeControl", true},
 		{"DevSampleRateControl", true},
-		{"Speaker_Channel_Setting", true}, // 设备级声道拓扑，播种实读 5.1 曾把设备页切回 5.1
+		{"Speaker_Channel_Setting", true}, // 设备级声道拓扑：进场景档会把设备页锁回 5.1
 		// APO 未实现家族 场景只收确认生效的）
 		{"Enable_SS_LFX", true},
 		{"SS_LB_ANGLE", true},
@@ -32,7 +32,6 @@ func TestExcludedFromScene(t *testing.T) {
 		{"Enable_VOICECLARITY_LFX", true},// 语音清晰度（双证据未实现）
 		// 升降调/人声消除是真模块（CKeyShifterLib/
 		// CVocalCancellationLib 有 vftable+构造体，K 档 GFX bit13/14），
-		// 之前依据「空壳」笔误被排除——恢复场景收录
 		{"Enable_KEYSHIFT_GFX", false},
 		{"KEYSHIFT_LEVEL", false},
 		{"Enable_VOCALCANCEL_GFX", false},

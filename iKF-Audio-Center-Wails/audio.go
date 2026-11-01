@@ -2,18 +2,18 @@
 
 package main
 
-// audio.go —— ikf_audio.dll（audiocore/，P1 音频热路径 Rust 化）的 Go 绑定层。
+// audio.go —— ikf_audio.dll（audiocore/，音频热路径 Rust 实现）的 Go 绑定层。
 //
-// S1 骨架：只做「查找 → 加载 → ABI 版本协商 → 自检」，不接任何功能。
-// 与 osConfLib.dll 同款 LoadLibrary 模式（driver.go），同一个纪律：
+// 只做「查找 → 加载 → ABI 版本协商 → 自检」。与 osConfLib.dll 同款
+// LoadLibrary 模式（driver.go），同一个纪律：
 // DLL 缺失/ABI 错配 = 功能明确降级，绝不崩主程序、绝不猜接口。
 //
 // 查找顺序（先开发态后部署态）：
 //   1. <exeDir>/ikf_audio.dll            部署（便携包根 / 安装目录）
 //   2. <exeDir>/../audiocore/target/release/ikf_audio.dll   源码态（wails dev / go test）
 //
-// 使用方式：热路径各模块（S2 起的 loopback/listen/recorder）在 Start 前
-// 调 audioReady()；false = 走既有 Go 路径（S1 期间唯一路径）。
+// 使用方式：热路径各模块（loopback/listen/recorder）在 Start 前
+// 调 audioReady()；false = 音频热路不可用，调用方明确报错。
 
 import (
 	"fmt"
@@ -113,5 +113,5 @@ func audioStatus() string {
 	if audioProbe() {
 		return fmt.Sprintf("rust: %s (abi %d)", audioVersion(), audioABI)
 	}
-	return "rust: 未启用（ikf_audio.dll 缺失或 ABI 错配，走 Go 路径）"
+	return "rust: 未启用（ikf_audio.dll 缺失或 ABI 错配）"
 }

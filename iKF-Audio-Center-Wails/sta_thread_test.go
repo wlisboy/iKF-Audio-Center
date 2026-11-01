@@ -3,11 +3,10 @@
 package main
 
 // sta_thread_test.go —— 面板模式回归锁：webview2 主线程是 STA
-// （CoInitializeEx(MTA) 返回 RPC_E_CHANGED_MODE）。清退首版把 COM 打开
-// 挪到调用线程，STA 上创建的对象移交给 Rust 采集线程（MTA）= 编组违规，
-// 频谱/监听/录音在面板里全静默失败（--serve 模式正常，因为 goroutine
-// 线程无 COM 历史）。修复后 startRust 包在干净 MTA 线程——本测试在
-// STA 线程上调 Start，锁死这个坑。
+// （CoInitializeEx(MTA) 返回 RPC_E_CHANGED_MODE）。STA 上创建的 COM 对象
+// 移交给 Rust 采集线程（MTA）= 编组违规，频谱/监听/录音在面板里全静默
+// 失败（--serve 模式正常，因为 goroutine 线程无 COM 历史）。startRust
+// 因此包在干净 MTA 线程——本测试在 STA 线程上调 Start，锁死这个坑。
 
 import (
 	"runtime"

@@ -230,7 +230,7 @@ type optSel struct {
 	install    bool
 	restart    bool
 	uninstall  bool
-	takeover   bool // P5-3：装完把 Run\Cm108BSound + CLSID {125C480D} 指向主程序
+	takeover   bool // 装完把 Run\Cm108BSound + CLSID {125C480D} 指向主程序
 	untakeover bool
 }
 

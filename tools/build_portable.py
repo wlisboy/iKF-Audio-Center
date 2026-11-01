@@ -112,8 +112,8 @@ IKFTOOL_NAME = "iKFTool.exe"
 
 
 def build_ikftool(out):
-    """编译 iKFTool 并入包。build_portable 负责——此前它是
-    10-25 手工放进包里的，一次全量重建就把手工件清掉了（已踩坑）。"""
+    """编译 iKFTool 并入包。build_portable 负责 —— 每次全量重建都会清掉
+   包根里的手工件，iKFTool.exe 不能靠手工放进来。"""
     dst = os.path.join(out, IKFTOOL_NAME)
     cmd = ["go", "build", "-trimpath", "-ldflags", "-s -w", "-o", dst, "./ikftool"]
     print("+ %s" % " ".join(cmd))

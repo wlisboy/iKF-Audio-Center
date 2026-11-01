@@ -1,6 +1,6 @@
 //go:build windows
 
-// WASAPI 回环采集（系统输出 → 频谱）—— P1 清退后的纯转发层
+// WASAPI 回环采集（系统输出 → 频谱）—— Rust 转发层
 // ====================================================================
 //
 // 采集/FFT/环形缓冲的全部实现住在 audiocore（Rust cdylib，见
@@ -238,9 +238,8 @@ func fftRadix2(re, im []float64) {
 
 // startRust 打开设备的 COM 调用必须在**无 COM 历史的 MTA 线程**上做：
 // 面板主线程是 STA（webview2 要求），STA 上创建的对象移交给 Rust 采集
-// 线程（MTA）= 编组违规，会话静默失败（清退首版真机踩坑）。所以把
-// startRustInner 包进锁定 OS 线程的干净 goroutine——与原 Go worker 的
-// 线程模型（专用线程 + 自行 CoInitializeEx）语义一致。
+// 线程（MTA）= 编组违规，会话静默失败。所以把 startRustInner 包进
+// 锁定 OS 线程的干净 goroutine（专用线程 + 自行 CoInitializeEx）。
 func (l *Loopback) startRust(device string) map[string]interface{} {
 	ch := make(chan map[string]interface{}, 1)
 	go func() {

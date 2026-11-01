@@ -58,7 +58,7 @@ type initItem struct {
 
 // initDeviceItems 设备级项（不在任何参数表里，硬件事实）。
 // 目前只有声道拓扑：本机耳机就是立体声，4/6/8 是驱动默认值作祟。
-// S2 起真源 = model/device-model.toml [[init_device]]（1 项，装载时自校验）。
+// 真源 = model/device-model.toml [[init_device]]（1 项，装载时自校验）。
 var initDeviceItems = func() []initItem {
 	out := make([]initItem, 0, len(modelData.InitDevice))
 	for _, kv := range modelData.InitDevice {

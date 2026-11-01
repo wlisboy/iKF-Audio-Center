@@ -221,7 +221,7 @@ func probe() *drvState {
 	return s
 }
 
-// probeOldPanel 检测旧版官方面板是否还在（P3 顺序保护）。
+// probeOldPanel 检测旧版官方面板是否还在（顺序保护）。
 //
 // 背景（工具/CPL与WHQL包对照-下一步.md §1.6）：旧卸载器 [POSTDELFILE_REMOVE_64]
 // 按**文件名**删文件、不认路径归属 —— System32\Drivers\108B.sys、
@@ -229,7 +229,7 @@ func probe() *drvState {
 // 驱动文件删了（耳机静音，直到重新 --install）。所以必须引导用户按
 // 「先装新驱动 → 再卸旧版 → 重跑一次 --install 恢复被删文件」的顺序走。
 //
-// 检测用文件存在性而不是注册表：Run/CLSID 可能已被接管（P1-A）改指向新 exe，
+// 检测用文件存在性而不是注册表：Run/CLSID 可能已被接管改指向新 exe，
 // 文件系统才是旧版卸载器会不会再跑的真实依据。INSTALLDIR 取官方安装器默认值
 // %ProgramFiles%\iKF headset（CmiSetupConfig.dll 按 INI 写死的那套）。
 func probeOldPanel() string {
@@ -242,8 +242,7 @@ func probeOldPanel() string {
 }
 
 // oldPanelNote 旧版还在时给一句安全顺序提示；没检测到返回空串。
-// 精简：新框架直接抛弃官方旧面板，这里只留必须知道的一句 ——
-// 旧卸载器会按文件名删驱动文件，顺序错了耳机静音（P3 验证结论不变）。
+// 旧卸载器会按文件名删驱动文件，顺序错了耳机静音 —— 提示只保留这一句。
 func (s *drvState) oldPanelNote() string {
 	if s.oldPanel == "" {
 		return ""

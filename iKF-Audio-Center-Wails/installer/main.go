@@ -19,7 +19,7 @@
 //
 //	iKF-驱动管理.exe              界面模式：320x252 窗口，4 行清单（精简版）
 //	iKF-驱动管理.exe --install    静默安装（含重启设备让 APO 生效）
-//	  --takeover                  装完顺带设置开机自启（接管官方入口，P5-3）
+//	  --takeover                  装完顺带设置开机自启（接管官方入口）
 //	  --takeover-undo             装完顺带还原官方入口（GUI 已去掉此项）
 //	iKF-驱动管理.exe --uninstall  静默卸载
 //	iKF-驱动管理.exe --status     打印现状（只读），退出码 0=已装 / 3=未装
@@ -136,7 +136,7 @@ func main() {
 		if action == "uninstall" {
 			sel = optSel{uninstall: true}
 		}
-		// P5-3：静默模式默认不碰入口 —— 主程序 /api/driver/setup 拉起的
+		// 静默模式默认不碰入口 —— 主程序 /api/driver/setup 拉起的
 		// --install 不带这些参数，行为不变；要接管需显式给开关。
 		if has("--takeover") {
 			sel.takeover = true
@@ -224,7 +224,7 @@ func runAction(s *drvState, dry bool, sel optSel) (string, bool) {
 			detail += "\n未重启音频设备"
 		}
 	}
-	// P5-3：接管（仅安装模式）。本程序启动即提权，注册表直写即可。
+	// 接管（仅安装模式）。本程序启动即提权，注册表直写即可。
 	// 完成提示不再提「开机自启」，成败只落日志。
 	if ok && !sel.uninstall && sel.takeover {
 		setStatus("正在设置开机自启…")
@@ -240,7 +240,7 @@ func runAction(s *drvState, dry bool, sel optSel) (string, bool) {
 			detail += "\n撤销接管失败：" + err.Error()
 		}
 	}
-	// P3 顺序保护：装好后若检测到旧版官方面板，把安全顺序讲清楚 ——
+	// 顺序保护：装好后若检测到旧版官方面板，把安全顺序讲清楚 ——
 	// 旧卸载器按文件名删驱动文件，顺序错了会耳机静音（见 oldPanelNote）。
 	if ok && !sel.uninstall {
 		detail += s.oldPanelNote()

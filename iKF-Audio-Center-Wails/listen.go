@@ -1,6 +1,6 @@
 package main
 
-// listen.go —— 内嵌麦克风监听 —— P1 清退后的纯转发层
+// listen.go —— 内嵌麦克风监听 —— Rust 转发层
 //
 // 链路（实现在 audiocore/src/listen.rs）：默认麦克风（capture，自身混音
 // 格式）→ 软件上混（样本写 FL/FR）→ 默认渲染端点（render，自身混音格式）。
@@ -10,7 +10,7 @@ package main
 //   内部 CoCreateInstance(CLSID {E642D042-…})，该 COM 服务器在整套 WHQL
 //   驱动包、System32、注册表里都不存在——官方原版面板同样开不了。
 // 转换必须自己做：WASAPI 引擎的 AUTOCONVERTPCM 无论放采集侧还是渲染
-//   侧都会产出静音 排障实测，教训已继承进 Rust 实现）。
+//   侧都会产出静音（排障实测）。
 //
 // 与 Python 线 center_src.py 的 MicListen 逐字段对齐。
 
@@ -76,7 +76,7 @@ func (l *MicListen) SetGain(g float64) map[string]interface{} {
 		return map[string]interface{}{"ok": false, "error": "监听未开启"}
 	}
 	// ★f32 必须按位传：uintptr(float32) 是值截断（3.0→3），Rust 端
-	// from_bits(3)=次正规数≈0 → 增益归零、监听无声 真机踩坑）。
+	// from_bits(3)=次正规数≈0 → 增益归零、监听无声。
 	bits := math.Float32bits(float32(g))
 	r, _, _ := audioDLL.NewProc("ikf_listen_set_gain").Call(h, uintptr(bits))
 	return map[string]interface{}{"ok": r == 0, "gain": g}
@@ -86,9 +86,8 @@ func (l *MicListen) SetGain(g float64) map[string]interface{} {
 
 // startRust 打开设备的 COM 调用必须在**无 COM 历史的 MTA 线程**上做：
 // 面板主线程是 STA（webview2 要求），STA 上创建的对象移交给 Rust 采集
-// 线程（MTA）= 编组违规，会话静默失败（清退首版真机踩坑）。所以把
-// startRustInner 包进锁定 OS 线程的干净 goroutine——与原 Go worker 的
-// 线程模型（专用线程 + 自行 CoInitializeEx）语义一致。
+// 线程（MTA）= 编组违规，会话静默失败。所以把 startRustInner 包进
+// 锁定 OS 线程的干净 goroutine（专用线程 + 自行 CoInitializeEx）。
 func (l *MicListen) startRust() map[string]interface{} {
 	ch := make(chan map[string]interface{}, 1)
 	go func() {
@@ -192,7 +191,7 @@ func (l *MicListen) stopRust() map[string]interface{} {
 }
 
 func (l *MicListen) statusRust() map[string]interface{} {
-	// ★破坏性检测 P0-3：DLL 调用与字段读取全程持锁（同 loopback）。
+	// DLL 调用与字段读取全程持锁（同 loopback）。
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	h, running := l.rustH, l.running

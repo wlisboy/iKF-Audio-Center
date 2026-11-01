@@ -66,17 +66,17 @@ var profileEndpoints = []string{EpRender, EpCapture}
 // 官方面板读不出归属 —— 用旧名导出的场景在官方面板里点了没反应。
 // profileGroups 属性名 → 官方 ApoEffect 分组名（= 页面 Canvas 名）。
 //
-// S4 起真源 = model/device-model.toml [profile_groups]（53 条含 EQ_Slider
+// 真源 = model/device-model.toml [profile_groups]（53 条含 EQ_Slider
 // 前缀键，装载时自校验）。组名出处与「EQ_Slider 前缀键、SS_* 前缀规则」
 // 见 groupOf 与 TOML 注释。已存旧档由 groupAlias 兜底。
 var profileGroups = modelData.ProfileGroups
 
-// groupAlias 旧版工具写出过的分组名 → 归一到现在的 Canvas 名。
+// groupAlias 历史档案里的旧分组名 → 现行 Canvas 名。
 // **只用于读**：用户已存下来的场景不该因这次改名而显示成「其他」。
-// S1 起真源 = model/device-model.toml [group_alias]（10 条，装载时自校验）。
+// 真源 = model/device-model.toml [group_alias]（10 条，装载时自校验）。
 var groupAlias = modelData.GroupAlias
 
-// profileEndpoint 端点 → 官方 Endpoint 名 / DataFlow（S4 起真源 = TOML）。
+// profileEndpoint 端点 → 官方 Endpoint 名 / DataFlow（真源 = TOML）。
 var profileEndpoint = func() map[string][2]string {
 	out := make(map[string][2]string, len(modelData.ProfileEndpoint))
 	for ep, v := range modelData.ProfileEndpoint {
@@ -141,7 +141,7 @@ func profileDirs(d *Driver) [][2]interface{} {
 // CPL\profile（profileWriteDir 就返回这里），按目录一刀切会把用户场景
 // 也标成内置 —— 前端场景墙 filter(!builtin) 直接被滤空，表现为
 // 「自定义场景不见了、官方场景也没了应用入口」 实测确认）。
-// S1 起名单真源 = model/device-model.toml [scene].builtin（7 项，含 HiFi）。
+// 名单真源 = model/device-model.toml [scene].builtin（7 项，含 HiFi）。
 var builtinScenes = strSet(modelData.Scene.Builtin)
 
 func builtinMark(dirBuiltin bool, stem string) bool {
@@ -161,7 +161,7 @@ func builtinMark(dirBuiltin bool, stem string) bool {
 //
 // 三个收口：ProfileSave（用户自建）、fullSnapshot（播种补齐）、
 // ProfileApply（兜底旧档里已有的这类项，跳过不写）。
-// S1 起真源 = model/device-model.toml [scene].exclude（6 项）。
+// 真源 = model/device-model.toml [scene].exclude（6 项）。
 var sceneExclude = strSet(modelData.Scene.Exclude)
 
 // excludedFromScene 场景排除判定（统一入口）。
@@ -200,11 +200,11 @@ func excludedFromScene(name string) bool {
 // 界面上这些控件照常显示可交互（UNPROVEN 口径：不置灰、写驱动、如实标注），
 // 只是场景不再管理它们；驱动收写入的（ret=0）手动拨动仍即时生效。
 //
-// 修正拼写：语音降噪的真名是 `VOICECLARITY_NOISESUPP_LEVEL`
-// （driver.go 白名单里就是它）。旧写法 `VOICECLARITY_NOISESUPPRESSION` 在
+// 语音降噪的真名是 `VOICECLARITY_NOISESUPP_LEVEL`
+// （driver.go 白名单里就是它）。`VOICECLARITY_NOISESUPPRESSION` 在
 // 208 项里根本不存在 ⟹ 死条目，「语音降噪强度」实际从未被排除，
 // 会跟着场景一起存、一起写。
-// S1 起真源 = model/device-model.toml [scene].unproven（35 项，装载时自校验）。
+// 真源 = model/device-model.toml [scene].unproven（35 项，装载时自校验）。
 var sceneUnproven = strSet(modelData.Scene.Unproven)
 
 func hasExcludedItem(items []ProfileItem) bool {
@@ -360,11 +360,11 @@ func groupOf(ep, name string) string {
 	return "General"
 }
 
-// groupLabel 组名 → 界面短标签（场景详情副行）。S4 起真源 = TOML [group_label]
+// groupLabel 组名 → 界面短标签（场景详情副行）。真源 = TOML [group_label]
 // （28 项；合并页描述口径与只读两组的用途见 TOML 注释）。
 var groupLabel = modelData.GroupLabel
 
-// groupOrder 分组展示顺序（S4 起真源 = TOML [display].group_order，27 项；
+// groupOrder 分组展示顺序（真源 = TOML [display].group_order，27 项；
 // 采集端 rank+1000、表外组 rank=base+500 的规则在 groupRank）。
 var groupOrder = modelData.Display.GroupOrder
 
@@ -1250,7 +1250,7 @@ var seedScenes = []struct {
 
 // factoryDefaults 出厂默认值表 —— 设备侧自愈（HealMissingParams）的依据。
 //
-// S2 起真源 = model/device-model.toml [[factory]]（42 项 = 渲染 36 + 采集 6，
+// 真源 = model/device-model.toml [[factory]]（42 项 = 渲染 36 + 采集 6，
 // 装载时自校验）。历史真值注释随数据走（EQ 全 0 = 官方预设索引 11、
 // RFX_ENVIRONMENT=0 = 官方预设口径等，见 TOML 与当日日志）。
 var factoryDefaults = func() []seedItem {
@@ -1409,8 +1409,8 @@ func MigrateProfileGroups(d *Driver) (int, int) {
 //
 // 全量播种：特征项之外按「factoryDefaults → 设备实读」补齐其余可写参数
 //
-//	（fullSnapshot），场景档回到旧版 ProfileSave 的全量形态 —— 旧版小档
-//	只有 18-42 项，用户对比「参数变少」。调用前必须已跑过 HealMissingParams。
+//	（fullSnapshot），场景档保持全量形态 —— 小档只有 18-42 项，用户对比
+//	「参数变少」。调用前必须已跑过 HealMissingParams。
 //
 // 驱动未就绪时跳过，等下次启动再补。
 func EnsureSeedScenes(d *Driver) {
@@ -1447,7 +1447,7 @@ func EnsureSeedScenes(d *Driver) {
 		}
 		snap = fullSnapshot(d, snap)
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			// 幂等：已有档就不动 —— 但项数不足（旧版小档）或混有排除项
+			// 幂等：已有档就不动 —— 但项数不足（历史小档）或混有排除项
 			//（音量/采样率，见 sceneExclude）时升级重建。
 			// 播种档 builtin，UI 禁止用户改，升级重建无害。
 			old := profileItems(readText(p))
@@ -1464,14 +1464,14 @@ func EnsureSeedScenes(d *Driver) {
 		[]byte(buildCML(s.Name, s.Desc)))
 		log.Printf("[播种] 已写入「%s」", s.Name)
 	}
-	// 原厂默认：直接落出厂值表，不再快照当前驱动状态。
+	// 原厂默认：直接落出厂值表，不快照当前驱动状态。
 	//
 	// 这里不能调 `d.ProfileSave(profileFactoryScene, …)` —— 它把
 	// 「此刻设备上有什么」当成出厂默认存下来，设备侧没值时存下的就是空档，
-	// 以后拿它恢复也恢复不回来（残留的几份同名档内容互不相同，就是这么来的）。
-	// 改成与 HealMissingParams 同源的固定表，此后不再漂移。
+	// 以后拿它恢复也恢复不回来。出厂值必须与 HealMissingParams 同源（固定表），
+	// 否则会随现场状态漂移。
 	//
-	// 档项数不足（旧版小档）时升级重建：播种档 builtin，UI 禁止用户改，安全。
+	// 档项数不足（历史小档）时升级重建：播种档 builtin，UI 禁止用户改，安全。
 	p := filepath.Join(wdir, profileFactoryScene+".profile")
 	var fsnap []snapRow
 	for _, it := range factoryDefaults {

@@ -29,6 +29,7 @@ github-repo/
 # ---- frontend ----
 node_modules/
 iKF-Audio-Center-Wails/frontend/dist/
+iKF-Audio-Center-Wails/audiocore/target/
 
 # ---- promo: generated assets only (src is tracked) ----
 promo/public/

@@ -203,7 +203,7 @@ pub fn downmix(ch: usize) -> (usize, f32) {
 /// 交错多声道块 → 单声道 f32 序列。四种格式 + 未知格式写静音，与 Go pushFrames 一致。
 pub fn decode_block(raw: &[u8], frames: usize, ch: usize, block_align: usize, tag: u16, bits: u16) -> Vec<f32> {
     let (take, _inv) = downmix(ch);
-    // ★破坏性检测 P0-2：WASAPI 报的 block_align/ch 与实际 buffer 不一致
+    // ★格式漂移防御：WASAPI 报的 block_align/ch 与实际 buffer 不一致
     // （设备被外部切格式、端点重建）时，raw[base+c*4..] 会越界 panic →
     // panic=abort 下就是 0xC0000409 且无日志。校验必须按**实际读宽**算：
     // 只查 frames*block_align 拦不住 block_align < ch×样本字节 的格式漂移
@@ -274,12 +274,12 @@ mod tests {
         assert!(b.iter().all(|&v| v == 0));
     }
 
-    /// ★破坏性检测 P0-2 回归：格式漂移（block_align < ch×样本字节）时
+    /// 格式漂移（block_align < ch×样本字节）回归：
     /// decode_block 必须静音返回，不得越界 panic（panic=abort → 0xC0000409）。
     #[test]
     fn decode_block_format_drift_is_silence() {
-        // 声明 float32 8ch（读宽 32B）但 block_align=8、buffer=3×8：旧校验
-        // frames*block_align ≤ raw.len 放行，逐帧读必越界；现在应整块静音。
+        // 声明 float32 8ch（读宽 32B）但 block_align=8、buffer=3×8：
+        // 按 frames*block_align 校验会放行，逐帧读必越界；应整块静音。
         let raw = [0u8; 24];
         let out = decode_block(&raw, 3, 8, 8, 3, 32);
         assert_eq!(out, vec![0.0f32; 3]);

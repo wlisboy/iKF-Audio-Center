@@ -1,10 +1,10 @@
 package main
 
-// recorder.go —— 耳机录音 —— P1 清退后的纯转发层
+// recorder.go —— 耳机录音 —— Rust 转发层
 //
-// 演进：官方捆绑的 SoundRecorder\Recorder.exe 是依附官方面板 COM 环境的
-// 薄客户端，脱离官方面板单独拉起必然静默退出（恒退 241）。内嵌实现录渲染端点回环
-// （WASAPI loopback，耳机里正在播放的声音）。
+// 官方捆绑的 SoundRecorder\Recorder.exe 是依附官方面板 COM 环境的
+// 薄客户端，脱离官方面板单独拉起必然静默退出（恒退 241）；录音因此内嵌：
+// WASAPI loopback 录渲染端点（耳机里正在播放的声音）。
 //
 // 采集/下混/写盘/finalize 的实现住在 audiocore/src/recorder.rs；路径策略
 // （recDir：注册表 My Music → iKF Audio Center 子目录，吃 OneDrive 重定向）
@@ -100,9 +100,8 @@ func recDir() (string, error) {
 
 // startRust 打开设备的 COM 调用必须在**无 COM 历史的 MTA 线程**上做：
 // 面板主线程是 STA（webview2 要求），STA 上创建的对象移交给 Rust 采集
-// 线程（MTA）= 编组违规，会话静默失败（清退首版真机踩坑）。所以把
-// startRustInner 包进锁定 OS 线程的干净 goroutine——与原 Go worker 的
-// 线程模型（专用线程 + 自行 CoInitializeEx）语义一致。
+// 线程（MTA）= 编组违规，会话静默失败。所以把 startRustInner 包进
+// 锁定 OS 线程的干净 goroutine（专用线程 + 自行 CoInitializeEx）。
 func (m *MicRecorder) startRust() map[string]interface{} {
 	ch := make(chan map[string]interface{}, 1)
 	go func() {
@@ -213,7 +212,7 @@ func (m *MicRecorder) stopRust() map[string]interface{} {
 }
 
 func (m *MicRecorder) statusRust() map[string]interface{} {
-	// ★破坏性检测 P0-3：DLL 调用与字段读取全程持锁（同 loopback）。
+	// DLL 调用与字段读取全程持锁（同 loopback）。
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	h, running := m.rustH, m.running
