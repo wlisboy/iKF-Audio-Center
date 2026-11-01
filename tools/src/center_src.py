@@ -1825,7 +1825,7 @@ FACTORY_DEFAULTS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[
 #
 #   两个例外的保留名（都**没有**对应页面，改名无从谈起）：
 #     · `GFSControl` —— 设备控制（HKCU\SOFTWARE\C-Media\Hook\EnableGFS，
-#取证），任何 .cml 里都没有它；
+#仅注册表接口），任何 .cml 里都没有它；
 #     · `MicEcho` —— 旧面板 `CDlgMicEcho` 对话框，官方新面板没有这张页。
 # S4 起真源 = TOML [profile_groups]（53 条含 EQ_Slider 前缀键）。
 # 组名出处/前缀规则/合并页口径见 TOML 注释；SS_* 前缀规则在 _group_of。
@@ -3691,7 +3691,6 @@ LOOPBACK = Loopback()
 #   那是个依附官方面板 COM 环境的薄客户端，导入表仅 KERNEL32+ole32
 #   （无 user32 画不了窗、无 winmm 记不了音），脱离官方面板单独拉起
 #   必然静默退出（本机实测恒退 241，事件日志无崩溃记录）。
-#   取证过程见 工具/录音机取证-Recorder.exe死件.md。
 # 与 Wails 线 recorder.go 的 MicRecorder 逐字段对齐：start/stop/status
 # 返回键、文件命名（文档\iKF录音\iKF录音_时间戳.wav）、以及「不做断流
 # 自动重试」（自动续录会把一段录音裂成多份，宁可明确报错）。
@@ -4123,7 +4122,7 @@ class MicListen(object):
     """一路麦克风监听会话（内嵌自研）。
 
     为什么不走官方路径（Driver.listen → osConfLib.RunListen2Device）：
-    反编译实锤（工具/监听取证-监听COM组件缺失.md），RunListen2Device
+    反编译确认（监听引擎 COM 组件在驱动包中不存在），RunListen2Device
     内部 CoCreateInstance 的监听引擎 CLSID {E642D042-5BCF-4E80-9451-
     83F4E398A88F} 在整套 WHQL 驱动包、System32、注册表里都不存在——
     官方原版面板同样开不了，实测恒返 0x80040154（类未注册）。
@@ -5075,7 +5074,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(LOOPBACK.spectrum())
         # 内嵌录音机（MicRecorder）。契约与 Wails 线逐字段一致。
         #   旧 POST /api/recorder「拉起官方 Recorder.exe」已废弃 —— 那个 exe
-        #   是依附官方面板 COM 环境的死件（取证见工具档），Python 线过去
+        #   是依附官方面板 COM 环境的死件，Python 线过去
         #   连路由都没有（前端调了必 404），本就是两线不同步的旧账。
         if path == "/api/recorder/status":
             return self._json(REC.status())
@@ -5197,7 +5196,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/listen":
             # 内嵌监听：官方 RunListen2Device 依赖的 COM
-            # 服务器驱动包里没有（见 工具/监听取证-监听COM组件缺失.md），
+            # 服务器驱动包里没有，
             # 改走 MicListen（listen.go 对应实现）。响应保留 {ok, on}
             # 形状，前端零改动。
             on = bool(body.get("on"))

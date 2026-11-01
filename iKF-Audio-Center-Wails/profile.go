@@ -177,7 +177,7 @@ func excludedFromScene(name string) bool {
 
 // sceneUnproven APO 未实现的效果家族，不进场景// 「自定义场景按照那些生效去调整就好，不需要把 APO 未实现的加进去」）。
 //
-// 判据链（工具/K档取证-LFX与采集侧位表.md + 回环 A/B 实测 + REA-OUT 字符串
+// 判据链（K 档分析文档 + 回环 A/B 实测 + REA-OUT 字符串
 // 按反编译产物复核：「bit2/13/14 是空壳」
 // 是前端注释笔误 —— K 档 §2.2 原文：GFX 只有 bit3/4/20 是空桩，bit1/2/13/14
 // 四个都是真模块）：

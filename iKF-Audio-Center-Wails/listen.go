@@ -6,7 +6,7 @@ package main
 // 格式）→ 软件上混（样本写 FL/FR）→ 默认渲染端点（render，自身混音格式）。
 //
 // 为什么不走官方路径（drv.Listen → osConfLib.RunListen2Device）：
-//   反编译实锤（工具/监听取证-监听COM组件缺失.md）：RunListen2Device
+//   反编译确认（监听引擎 COM 组件在驱动包中不存在）：RunListen2Device
 //   内部 CoCreateInstance(CLSID {E642D042-…})，该 COM 服务器在整套 WHQL
 //   驱动包、System32、注册表里都不存在——官方原版面板同样开不了。
 // 转换必须自己做：WASAPI 引擎的 AUTOCONVERTPCM 无论放采集侧还是渲染

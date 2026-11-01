@@ -25,7 +25,7 @@ func TestRecorderRustRealDevice(t *testing.T) {
 	}
 	file := out["file"].(string)
 	defer func() {
-		// 删除前读峰值取证（max-abs 下混的幅度验证）
+		// 删除前读峰值验证（max-abs 下混的幅度验证）
 		if raw, err := os.ReadFile(file); err == nil && len(raw) > 44 {
 			peak := int32(0)
 			for i := 44; i+1 < len(raw); i += 2 {

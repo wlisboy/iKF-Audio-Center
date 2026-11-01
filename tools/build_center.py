@@ -133,7 +133,7 @@ BRIDGE_JS = r"""
   };
 
   /*本机「主机侧真的有实现」的 APO 模块表。
-     来源 = K 档取证（docs/K档取证-LFX与采集侧位表.md）：逐位反编译 APO 的模块
+     来源 = K 档分析（docs/K档分析-LFX与采集侧位表.md）：逐位反编译 APO 的模块
      构造器、读完对象 vftable 才写进这里 —— 不靠猜，也不靠「参数名字像」。
        GFX 侧：bit1 CReverbLib(环境音效) · bit2 CEQ15BandLib(均衡) ·
                bit13 CKeyShifterLib(变调) · bit14 CVocalCancellationLib(消人声)
@@ -153,7 +153,7 @@ BRIDGE_JS = r"""
   /* 提示文案 终稿：统一且简短——
      「同一件事只有一个说法」。
      REA-OUT 复核修正：6 个置位里仅 bit1 真建模块，
-     bit2/7/13/14 是空壳」——与 K 档取证原文不符，系笔误。K 档 §2.2/2.5：
+     bit2/7/13/14 是空壳」——与 K 档分析原文不符，系笔误。K 档 §2.2/2.5：
      GFX 位 1/2/13/14（CReverbLib/CEQ15BandLib/CKeyShifterLib/
      CVocalCancellationLib）与 LFX 位 7（CXearSurrMaxLib）都是真模块
      （非空桩），只有 GFX bit3/4/20 与 LFX 其余位是空桩；采集侧
@@ -1444,7 +1444,7 @@ BRIDGE_JS = r"""
   }
 
   /* ---------- 5.7 Dolby 的声道前置条件I 档） ----------
-     ---- 取证（i_probe3.py）----
+     ---- 验证（i_probe3.py）----
      Skin/FaceLift/apoSpeakerDolbyHPVS.cml 尾部原文：
        <Canvas Width="643" Height="455" Name="WarningContent" Visibility="Hidden">
          <Button Name="ChannelsSetting" Style="ClickButton" Text="ml_SpeakerDolbyHPVS_ChannelsSetting"/>
@@ -1552,7 +1552,7 @@ BRIDGE_JS = r"""
 
     /* 麦克风监听： 起为内嵌 WASAPI 监听（POST /api/listen
        {on}）。旧的 RunListen2Device 官方路径依赖的 COM 服务器驱动包里
-       没有（官方原版同样开不了），取证见 docs/监听取证-监听COM组件缺失.md */
+       没有（官方原版同样开不了）。 */
     var ls = $('listenSw');
     if (ls){
       var lgr = $('listenGainRow');
@@ -1708,7 +1708,7 @@ BRIDGE_JS = r"""
      一份 .profile（参数快照）+ 一份 .cml（列表项），格式与
      CPL/profile/* 完全一致，可与官方面板互相阅读。
 
-     ★ 第二十一轮改版：「应用」和「保存」分进了两个空间 ——
+     ★ 「应用」和「保存」分进了两个空间 ——
        中央场景墙（设计稿的 renderProfile()，数据来自这里的 PROFILES）
        只做「点一下整套切过去」；右侧面板只做管理：状态与脏标记 /
        场景详情 / 新建 · 覆盖 · 改名 · 删除。

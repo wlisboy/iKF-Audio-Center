@@ -4,7 +4,7 @@
 //! 约定（全库统一）：
 //!   * 所有导出函数 `extern "system"`（stdcall，与 Win32/Go syscall 默认一致）；
 //!   * 所有导出函数不得 panic —— panic="abort" 下没有 catch_unwind 可言，
-//!     兜底是 ensure_panic_hook 落盘取证（见 handle_reg 段之后）；
+//!     兜底是 ensure_panic_hook 落盘留证（见 handle_reg 段之后）；
 //!   * 字符串一律 UTF-8（错误串）/ UTF-16（Windows 端点名，S2 起），与
 //!     osConfLib.dll / 既有 Go 绑定层的约定逐项对齐。
 //!
@@ -549,7 +549,7 @@ mod tests {
 
 /// panic 落盘端到端：hook 挂上后，一次真实 panic 必须在 panic 日志里
 /// 留下现场（位置 + 消息）。只在 panic="unwind"（dev 套件）下可测 ——
-/// abort 策略下无法回捕，这正是生产选择落盘取证而非 catch_unwind 的原因。
+/// abort 策略下无法回捕，这正是生产选择落盘留证而非 catch_unwind 的原因。
 /// libtest 自身装有输出捕获 hook，测完还原，避免影响其他用例的输出。
 #[cfg(all(test, panic = "unwind"))]
 mod panic_hook_tests {

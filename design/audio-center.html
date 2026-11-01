@@ -433,8 +433,8 @@ html[data-viz="1"][data-vizstage="light"] #__toast{
   --t1:#14161A; --t3:rgba(20,22,26,.46);
   --line:rgba(0,0,0,.10); --glass2:rgba(255,255,255,.72)}
 
-/* 晚：录音灵动岛（#recIsland）。三态 data-state=idle|rec|saved；
-   ★ 23:05 用户位置定在**顶部偏右**：top:26 与设备胶囊同行、right:200
+/* 录音灵动岛（#recIsland）。三态 data-state=idle|rec|saved；
+   位置定在**顶部偏右**：top:26 与设备胶囊同行、right:200
    让开胶囊（约 150px 宽）——底部被右侧面板和托盘挤满，saved 卡片会盖住
    「环绕类型」等行。隐藏态 pointer-events:none + 上浮淡出（从顶部落下），
    出现/收起走同一条 transition。颜色全走主题变量（__toast 教训）。 */
@@ -514,7 +514,7 @@ html[data-viz="1"][data-vizstage="light"] #__toast{
   cursor:pointer;overflow:hidden}
 .vbar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);
   border-radius:5px;pointer-events:none}
-/* ---------- 律动空间页：右侧通高侧栏（第二十二轮改版） ----------
+/* ---------- 律动空间页：右侧通高侧栏 ----------
    这一页的处境和另外六页完全不同：中央不是 SVG 舞台，而是一块铺满窗口的
    WebGL 画布，地形**在画布正中**渲染；而右侧一列（设备胶囊 / 读数区 /
    控制面板）全都锚在窗口边缘上，正好压在地形上。实测：
@@ -814,7 +814,7 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
 .vm-prev{height:38px;border-radius:11px;border:1px solid var(--line);
   margin-bottom:12px;background:var(--ghost)}
 
-/* 字段区：两列，标签列固定 46px。固定宽度是这一轮对齐的关键 ——
+/* 字段区：两列，标签列固定 46px。固定宽度是对齐的关键 ——
    旧版用 flex 让每个格子自己算，结果右边界参差。
    ★ 两列不等宽（1 : 1.4）而不是 1 : 1：三行配对是
        底色 | 雾色      两个都只有「标签 + 色块」，窄列绰绰有余
@@ -907,7 +907,7 @@ html[data-viz="1"] .rail{overflow-y:auto;overflow-x:hidden;
   scrollbar-width:none;-ms-overflow-style:none}
 html[data-viz="1"] .rail::-webkit-scrollbar{width:0;height:0;display:none}
 
-/* ---- 自定义场景 · 面板与场景墙（第二十一轮改版） ----
+/* ---- 自定义场景 · 面板与场景墙 ----
    改版的出发点是：「应用」和「保存」必须分在两个空间里。
    中央舞台只负责「点一下切过去」（场景卡），右侧面板只负责
    「管理」（状态 / 详情 / 新建 / 覆盖 / 改名 / 删除）。
@@ -965,7 +965,7 @@ html[data-viz="1"] .rail::-webkit-scrollbar{width:0;height:0;display:none}
 .pfoot{margin-top:11px;font-size:10.5px;color:var(--t3);line-height:1.5;word-break:break-all}
 
 /* ============================================================
-   · 交付前视觉精修（只动呈现层，不改任何布局口径）
+   · 视觉精修（只动呈现层，不改任何布局口径）
    ------------------------------------------------------------
    约束：本文件大量数字被 diag_panel.js / probe2.py 等验收脚本量过
    （面板内距、行高、侧栏分档），这一轮刻意**不改任何影响布局的
@@ -1027,7 +1027,7 @@ select{box-shadow:0 2px 8px -4px rgba(0,0,0,.28)}
 @keyframes headswap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ---------- 开发者模式 ----------
-   「参数」页面向调试/取证（195 个驱动参数、PropertyControl 字样），
+   「参数」页面向调试/诊断（195 个驱动参数、PropertyControl 字样），
    交付版默认从 dock 收起：html.devmode 才显示。入口（见 JS）：
      · 左上角 logo 2 秒内连点 5 次；
      · 任意页面按 Ctrl+Alt+P。
@@ -1048,8 +1048,8 @@ html.devmode .dock button[data-dev]{display:flex}
       环绕族下拉/滑杆）缩进 + 左侧红色细条，跟上面的开关成对可读。
       静态行在设计稿加 .ctl-sub，动态行由 addSpaceSlider/addSpaceSelect
       加同一个类，两条线口径一致；
-   ③ 底部渐隐：面板内容可滚时，底部 12px 渐隐提示「下面还有」（
-      用户从 24px 减半——滚动条隐藏后它是「下面还有」的唯一线索，
+   ③ 底部渐隐：面板内容可滚时，底部 12px 渐隐提示「下面还有」（高度
+      从 24px 减半——滚动条隐藏后它是「下面还有」的唯一线索，
       保留但别盖住末行内容）——
       .panel.scrolled 才显示，滚到底自动隐藏（JS 见 dock 监听器后那段）；
    ④ 开关联动降暗：开关关着时从属控件整体降不透明度（.grp-dim），
@@ -1285,7 +1285,7 @@ html.devmode .dock button[data-dev]{display:flex}
         <button class="sw" data-p="MuteControl" data-label="耳机静音"></button>
       </div>
 
-      <!-- 晚：「耳机录音」—— 录耳机里正在播放的
+      <!-- 「耳机录音」—— 录耳机里正在播放的
            声音（渲染端点 WASAPI loopback 采集），写 16bit 立体声 WAV 到
            「音乐\iKF Audio Center\」。原麦克风页「录音机」（录麦克风）废弃
            移除；副标状态行也删。
@@ -1297,7 +1297,7 @@ html.devmode .dock button[data-dev]{display:flex}
            同步循环；API 仍是 POST /api/recorder/start|stop + GET status。 -->
       <div class="row" id="recRow">
         <div><div class="nm">耳机录音</div></div>
-        <!-- 晚：悬浮文字与 data-p 开关的默认注
+        <!-- 悬浮文字与 data-p 开关的默认注
              「· 可写」对齐 —— 本开关无 data-p 吃不到桥接层默认值，写死。 -->
         <button class="sw" id="recBtn" data-label="耳机录音"
           title="耳机录音 · 可写"></button>
@@ -1530,11 +1530,10 @@ html.devmode .dock button[data-dev]{display:flex}
       <!-- 内嵌监听：官方 RunListen2Device 依赖的监听引擎
            COM 服务器（CLSID {E642D042-…}）在整套 WHQL 驱动包里不存在，
            官方原版同样开不了（恒返 0x80040154）。开关改走内嵌 WASAPI
-           监听（等价系统「侦听此设备」），取证见
-           工具/监听取证-监听COM组件缺失.md。POST /api/listen {on}。 -->
+           监听（等价系统「侦听此设备」）。POST /api/listen {on}。 -->
       <div class="row">
         <div><div class="nm">麦克风监听</div></div>
-        <!-- 晚：悬浮文字对齐「· 可写」口径
+        <!-- 悬浮文字对齐「· 可写」口径
              （内嵌 WASAPI 监听可写可开，与 data-p 开关默认注一致）。 -->
         <button class="sw" id="listenSw" data-label="麦克风监听"
           title="麦克风监听 · 可写"></button>
@@ -1574,7 +1573,7 @@ html.devmode .dock button[data-dev]{display:flex}
       <!-- 驱动组件：系统里的驱动包由同目录的 iKF-驱动管理.exe 装卸
            （它自提权，主界面因此一次 UAC 都不弹）。 -->
       <div class="ptitle">驱动组件</div>
-      <!-- 晚：录音功能迁出麦克风页——声音页
+      <!-- 录音功能迁出麦克风页——声音页
            「耳机录音」行接管，录渲染端点回环（耳机里正在播放的声音）。
            麦克风页不再有任何录音入口。 -->
 
@@ -1664,7 +1663,7 @@ html.devmode .dock button[data-dev]{display:flex}
         <button id="vizThemeEdit">编辑…</button>
       </div>
 
-      <!-- 致谢（只留用户指定的两行 —— 上一轮我自作主张多加的
+      <!-- 致谢（只保留两行 —— 多余的
            「特此感谢原作者的开源贡献」与许可声明都被要求删掉）。
            ★ 两个链接必须 target="_blank"：WebView2 里同窗打开会把整个应用
              导航走（白屏），应用侧没有拦截外链的逻辑。 -->
@@ -1680,7 +1679,7 @@ html.devmode .dock button[data-dev]{display:flex}
     </div>
 
     <div class="pgroup" id="pg-profile">
-      <!-- 第二十一轮改版：这一页拆成「中央场景墙 + 右侧管理」两半。
+      <!-- 改版：这一页拆成「中央场景墙 + 右侧管理」两半。
            中央（#stage 上的 .pcard）只做一件事 —— 点一下应用整套音效；
            这里只做管理，不再出现任何会让人以为是「场景」的保存按钮。
            旧版的「原厂默认/游戏/音乐/电影」chip 已删除。 -->
@@ -1785,8 +1784,8 @@ html.devmode .dock button[data-dev]{display:flex}
           </div>
           <!-- 这里原本是三句话的解释（「暖色是一眼看到的那片
                颜色，低频重的音乐会让着色器的 warmBlend 逼近 1……」），
-               62px 高、960×600 下把右栏顶出滚动条，而且和用户提的
-               「保留功能介绍、去掉复杂解释」相悖。压成一行功能说明。 -->
+               62px 高、960×600 下把右栏顶出滚动条，与「保留功能介绍、
+               去掉复杂解释」的目标相悖。压成一行功能说明。 -->
           <div class="vm-note">
             <b>暖色</b>是主色 · <b>冷色</b>走高频 · <b>雾色</b>兼作舞台底色</div>
         </div>
@@ -1815,7 +1814,7 @@ html.devmode .dock button[data-dev]{display:flex}
 
 </div>
 
-<!-- 晚：录音灵动岛 —— fixed **顶部偏右**浮层
+<!-- 录音灵动岛 —— fixed **顶部偏右**浮层
      （与右上角设备胶囊同一行、其左侧：胶囊 top:26/right:28，统计块
      top:96 起，y 26..64 除胶囊外是空档；底部空间被面板/托盘挤满，
      实测放不下），三态由 data-state 驱动（idle 隐藏 / rec 录音中 /
@@ -2279,7 +2278,7 @@ function hud(){
        不能每帧重建 innerHTML —— hud() 末尾会调 layoutHud() 重算分档与 --hud-top，
        高频重建会让读数区在 compact / mini 之间来回抖。
 
-       第二十三轮：做成「仪表」。原来是一个 42px 数字 + 一根 8 段条 + 三行读数，
+       做成「仪表」。原来是一个 42px 数字 + 一根 8 段条 + 三行读数，
        全靠小字撑层级；现在给大数字配一把**刻度尺 + 游标**（读总能量 0~100%），
        下面那根 8 段条单独标明是「频段」（左低右高，语义与总能量不同），
        再把上一轮那行「音源状态」删掉 —— 它和侧栏顶部的音源块完全重复，
@@ -2433,7 +2432,7 @@ function render(){
 }
 
 /* ================= 自定义场景 · 中央场景陈列墙 =================
-   第二十一轮改版的落点。这块原来是「当前参数 → 场景快照 → 写回驱动」
+   本节的落点。这块原来是「当前参数 → 场景快照 → 写回驱动」
    三个空框的链路示意，1280×800 里最大的一片区域信息量几乎为零，
    而右侧面板被塞成一条。现在两者换位：
 
@@ -2679,8 +2678,7 @@ var TITLES = {
   api:   ['参数', '开发者选项']
 };
 /* 首屏标题/副行也走 TITLES —— 此前静态 HTML 里写死的副行
-   只在切页时才被 TITLES 覆盖，首次打开显示的是旧文案（用户报告的
-   「首次打开页面内容显示有误」即此）。TITLES 从此是唯一真源。 */
+   只在切页时才被 TITLES 覆盖，首次打开显示的是旧文案（实测确认过的缺陷）。TITLES 从此是唯一真源。 */
 document.getElementById('hTitle').textContent = TITLES[S.section][0];
 document.getElementById('hSub').textContent   = TITLES[S.section][1];
 
@@ -4469,7 +4467,7 @@ var VIS = (function(){
       }
     }
     /* 只写数字 —— 那个 % 是 #vizHudEnergy 的兄弟节点，
-       写进同一个 textContent 会被每帧抹掉（第二十二轮改）。 */
+       写进同一个 textContent 会被每帧抹掉。 */
     var hv2 = document.getElementById('vizHudEnergy');
     if (hv2) hv2.textContent = Math.round(state.energy * 100);
     /* 刻度尺游标 */

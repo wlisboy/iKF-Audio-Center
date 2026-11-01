@@ -144,8 +144,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		a.json(w, http.StatusOK, resp)
 	// 内嵌录音机（recorder.go）：官方捆绑 Recorder.exe 是
-	//   依附官方面板 COM 环境的死件（脱离面板拉起必退 241，取证见
-	//   工具/录音机取证-Recorder.exe死件.md），旧 POST /api/recorder
+	//   依附官方面板 COM 环境的死件（脱离面板拉起必退 241），旧 POST /api/recorder
 	//   「拉起官方 exe」语义废弃，改为 start/stop/status 三端点。
 	//   声音页「耳机录音」=渲染端点 loopback，
 	//   WAV 落「音乐\iKF Audio Center\」（原麦克风录音废弃）。
@@ -344,7 +343,7 @@ func (a *API) listen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 官方 RunListen2Device 依赖的 COM 服务器在驱动包里
-	// 不存在（见 工具/监听取证-监听COM组件缺失.md），改内嵌 WASAPI
+	// 不存在，改内嵌 WASAPI
 	// 监听（listen.go）。响应保留 {ok, on, error} 形状，前端零改动。
 	if req.Gain != nil {
 		a.json(w, http.StatusOK, lis.SetGain(*req.Gain))
@@ -388,5 +387,5 @@ func (a *API) profileOp(w http.ResponseWriter, r *http.Request, op string) {
 }
 
 // recorderPath / launchRecorder 已删除 —— 官方捆绑
-// Recorder.exe 是死件（见 工具/录音机取证-Recorder.exe死件.md），
+// Recorder.exe 是死件，
 // 录音机改为内嵌实现（recorder.go 的 rec 实例，三端点见上方路由）。

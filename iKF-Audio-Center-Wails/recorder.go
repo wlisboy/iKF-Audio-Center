@@ -3,8 +3,7 @@ package main
 // recorder.go —— 耳机录音 —— P1 清退后的纯转发层
 //
 // 演进：官方捆绑的 SoundRecorder\Recorder.exe 是依附官方面板 COM 环境的
-// 薄客户端，脱离官方面板单独拉起必然静默退出（恒退 241，取证见
-// 工具/录音机取证-Recorder.exe死件.md）。内嵌实现录渲染端点回环
+// 薄客户端，脱离官方面板单独拉起必然静默退出（恒退 241）。内嵌实现录渲染端点回环
 // （WASAPI loopback，耳机里正在播放的声音）。
 //
 // 采集/下混/写盘/finalize 的实现住在 audiocore/src/recorder.rs；路径策略

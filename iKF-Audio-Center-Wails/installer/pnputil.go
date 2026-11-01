@@ -245,7 +245,7 @@ func probeOldPanel() string {
 
 // oldPanelNote 旧版还在时给一句安全顺序提示；没检测到返回空串。
 // 精简：新框架直接抛弃官方旧面板，这里只留必须知道的一句 ——
-// 旧卸载器会按文件名删驱动文件，顺序错了耳机静音（P3 取证结论不变）。
+// 旧卸载器会按文件名删驱动文件，顺序错了耳机静音（P3 验证结论不变）。
 func (s *drvState) oldPanelNote() string {
 	if s.oldPanel == "" {
 		return ""

@@ -382,7 +382,7 @@ unsafe fn listen_loop(h: LsHandles, state: &Arc<ListenState>, stop: &Arc<AtomicB
             };
             let dst = std::slice::from_raw_parts_mut(data, n * ren_block);
             // 单声道样本写进渲染端点的**每一个声道**：多声道端点的物理
-            // 声道映射不保证在 FL/FR（取证见文件头注），全声道写入保证
+            // 声道映射不保证在 FL/FR（见文件头注），全声道写入保证
             // 任何映射都出声。样本从 pending 的声道 0 取（麦克风源）。
             let gain = f32::from_bits(state.gain_bits.load(Ordering::SeqCst));
             for f in 0..n {

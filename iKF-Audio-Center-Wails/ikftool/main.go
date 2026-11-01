@@ -9,7 +9,7 @@
 //	    %APPDATA% 档；位置参数是额外场景目录）
 //
 // 报告六段：运行环境（系统/WebView2）→ 包完整性（SHA256）→ 进程与日志现状
-// → 崩溃取证（事件日志/WER/panic 行/转储）→ 场景诊断 → 交叉检查。
+// → 崩溃诊断（事件日志/WER/panic 行/转储）→ 场景诊断 → 交叉检查。
 // 另有两个动作模式（只做动作不跑诊断）：
 //	  -zip      把 log\ 按天日志 + 驱动管理日志 + 崩溃转储打成回传 zip
 //	  -arm      给主程序/驱动管理布防 WER 本地崩溃转储（HKCU，免提权）
@@ -335,13 +335,13 @@ func secProcsLogs(w func(string, ...interface{}), exe string) {
 	}
 }
 
-// secCrash 崩溃取证：事件日志（异常代码+出错模块）→ WER 归档 → 转储目录
+// secCrash 崩溃诊断：事件日志（异常代码+出错模块）→ WER 归档 → 转储目录
 // → 按天日志里的 panic 行。判据：事件里出错模块=exe 自身
 // → Go fatal；=osConfLib.dll → 原生侧；=杀软 DLL → 注入；无记录 → 加载
 // 阶段就死了（代码一行没跑）。
 func secCrash(w func(string, ...interface{}), exe string) {
 	w("")
-	w("──────── 崩溃取证 ────────")
+	w("──────── 崩溃诊断 ────────")
 	for _, prov := range []string{"Application Error", "Windows Error Reporting"} {
 		out, err := runCmd(15*time.Second, "wevtutil", "qe", "Application",
 			"/q:*[System[Provider[@Name='"+prov+"']]]", "/c:50", "/rd:true", "/f:text")
@@ -579,7 +579,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(),
 			"用法：iKFTool.exe [-zip] [-arm | -arm-off] [额外场景目录…]\n"+
-				"  无参数 = 跑全量诊断（运行环境/包完整性/进程与日志/崩溃取证/场景），\n"+
+				"  无参数 = 跑全量诊断（运行环境/包完整性/进程与日志/崩溃诊断/场景），\n"+
 				"           报告打印到控制台并追加进 exe 旁 log\\yyyy-mm-dd.txt\n")
 		flag.PrintDefaults()
 	}
@@ -598,7 +598,7 @@ func main() {
 	w("时间 : %s", start.Format("2006-01-02 15:04:05"))
 	w("目录 : %s", mustExeDir())
 
-	// ---- 新四段：环境 → 完整性 → 进程/日志 → 崩溃取证（全部只读） ----
+	// ---- 新四段：环境 → 完整性 → 进程/日志 → 崩溃诊断（全部只读） ----
 	secRuntime(w)
 	secIntegrity(w, mustExeDir())
 	secProcsLogs(w, mustExeDir())
