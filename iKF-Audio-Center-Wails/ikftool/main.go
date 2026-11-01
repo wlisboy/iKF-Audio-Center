@@ -628,6 +628,12 @@ func main() {
 	for _, c := range cands {
 		entries, err := os.ReadDir(c.dir)
 		if err != nil {
+			// CPL/profile/default 在绿色版里不存在（build_portable 的
+			// CPL_ITEMS 从不拷它，官方 HiFi 空模板也无参数可拷）——
+			// 这是常规布局不是故障；只有 profile 主目录缺失才值得警告。
+			if os.IsNotExist(err) && strings.HasSuffix(c.dir, "profile"+string(os.PathSeparator)+"default") {
+				continue
+			}
 			w("⚠ 目录不可读：%s（%v）", c.dir, err)
 			continue
 		}
