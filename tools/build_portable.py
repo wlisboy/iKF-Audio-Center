@@ -38,7 +38,7 @@ docs/录音机取证-Recorder.exe死件.md。
 
 用法
 ----
-    python tools/build_portable.py                    # 默认走 ../iKF headset-0817
+    python tools/build_portable.py                    # 默认走 ../iKF headset
     python tools/build_portable.py --src <驱动包目录>
     python tools/build_portable.py --no-build         # 不重新编译，只打包
     python tools/build_portable.py --no-check         # 跳过产物自检
@@ -58,7 +58,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 APP = os.path.join(ROOT, "iKF-Audio-Center-Wails")
 
-DEF_SRC = os.path.join(os.path.dirname(ROOT), "iKF headset-0817",
+DEF_SRC = os.path.join(os.path.dirname(ROOT), "iKF headset",
                        "WIN10(WHQL)", "SoftwareDriver")
 DEF_EXE = os.path.join(APP, "build", "bin", "iKF-Audio-Center.exe")
 DEF_OUT = os.path.join(ROOT, "release", "iKF-Audio-Center-Portable")
@@ -180,6 +180,64 @@ def restore_user_profiles(stashed, out_dir):
         print("放回用户场景档 %d 个文件（缺失才补，内置档以新版为准）" % n)
 
 
+def sweep_stale(out_dir, exe_name):
+    """删掉包里不再被任何源引用的陈旧文件。
+
+    打包从「整包重建」改成了「同步覆盖」（见 main），覆盖不会移除
+    旧构建留下的、本轮源里已没有的文件 —— 这里补上清扫。允许失败：
+    个别文件被占用/删不掉时打 WARN 继续走，残留文件不影响正确性
+    （源覆盖已把该有的都写对了），比整包删除被拦、构建假红强。
+    """
+    keep = set()
+    for rel in CPL_ITEMS:
+        dst = os.path.join(out_dir, "CPL", rel.replace("\\", os.sep))
+        if os.path.isdir(dst):
+            for r, _d, fs in os.walk(dst):
+                for f in fs:
+                    keep.add(os.path.normpath(os.path.join(r, f)).lower())
+        elif os.path.isfile(dst):
+            keep.add(os.path.normpath(dst).lower())
+    for rel in DRV_ITEMS:
+        dst = os.path.join(out_dir, "driver", rel.replace("\\", os.sep))
+        if os.path.isdir(dst):
+            for r, _d, fs in os.walk(dst):
+                for f in fs:
+                    keep.add(os.path.normpath(os.path.join(r, f)).lower())
+        elif os.path.isfile(dst):
+            keep.add(os.path.normpath(dst).lower())
+    prof = os.path.join(out_dir, "CPL", "profile")
+    if os.path.isdir(prof):
+        for r, _d, fs in os.walk(prof):
+            for f in fs:
+                keep.add(os.path.normpath(os.path.join(r, f)).lower())
+    # 根目录四件套：主 exe（copy2 在 main 里）、Rust DLL、两个 go build
+    # 产物——它们不在 CPL/driver 源清单里，但不列入 keep 就会被自己清扫掉。
+    for fn in (exe_name, "ikf_audio.dll", SETUP_NAME, "iKFTool.exe"):
+        keep.add(os.path.normpath(os.path.join(out_dir, fn)).lower())
+
+    n = 0
+    for root, dirs, files in os.walk(out_dir, topdown=False):
+        for fn in files:
+            p = os.path.normpath(os.path.join(root, fn)).lower()
+            if p in keep:
+                continue
+            try:
+                os.chmod(os.path.join(root, fn), 0o666)
+                os.remove(os.path.join(root, fn))
+                n += 1
+            except OSError as e:
+                print("WARN 清扫失败（保留）：%s (%s)" % (fn, e.strerror or e))
+        for dn in dirs:
+            d = os.path.join(root, dn)
+            try:
+                if not os.listdir(d):
+                    os.rmdir(d)
+            except OSError:
+                pass
+    if n:
+        print("清扫陈旧文件 %d 个（本轮源里已不存在）" % n)
+
+
 def dir_size(p):
     total = 0
     for r, _dirs, files in os.walk(p):
@@ -213,8 +271,7 @@ def main():
         stashed = stash_user_profiles(args.out)
         if stashed and os.path.isdir(STASH_DIR):
             print("已暂存用户场景档 → %s" % os.path.relpath(STASH_DIR, ROOT))
-        shutil.rmtree(args.out)
-    os.makedirs(args.out)
+    os.makedirs(args.out, exist_ok=True)
 
     shutil.copy2(args.exe, os.path.join(args.out, os.path.basename(args.exe)))
 
@@ -247,8 +304,9 @@ def main():
     # 不再捆绑 SoundRecorder\Recorder.exe —— 死件（见头部
     #   注释）；录音机已内嵌。
     # 内置档（原厂默认/游戏/电影/音乐）由 EnsureSeedScenes 首次启动时生成，
-    # 不在这里拷；stash 的场景树必须放回，否则上面那次 rmtree 就是静默删除。
+    # 不在这里拷；stash 的场景树必须放回，否则清除旧包就是静默删除。
     restore_user_profiles(stashed, args.out)
+    sweep_stale(args.out, os.path.basename(args.exe))
 
     if not args.no_build:
         build_setup(args.out)
