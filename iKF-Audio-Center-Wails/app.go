@@ -243,7 +243,7 @@ func (a *API) driverSetup(w http.ResponseWriter, r *http.Request) {
 		}
 		action = req.Action
 	}
-	// ★破坏性检测 P1-1：空 action 此前被放行 → RunSetup("") 走默认分支
+	// ★破坏性检测 P1-1：空 action 放行会让 RunSetup("") 走默认分支
 	// = 主动关驱动上下文 + 弹提权安装器并阻塞 —— 一条误调用就能断驱动。
 	// 非法值一律 400，驱动管理只允许显式调用。
 	if action != "install" && action != "uninstall" {

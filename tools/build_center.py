@@ -431,7 +431,7 @@ BRIDGE_JS = r"""
     if (!d) return null;
     if (d.r === 0) return d.v === '1' ? '开' : '关';
     /* ret=2 是「存在但从未写过」，不是「本机不支持」——
-       铁律第 2 条。这里原来判 `d.r !== 0` 就返回 null，于是**刚装完驱动、
+       铁律第 2 条。判 `d.r !== 0` 就返回 null 会漏掉**刚装完驱动、
        一次都没设置过**时，麦克风页右上四行全显示「设备不支持」，用户看到
        的就是「麦克风功能整个废了」；可下面四个开关其实都能点（w=true 走
        白名单）。值也猜不得：读缓冲区零初始化，驱动返回 2 时不填，
@@ -578,7 +578,7 @@ BRIDGE_JS = r"""
       dial.title = '主音量 ' + (st.vol_db === null ? '—' : st.vol_db.toFixed(2) + ' dB')
         + ' · 上下拖拽或滚轮调节';
     }
-    /*删除：这里原来无条件把「动态低音」「语音清晰」两个旋钮
+    /*删除：这里若无条件把「动态低音」「语音清晰」两个旋钮
        dim() 成「本机 APO 未实现此效果」。那句话在**参数接好线之后就
        不成立了** —— 两个旋钮现在分别绑 BM_Slider_BassLevel（配 Enable_BM_GFX）
        与 VOICECLARITY_LEVEL（配 Enable_VOICECLARITY_LFX），两项都已进白名单
@@ -648,7 +648,7 @@ BRIDGE_JS = r"""
      data-p / data-label（麦克风侧再加 data-ep="capture"），
      状态由下方统一处理器按驱动读回值同步，点击也由全局委托处理。
 
-     撤掉了原来那张 SWITCH_MAP。它按「#pg-* 内 button.sw
+     不设那张 SWITCH_MAP。它按「#pg-* 内 button.sw
      的出现顺序」索引着填 data-p，隐患是**界面一改顺序就悄悄错位**；
      而这轮恰好把四组开关从均衡页搬到了声场页。既然统一处理器本来就
      支持属性直连，那张表就是纯负担，故删除 —— 顺序不再有任何隐式约束。
@@ -660,7 +660,7 @@ BRIDGE_JS = r"""
      IsSupportXearSurround71 / GFSControl / SpectrumControl…）。
      GFSControl 在**控制表**里，不是音效参数；它确实是可写的布尔开关
      （分发表 ID 0x10029 → RegSetValueExW 写 HKCU\SOFTWARE\C-Media\Hook\
-     EnableGFS），但语义与「智能音量」无关，此前是**按名字猜的绑定**。
+     EnableGFS），但语义与「智能音量」无关——绑定不能按名字猜。
      官方 Xear Smart Volume 页的开关在功能表里叫 Enable_SMART_VOLUME_GFX，
      且与控件名 EnableSmartVol 在 XearAudioCenter_x64.exe 的字符串表中相邻
      （… EnableGX | Enable_SMART_VOLUME_GFX | SVN | EnableSmartVol …），配对确凿。
@@ -803,7 +803,7 @@ BRIDGE_JS = r"""
   }
 
   /* ---------------- 5.5 扩展功能：静音 / 环境类型 / 变调 / 人声消除 / GFS
-     这 5 组是本机 23 项可写参数里此前没有界面入口的部分。
+     这 5 组是本机 23 项可写参数里没有界面入口的部分。
 
      RFX_ENVIRONMENT 的索引语义已由静态反编译确认）：
        · CMEffectAPO_108B.dll 内 FUN_18021efd0 对 *(this+0x27C) 做 switch，
@@ -1174,7 +1174,7 @@ BRIDGE_JS = r"""
       } else {
         /* 动态低音/语音清晰读不到驱动记忆值时
            给一个可交互的初始刻度。
-           兜底值必须落在**驱动真实档位**上（原来写死
+           兜底值必须落在**驱动真实档位**上（写死
            45，而 bass 只有 0..10、clear 只有 0..6，45 写进去会被四舍五入
            成 5/3，回读再换算就成 50 —— 首次进入界面时数字会「自己跳」）。
            50 是两档中点，两个量程都能精确表示（5/10、3/6）。 */
@@ -1322,7 +1322,7 @@ BRIDGE_JS = r"""
   }
 
   /* 声场页动态补「虚拟音箱摆位」编辑器。
-     重设计（旧的三颗文字按钮观感差）：原来的
+     重设计（旧的三颗文字按钮观感差）：
        「两个 chip + 一排三个文字按钮」合并成一条工具条 ——
        左边是「旋转 | 平移」分段选择器（pill 胶囊、accent 填充激活态），
        右边是三颗图标圆钮（逆时钟 ↺ / 顺时钟 ↻ / 重置 ⟲，lucide 线性
@@ -1365,7 +1365,7 @@ BRIDGE_JS = r"""
      两次调用天然保序：第二次插在第一次的后面。 */
   /* 静态滑杆（设计稿里就写好的）+ 动态补的滑杆，统一一份配置。
      补 AUDIOBRILLIANT_LEVEL：官方 Xear Audio Brilliant 页除开关外
-     还有一根 Brilliant强度 滑杆（0~6），此前只有开关、强度没入口。 */
+     还有一根 Brilliant强度 滑杆（0~6）——只有开关、强度没入口。 */
   var EXTRA_SLIDERS = [
     ['ksRange', 'ksVal', 'KEYSHIFT_LEVEL', function(v){ return (v > 0 ? '+' : '') + v; }],
     ['vcRange', 'vcVal', 'VOCALCANCEL_LEVEL', function(v){ return v; }],
@@ -2030,7 +2030,7 @@ BRIDGE_JS = r"""
         PROFILES.dead = PROFILES.dead || {};
         PROFILES.deadWhy = PROFILES.deadWhy || {};
         if (r.error){ PROFILES.dead[name] = true; PROFILES.deadWhy[name] = r.error; }
-        /* 失败说明驱动可能只写进去一部分，原来的 active 已不再成立 */
+        /* 失败说明驱动可能只写进去一部分，记录的 active 已不再成立 */
         PROFILES.active = '';
         profSaveActive();
         paintProfPanel();
@@ -2322,7 +2322,7 @@ BRIDGE_JS = r"""
     var fmtv = fmt || function(v){ return v; };
     var k = scale || 1;              /* 滑杆刻度 → 参数值 的换算（标量音量是 100:1） */
     /* 注册到统一重同步表 —— 场景 apply 后 applyParams 按表
-       回填（此前 capture 端滑杆不在任何同步路径，应用含麦克风参数的
+       回填（capture 端滑杆一旦不在任何同步路径，应用含麦克风参数的
        自定义场景后页面停在旧值）。新控件走 bindSlider 自动获得同步。 */
     BIND_REG.push({id:id, labId:labId, param:param, ep:ep, fmt:fmtv, k:k});
     el.addEventListener('input', function(){
@@ -2504,7 +2504,7 @@ BRIDGE_JS = r"""
     syncSpk(pm);
 
     /* bindSlider/bindSelect 注册表统一重同步 —— 麦克风页
-       （capture 端）的滑杆/下拉此前不在任何同步路径：应用含麦克风参数
+       （capture 端）的滑杆/下拉不能脱离同步路径：应用含麦克风参数
        （降噪/回声/AGC/魔音/采集采样率/麦克风音量）的自定义场景后，
        页面停在旧值。r!==0（未写过/不可读）跳过 —— 不替驱动下结论。 */
     BIND_REG.forEach(function(r){
@@ -2543,7 +2543,7 @@ BRIDGE_JS = r"""
         return;
       }
       /* ★ 修（P0 后）：判据必须只有 !d.w —— ret=2 是「从未写过」不是
-         「不支持」（铁律）。这里此前写成 d.w && d.r===0，被「闸脚本先跑
+         「不支持」（铁律）。写成 d.w && d.r===0 会被「闸脚本先跑
          把参数写活」的测试顺序掩盖；P3 干净机上全新端点全 ret=2 时会
          大面积误置灰（P0 断依赖验收实测踩中）。 */
       if (d && d.w){
@@ -2692,7 +2692,7 @@ BRIDGE_JS = r"""
     var el = $('hud');
     if (!el) return;
     if (S.section === 'space'){
-      /*这里原来把副标改写成「8 声道声场 · 拖动音箱写回方位
+      /*这里把副标改写成「8 声道声场 · 拖动音箱写回方位
          （由驱动决定）」。现在设计稿的 hud() 自己就按当前交互模式写
          「8 个音箱 · 拖动改角度 / 拖动改距离」——**比这句更准**，
          而且它随模式切换即时更新。再覆盖回去只会把模式信息抹掉，
@@ -2797,7 +2797,7 @@ BRIDGE_JS = r"""
   /* ---------------- 10.5 音箱方位：真写驱动，由硬件决定 ----------------
      官方面板 apoSpeakerVirtual.cml 里的音箱方位，对应驱动的 SS_*_ANGLE / SS_*_DIST。
 
-     ★ 实测更正（此前误判为「本机不支持」）：这些属性是**写后即可读**的 ——
+     ★ 实测确认：这些属性是**写后即可读**的 ——
      没写过时读返回 2（存在但无值），写一次就变成可读，且跨进程持久。
      SS_C/LF/RF/LS/RS/LB/RB/LFE_ANGLE/DIST 全部接受任意 int（含负数，实测
      写 −32 读回 −32），驱动不做值域校验。所以这里必须真写，
@@ -2818,14 +2818,14 @@ BRIDGE_JS = r"""
 
   function bindHonesty(){
     /*删掉了这里对页头副标的覆盖。
-       它原来把 TITLES.space[1] 改写成「拖动虚线圈改变房间大小 ·
-       拖动音箱写回方位（由驱动决定）」—— 那是「怎么操作」，而此前
+       它把 TITLES.space[1] 改写成「拖动虚线圈改变房间大小 ·
+       拖动音箱写回方位（由驱动决定）」—— 那是「怎么操作」，
        已经定下副标只写「这一页是干什么的」。更要命的是它**只改运行时、
        不改设计稿**：稿子上写着「房间、音箱与音效」，装到机器上却变成
        那一长句，两边对不上（这轮改副标时才暴露出来）。
        现在操作提示挂在音箱元素自己的 <title> 上（见设计稿里生成
        <g class="spk"> 的那段），副标归 TITLES 管。 */
-    /*这里原来那段「记住按在哪个音箱上、松手写回 SS_*_ANGLE、
+    /*这里那段「记住按在哪个音箱上、松手写回 SS_*_ANGLE、
        成功就 __resync()」的写法**整块搬走了** —— 它只写角度、且与新的
        虚拟音箱摆位路径抢同一个交互（详见 10.5 节的说明）。
        现在拖拽的统一出口是设计稿的 window.__vssCommit() → bindVss */
@@ -2994,7 +2994,7 @@ BRIDGE_JS = r"""
     if (CUR_EP !== 'capture'){
       P.forEach(function(p){
         seen[p[0]] = 1;
-        /*这里原来写的是**固定一句**「（回环 A/B 未测到变化）」，
+        /*这里若写**固定一句**「（回环 A/B 未测到变化）」，
            与开关那边（走 __unprovenNote 分流）不是一套说法 —— 同一件事两套文案。
            现在统一走同一个函数：模块建了的会带上模块名。
            见 lint 闸的 E7 项（它检查的不只是「有没有用函数」，还要求这两条路径

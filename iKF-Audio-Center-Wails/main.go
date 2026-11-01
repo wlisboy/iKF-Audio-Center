@@ -88,7 +88,7 @@ var drv = NewDriver()
 
 // ensureChannelTopology 已迁到 initstate.go —— 声道拓扑纠正不再只是
 // 「启动期一次性」的事：装完驱动点「重新检测」连上后同样要补// 用户虚拟机实测：首次启动声道组不是立体声、重启主程序才对，就是因为它
-// 当时只挂在启动路径上，而那次写入落在端点重建窗口里被丢弃了）。
+// 若只挂在启动路径上，落在端点重建窗口里的写入会被丢弃）。
 // 现在由 EnsureInitialState 统一调用，写后回读确认 + 最多重试 3 次。
 
 // seedSceneDefaults 驱动重装/参数存储清空后，把「默认」场景整体应用一次
@@ -160,7 +160,7 @@ func openWithRetry() bool {
 }
 
 // setupFileLog 把标准日志落到 exe 旁的 log/yyyy-mm-dd.txt（追加）。
-// GUI 模式没有 stdout，此前 log.Printf 的输出
+// GUI 模式没有 stdout，log.Printf 的输出
 // 全部丢失（破坏性检测报告也点名"panic 无日志"）；现在同时写文件与
 // stderr（serve 模式两者都能看）。按天分文件，多实例追加写安全。
 func setupFileLog() {

@@ -5,7 +5,7 @@ package main
 // 背景 需求）：驱动卸载重装会清空设备侧参数
 // （FxProperties），开机自愈只补 42 项出厂默认；期望的恢复行为是
 // **回到「默认」场景**（干净起点），之后自己决定用哪个场景（点场景卡
-// 随时改，写回路径已实测可靠）。界面「使用中 · X」此前来自前端
+// 随时改，写回路径已实测可靠）。界面「使用中 · X」来自前端
 // localStorage（与设备无关、跨重装残留），形成「显示在用、实际被清」
 // 的假象 —— 现改为后端按设备真值识别（identifyActiveScene）。
 //
@@ -77,7 +77,7 @@ func RestoreDefaultScene(d *Driver, force bool) (bool, string) {
 // 判据（与 profileSave 的快照口径一致）：
 //   - 只比 .profile 里实际存的参数项（带 # 的逐声道项不会出现在快照里）
 //   - 设备侧 ret!=0（无值/不支持）视为不匹配 —— 宁可诚实显示「自定义状态」
-//   - 文本精确比对（快照值 = 当时的设备读数原文，驱动格式稳定）
+//   - 文本精确比对（快照值 = 保存时的设备读数原文，驱动格式稳定）
 func identifyActiveScene(d *Driver) string {
 	if d == nil || !d.ready {
 		return ""
@@ -150,7 +150,7 @@ func profileNamesForIdentify(d *Driver) []string {
 	/*
 		多个场景内容相同时，识别必须先判「默认」。
 
-		当时 `音乐.profile` 与 `默认.profile` 逐项完全相同（默认就是古典乐曲线），
+		`音乐.profile` 与 `默认.profile` 内容逐项相同（默认就是古典乐曲线）时，
 		sort.Strings 按 UTF-8 字节序排，「音」(E9 9F B3) 在「默」(E9 BB 98)
 		之前，于是识别一命中就返回「音乐」，场景墙标成「音乐 · 使用中」。
 

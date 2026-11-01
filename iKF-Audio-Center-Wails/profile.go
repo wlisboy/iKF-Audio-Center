@@ -311,7 +311,7 @@ func kindOfValueType(vtype, name string) string {
 }
 
 // coerce 组态文件里的文本值 → 数值。不合法返回 (nil, false)。
-// 健壮性审计 #9：原来用 Sscanf("%f")，"1abc" 会被当 1 收下 —— 场景档里
+// Sscanf("%f") 会把 "1abc" 当 1 收下 —— 场景档里
 // 手滑的脏值静默变形。换 strconv.ParseFloat，整串必须合法。
 func coerce(val, kind string) (interface{}, bool) {
 	f, err := strconv.ParseFloat(strings.TrimSpace(val), 64)
@@ -1466,7 +1466,7 @@ func EnsureSeedScenes(d *Driver) {
 	}
 	// 原厂默认：直接落出厂值表，不再快照当前驱动状态。
 	//
-	// 这里原来是 `d.ProfileSave(profileFactoryScene, …)` —— 那是缺陷：它把
+	// 这里不能调 `d.ProfileSave(profileFactoryScene, …)` —— 它把
 	// 「此刻设备上有什么」当成出厂默认存下来，设备侧没值时存下的就是空档，
 	// 以后拿它恢复也恢复不回来（残留的几份同名档内容互不相同，就是这么来的）。
 	// 改成与 HealMissingParams 同源的固定表，此后不再漂移。

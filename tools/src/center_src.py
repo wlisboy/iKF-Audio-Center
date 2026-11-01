@@ -512,7 +512,7 @@ def _shared_cpls():
 # 候选目录里有一个是 `_app_dir`（= 程序所在目录）。源码运行时它就是**工程根**，
 # 而工程根的 dist/ 里躺着上一轮打好的便携包，便携包自带
 # `<工程根>/dist/iKF-Audio-Center-Portable/CPL/Driver/x64/vista/osConfLib.dll`。
-# 原来那两遍 os.walk 没有深度上限，一路钻进去把那份 dll 认了下来 ——
+# os.walk 若无深度上限，会一路钻进去把那份 dll 认下来 ——
 # 于是 `_find_dll(<工程根>)` 成功，`self.cpl` 被判成**工程根**，
 # `sound/` `profile/` `lang/` `FactoryDefault.xml` 全部指向不存在的路径
 # （症状：源码运行时「声道测试 0/8 资源就位」、组态与词条读不到）。
@@ -594,7 +594,7 @@ class Driver(object):
 
     解决办法与 Go 版一致：所有 DLL 调用收敛到一个专用的工作线程上，
     调用方通过队列投递并等待结果。这样同时也天然实现了串行化，
-    取代了此前的互斥锁。
+    取代了先前的互斥锁。
     """
 
     def __init__(self):
@@ -1290,7 +1290,7 @@ class Driver(object):
                 # 口径收敛到 excluded_from_scene —— 不再只是挡
                 # 「带声道后缀的虚拟参数」，而是设备级（音量/静音/采样率/声道拓扑）
                 # 与 APO 未实现族一并排除。Go 侧 起就走这条判定，
-                # Python 此前只剩 `"#" in pname`，实测同一动作 37 vs 64 项。
+                # 只判 `"#" in pname` 时实测同一动作 37 vs 64 项。
                 if excluded_from_scene(pname):
                     continue
                 kind = WRITABLE[ep][pname]
@@ -1730,7 +1730,7 @@ PROFILE_CURRENT = "UserDefine.cml"
 # `XearAudioCenter /u /q` 会清掉设备侧的值，于是全部退回 ret=2，界面把开关
 # 灰成「本机不支持」—— 看起来像「虚拟环绕 / 升降 Key 丢了」。
 #
-# 值取自官方安装状态的实测快照 --dump，当时两端点合计 ret=0
+# 值取自官方安装状态的实测快照 --dump，两端点合计 ret=0
 # 有 104 项）。它们存在端点的 FxProperties
 # （HKLM\SOFTWARE\...\MMDevices\Audio\Render\{GUID}\）里 —— 每组合一个
 # C-Media 私有的 PROPERTYKEY，共 36 个值。所以「移植官方文件」治不了这个
@@ -2043,7 +2043,7 @@ def identify_active_scene(drv):
             here.append(stem)
         names.extend(here)
     # 多个场景内容相同时，识别必须先判「默认」。
-    # 当时 `音乐.profile` 与 `默认.profile` 逐项完全相同（默认就是古典乐曲线），
+    # `音乐.profile` 与 `默认.profile` 曾逐项完全相同（默认就是古典乐曲线），
     # sorted 按 UTF-8 排「音」在「默」之前，识别一命中就返回「音乐」。
     # 默认档 EQ 换成**官方预设 Default 的平直曲线**，音乐仍是
     #   古典乐 ⟹ 两档不再同分，这里只是兜底（自己把某档调得跟默认一样时

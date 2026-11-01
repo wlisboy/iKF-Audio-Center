@@ -818,7 +818,7 @@ func (d *Driver) Read(name string) (ret int, val string) {
 }
 
 // ReadEp 在指定端点上读。ep = "render" / "capture"
-// 注意：原来的调用侧 ptrFor 预检已删 —— 它在
+// 注意：调用侧 ptrFor 预检已删 —— 它在
 // HTTP goroutine 上裸读 d.ready/capPtr，与工作线程上的 Open/Close 构成
 // 数据竞争。pcLocked 在工作线程上会复检并同样返回 -9，行为不变。
 func (d *Driver) ReadEp(ep, name string) (ret int, val string) {
@@ -892,7 +892,7 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 			case "0", "false", "off", "no", "":
 				on = false
 			default:
-				// ★ 健壮性审计 #7：原来未识别的串静默当「关」写 0 ——
+				// ★ 未识别的串不能静默当「关」写 0 ——
 				// 传错值的人看到的是成功。改成与 TInt/TFloat 同口径报错。
 				return map[string]interface{}{"ok": false, "ret": -1,
 					"error": fmt.Sprintf("布尔值不合法：%v", value)}
@@ -959,7 +959,7 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 
 	// 值未变化时视为成功，不打扰驱动。
 	// 实测 MuteControl 重复写同值会返回 0x10003，但语义上这是一次成功的无操作。
-	// ★ 健壮性审计 #8：TFloat 原来拿 "%f" 生成的 target（"0.500000"）与驱动
+	// ★ TFloat 拿 "%f" 生成的 target（"0.500000"）会与驱动
 	// 回读原文（"0.5"）做字符串比较，永远不等 → 滑杆每次都白打一轮写+读回。
 	// 浮点改按数值比较（valueUnchanged），其余仍按原文比较。
 	if !noopSkip[name] {
