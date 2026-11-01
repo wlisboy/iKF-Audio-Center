@@ -38,3 +38,8 @@ promo/audio/
 # ---- design generated previews ----
 design/scene-preview.html
 design/viz-preview.html
+
+# ---- local notes (never ship) ----
+README.txt
+*.png
+!design/*.png

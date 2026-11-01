@@ -1154,7 +1154,7 @@ html.devmode .dock button[data-dev]{display:flex}
     <i>AUDIO CENTER</i>
     <!-- 作者署名（2026-10-20 用户要求）：与副标同字号但更低调（透明度 .75、
          字距略小），视觉上是一行小字的两段，不抢产品身份。 -->
-    <em id="brandAuthor" title="打开抖音主页 @wlisboy">by wlisboy</em>
+    <em id="brandAuthor" title="打开抖音主页">by iKF Audio Center</em>
   </div>
 
   <div class="head">
@@ -2791,9 +2791,9 @@ document.addEventListener('click', function(e){
   if (!el) return;
   el.addEventListener('click', function(){
     if (typeof fetch !== 'function') return;
-    el.title = '打开抖音主页 @wlisboy';
+    el.title = '打开抖音主页';
     fetch('/api/openurl?url=' + encodeURIComponent(
-        'https://www.douyin.com/user/MS4wLjABAAAA8hlVaG2Wn0K2tyYAsVNWUwbvOCGJpDkc_yOjh9ynbIEwqoFglxDorBZhQUaxsgcL'))
+        'https://www.douyin.com/user/REDACTED'))
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (window.__toast && d && d.ok === false){
