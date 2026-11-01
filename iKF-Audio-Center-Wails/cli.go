@@ -251,10 +251,9 @@ func isLoopbackHost(host string) bool {
 // 而回环采集在「系统静音」时返回全 0 是**正确行为** —— 不给信号源就
 // 分不清「链路坏了」和「本来就没声音」。自己播一段就都清楚了。
 //
-// 此前注释曾写「驱动自带的 PlayTestSound 在本机返回
-//   0x10001，所以走不通」—— 那个结论是错的。0x10001 是因为调用方把
-//   设备上下文当成了 wav 路径（见 driver.go 的 PlayTest），修好之后
-//   PlayTestSound 是可用的，--tone 也重新走驱动自带的测试音。
+// PlayTestSound 返回 0x10001 通常不是接口走不通，而是调用方把
+//   设备上下文当成了 wav 路径（见 driver.go 的 PlayTest）。路径正确时
+//   它是可用的，--tone 也走驱动自带的测试音。
 //
 // 不释放 winmm 句柄：SND_ASYNC 下由系统托管，进程退出自动停。
 func playWav(path string) error { return playWavEx(path, false) }
