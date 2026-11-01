@@ -5,7 +5,7 @@ initmanifest.go —— 「初始化清单」：初始化目标的**唯一真相*
 
 ## 为什么要这个文件
 
-2026-10-22 用户把这几轮修复归纳成一句话：「从卸载驱动到重新安装，我们在
+目标一句话：从卸载驱动到重新安装，
 设计一个场景 → 初始化，自定义场景里的默认就是我们的初始化」。
 
 说得对，但当时的实现配不上这个说法 ——「初始化该写哪些项」散在**五处**：
@@ -20,7 +20,7 @@ initmanifest.go —— 「初始化清单」：初始化目标的**唯一真相*
 漏洞就冒一个新的（10-20 到 10-22 连着冒了三次）。这里把并集算出来，做成
 一份**可枚举的数据**，链、核对命令、闸三方共用同一份。
 
-## 清单构成（2026-10-22 实测口径）
+## 清单构成 实测口径）
 
 	出厂表 42 ∪ 默认档 37 = 54
 	  交集 25 项（值逐项一致，无冲突 —— 冲突时以出厂表为准）
@@ -59,7 +59,7 @@ type initItem struct {
 
 // initDeviceItems 设备级项（不在任何参数表里，硬件事实）。
 // 目前只有声道拓扑：本机耳机就是立体声，4/6/8 是驱动默认值作祟。
-// ★ S2 起真源 = model/device-model.toml [[init_device]]（1 项，装载时自校验）。
+// S2 起真源 = model/device-model.toml [[init_device]]（1 项，装载时自校验）。
 var initDeviceItems = func() []initItem {
 	out := make([]initItem, 0, len(modelData.InitDevice))
 	for _, kv := range modelData.InitDevice {

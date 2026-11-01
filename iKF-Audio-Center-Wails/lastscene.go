@@ -2,8 +2,8 @@ package main
 
 // lastscene.go —— 驱动重置后的「自动回到默认场景」+ 设备真值场景识别。
 //
-// 背景（2026-10-20 用户澄清需求）：驱动卸载重装会清空设备侧参数
-// （FxProperties），开机自愈只补 42 项出厂默认；用户期望的恢复行为是
+// 背景 需求）：驱动卸载重装会清空设备侧参数
+// （FxProperties），开机自愈只补 42 项出厂默认；期望的恢复行为是
 // **回到「默认」场景**（干净起点），之后自己决定用哪个场景（点场景卡
 // 随时改，写回路径已实测可靠）。界面「使用中 · X」此前来自前端
 // localStorage（与设备无关、跨重装残留），形成「显示在用、实际被清」
@@ -40,7 +40,7 @@ func missingDefaultCount(d *Driver) int {
 // 全量写回（=「默认」场景的状态；apply 场景文件依赖播种顺序，直接写
 // factoryDefaults 表无文件依赖、幂等）。守护/主程序/--restore-scene 共用。
 // force=true 跳过指纹（排障兜底：指纹窗口被自愈提前跑掉时手动恢复）。
-// 指纹不成立绝不写 —— 保护用户手动调过但没存场景的参数。
+// 指纹不成立绝不写 —— 保护手动调过但没存场景的参数。
 // 返回 (是否触发了写设备, 人读描述)。
 func RestoreDefaultScene(d *Driver, force bool) (bool, string) {
 	if d == nil || !d.ready {
@@ -52,7 +52,7 @@ func RestoreDefaultScene(d *Driver, force bool) (bool, string) {
 			missing, len(factoryDefaults))
 	}
 	/*
-		★ 2026-10-22 第二版：执行体不再「遍历出厂表 + 补一次场景档」，
+		执行体不再「遍历出厂表 + 补一次场景档」，
 		而是**按初始化清单**一次写完。
 
 		清单 = 出厂表 42 ∪ 「默认」档 37 ∪ 设备级 1 = 55 项
@@ -119,8 +119,8 @@ func identifyActiveScene(d *Driver) string {
 }
 
 // profileNamesForIdentify 识别候选（按列表顺序，内置在前）。
-// ★ 不能走 d.Profiles() —— 那里面会调 identifyActiveScene，互相递归
-// （2026-10-20 实测把 /api/profiles 挂死）；这里直接枚举场景文件名。
+// 不能走 d.Profiles —— 那里面会调 identifyActiveScene，互相递归
+//  实测把 /api/profiles 挂死）；这里直接枚举场景文件名。
 func profileNamesForIdentify(d *Driver) []string {
 	seen := map[string]bool{}
 	var names []string
@@ -149,13 +149,13 @@ func profileNamesForIdentify(d *Driver) []string {
 		names = append(names, here...)
 	}
 	/*
-		★ 2026-10-22：多个场景内容相同时，识别必须先判「默认」。
+		多个场景内容相同时，识别必须先判「默认」。
 
 		当时 `音乐.profile` 与 `默认.profile` 逐项完全相同（默认就是古典乐曲线），
 		sort.Strings 按 UTF-8 字节序排，「音」(E9 9F B3) 在「默」(E9 BB 98)
 		之前，于是识别一命中就返回「音乐」，场景墙标成「音乐 · 使用中」。
 
-		★ 同日改判：默认档的 EQ 换成**官方预设 Default 的平直曲线**（全 0），
+		默认档的 EQ 换成**官方预设 Default 的平直曲线**（全 0），
 		音乐仍是古典乐（索引 9）⟹ 两档不再同分，下面的 factoryFirst 只是兜底：
 		用户自己把别的档调得跟默认一模一样时，仍然归到「默认」这个出厂态名字下，
 		而不是随机落到某个名字上。
@@ -181,7 +181,7 @@ func factoryFirst(names []string) []string {
 }
 
 // cleanupLegacyLastApplied 上一轮「恢复上次场景」方案的标记文件已按
-// 2026-10-20 用户拍板废弃 —— 启动时顺手删掉遗留文件。
+// 已废弃 —— 启动时顺手删掉遗留文件。
 func cleanupLegacyLastApplied(d *Driver) {
 	dir := profileWriteDir(d)
 	if dir == "" {

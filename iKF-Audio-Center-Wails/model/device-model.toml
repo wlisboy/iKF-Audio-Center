@@ -5,7 +5,7 @@
 # 改这里 = 两线同步；代码里不再保留字面数据表。
 # 加载失败 / 自校验不过 = 拒绝启动，绝不内置兜底。
 #
-# 分阶段抽取进度（见 docs/device-model-抽取清单.md）—— S1-S5 全部完成（2026-10-23）：
+# 分阶段抽取进度（见 docs/device-model-抽取清单.md）—— S1-S5 全部完成：
 #   S1 ✅ 场景排除 / 内置场景 / 分组别名
 #   S2 ✅ 出厂表 42 + 初始化设备级 1
 #   S3 ✅ 名字表 208 + 可写白名单 80 + 值域
@@ -23,14 +23,14 @@ device = "iKF"
 
 # ---------------------------------------------------------------- 场景
 [scene]
-# 「预设」档 = FactoryDefault.xml；「默认」= 原「原厂默认」（2026-10-20 改名）。
+# 「预设」档 = FactoryDefault.xml；「默认」= 原「原厂默认」（已改名）。
 # 名字必须与 EnsureSeedScenes 播种的文件名一致。
 factory_profile = "预设"
 factory_scene = "默认"
 
 # 内置场景名单：源包自带 + 播种。★ builtin 判定按名字、不按目录：
 # 便携包下用户自建场景与内置档同住 CPL\profile，按目录一刀切会把用户场景
-# 也标成内置（2026-10-19 真机确认过这个坑）。
+# 也标成内置（实测确认过这个坑）。
 builtin = ["默认", "音乐", "电影", "UserDefine", "UserDefineFormwork", "HiFi"]
 
 # 设备级状态：个人听音 / 硬件事实，进场景会被系统回滚或触发端点重建。
@@ -45,7 +45,7 @@ exclude = [
     "Speaker_Channel_Setting",  # 设备级声道拓扑，设备页自选
 ]
 
-# APO 未实现 / 未验证生效的家族：不进场景（2026-10-19 用户拍板）。
+# APO 未实现 / 未验证生效的家族：不进场景。
 unproven = [
     # SS 虚拟环绕家族（总开关 + 8 方位角 + 8 距离）
     "Enable_SS_LFX",
@@ -592,7 +592,7 @@ notes = "render=扬声器静音 / capture=麦克风静音"
 ep = "render"
 name = "GFSControl"
 t = "bool"
-notes = "GFS 开关（HKCU/.../Hook/EnableGFS 读写接口；2026-10-22 恢复登记）"
+notes = "GFS 开关（HKCU/.../Hook/EnableGFS 读写接口）"
 
 [[writable]]
 ep = "render"
@@ -736,7 +736,7 @@ notes = "0=大 1=中 2=小（Tag 反序）"
 ep = "render"
 name = "Enable_SURRSENS_LFX"
 t = "bool"
-notes = "Xear Surround Max 开关（第 48 轮更正：非 SURRMAX_FOR_HPSPK）"
+notes = "Xear Surround Max 开关（绑定的是 Enable_SURRMAX，非 SURRMAX_FOR_HPSPK）"
 
 [[writable]]
 ep = "render"
@@ -897,19 +897,19 @@ notes = "采样率，只接受 44100/48000（其余 0x10003）"
 ep = "capture"
 name = "Enable_AEC_LFX"
 t = "bool"
-notes = "回音消除（apoMicInAEC，第 62 轮）"
+notes = "回音消除（apoMicInAEC）"
 
 [[writable]]
 ep = "capture"
 name = "Enable_ENC_LFX"
 t = "bool"
-notes = "通话降噪（apoMicInENC，第 62 轮）"
+notes = "通话降噪（apoMicInENC）"
 
 [[writable]]
 ep = "capture"
 name = "Enable_MICARRAY_LFX"
 t = "bool"
-notes = "麦克风收音（apoMicInBeamForming，第 62 轮）"
+notes = "麦克风收音（apoMicInBeamForming）"
 
 [[writable]]
 ep = "render"

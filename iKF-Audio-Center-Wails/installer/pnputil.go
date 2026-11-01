@@ -244,7 +244,7 @@ func probeOldPanel() string {
 }
 
 // oldPanelNote 旧版还在时给一句安全顺序提示；没检测到返回空串。
-// 2026-10-19 精简：新框架直接抛弃官方旧面板，这里只留必须知道的一句 ——
+// 精简：新框架直接抛弃官方旧面板，这里只留必须知道的一句 ——
 // 旧卸载器会按文件名删驱动文件，顺序错了耳机静音（P3 取证结论不变）。
 func (s *drvState) oldPanelNote() string {
 	if s.oldPanel == "" {
@@ -286,8 +286,8 @@ func (s *drvState) install() (string, bool) {
 		// 命令报成功但驱动库里没有 —— 不能算成功
 		return "命令已执行，但系统驱动库里仍找不到该驱动包。\n\n" + tail(out, 700), false
 	}
-	// 2026-10-20（用户定稿）：完成弹窗只说结果，pnputil 原始输出留在日志
-	// （note() 已落盘），失败弹窗才带技术细节。行尾不带句号。
+	// 完成弹窗只说结果，pnputil 原始输出留在日志
+	// （note 已落盘），失败弹窗才带技术细节。行尾不带句号。
 	return "驱动组件已安装完成" + rebootNote(code), true
 }
 
@@ -323,7 +323,7 @@ func (s *drvState) uninstall() (string, bool) {
 		// 失败才逐项带细节；成功弹窗只说结果
 		return strings.Join(lines, "\n") + rebootNote(reboot), false
 	}
-	// 2026-10-20（用户定稿）：卸载完成固定建议重启电脑（不再依赖 pnputil
+	// 卸载完成固定建议重启电脑（不再依赖 pnputil
 	// 是否回报了 reboot required）。
 	return "驱动组件已卸载完成，建议重启电脑", true
 }

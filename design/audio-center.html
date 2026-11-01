@@ -33,7 +33,7 @@
   /* 律动空间页的通高侧栏底色。半透明的 --glass 在那一页不合适：
      舞台颜色由配色决定，可能是浅色，而侧栏文字按明暗主题取色。 */
   --railbg:#151518;
-  /* 第 59 轮：面板底部渐隐的收口色（贴着玻璃面板的观感取色），
+  /* 面板底部渐隐的收口色（贴着玻璃面板的观感取色），
      与从属控件左侧色条的颜色（--accent-soft 太淡，单用的 2px 竖线看不清）。 */
   --fade:rgba(24,24,28,.95); --subbar:rgba(230,0,18,.38);
 }
@@ -56,7 +56,7 @@
 ::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:9px}
 ::-webkit-scrollbar-thumb:hover{background:var(--t3)}
 /* 右下卡片：保留滚轮 / 触控板 / 键盘的滚动能力，只把滚动条视觉去掉。
-   面板限高后会内部滚动（内容最高的是麦克风页 —— 第 31 轮实测 1366×768 下
+   面板限高后会内部滚动（内容最高的是麦克风页 —— 实测 1366×768 下
    743px / 可视仅 377px），9px 滚动条会把 420px 的内容区再压窄 9px，
    且浅色主题下 thumb 明显抢视线。
    作用域限定在 .panel 及其内部滚动容器（参数表），不影响其它区域。 */
@@ -92,7 +92,7 @@ body{
    元素铺满窗口，内部图形按 16:10 等比缩放并居中，空白处透明，
    于是画面比例永不走形，而两侧也不会再留边。 */
 #stage{position:absolute;inset:0;width:100%;height:100%;z-index:1;
-  /* ★ 2026-10-31 e2e 实测修复：SVG 默认 visiblePainted 命中 —— 画了形状的
+  /* e2e 实测修复：SVG 默认 visiblePainted 命中 —— 画了形状的
      地方（径向光斑等装饰）会拦截 pointer 事件，恰好压在面板控件上时
      （如声音页「耳机环绕」开关、均衡页部分预设芯片）真实鼠标点击被
      svg#stage 吃掉，控件点不动。装饰层整体关掉命中，交互节点白名单恢复。 */
@@ -103,7 +103,7 @@ body{
 #stage .spk:active{cursor:grabbing}
 #stage .ringhit{fill:none;stroke:transparent;stroke-width:34;cursor:ns-resize}
 #stage .eqnode{cursor:ns-resize}
-/* ★ 2026-10-19 静态闪烁修复：中央脉冲环改 CSS 呼吸动画。
+/* 静态闪烁修复：中央脉冲环改 CSS 呼吸动画。
    原实现每 110ms 用 Math.random() 改半径与透明度（9 次/秒随机跳变），
    且整张 SVG 每帧 innerHTML 重建 —— 静态下页面闪烁的根因。
    现在声音页静态零重绘，呼吸交给合成器跑的 CSS 动画。 */
@@ -123,7 +123,7 @@ body{
   padding-left:11px;border-left:1px solid var(--line)}
 .brand em{font-style:normal;font-size:10px;color:var(--t3);opacity:.75;
   letter-spacing:.6px;
-  /* 2026-10-20：作者名可点击（跳抖音主页）。.brand 整体 pointer-events:none
+  /* 作者名可点击（跳抖音主页）。.brand 整体 pointer-events:none
      （画布避让），署名单独恢复交互；悬停提亮给「可点」暗示。 */
   pointer-events:auto;cursor:pointer;transition:color .15s}
 .brand em:hover{color:var(--t1);opacity:1}
@@ -143,7 +143,7 @@ body{
 .devpill span{color:var(--t3)}
 
 /* ---------- 右上：大字号读数区 ---------- */
-/* top 走变量：空间实在不够时 layoutHud() 会把它从 96px 抬到 72px
+/* top 走变量：空间实在不够时 layoutHud 会把它从 96px 抬到 72px
    （再高就撞上右上角的设备状态胶囊，它底边在 60px），
    用 24px 的位移换一档字号，免得在最小窗口下把读数压成 10px。 */
 .hud{position:absolute;z-index:3;top:var(--hud-top,96px);right:28px;width:330px;
@@ -231,7 +231,7 @@ body{
    而 CSS 的 max-height 是静态的、不知道 HUD 抬没抬。
    按 96 预留的话那 24px 白扔，1366×768 下最下面那几组控件
    就被推到折叠线以下了。★ 具体数字随页面内容变，别在注释里写死：
-   第 31 轮实测（1366×768，面板可视 377px）麦克风页 743px、
+   实测（1366×768，面板可视 377px）麦克风页 743px、
    声音页 697px、设备页 599px，靠面板内部滚动兜住。
    （复现：`.workbuddy-ai/tmp/final29.py` 的「面板高度」段。）
    面板上限 210px 顶边 − HUD 最小底边 185px = 25px，仍留够视觉间隙。
@@ -245,23 +245,23 @@ body{
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .pgroup{display:none}
 .pgroup.on{display:block}
-/* 第 59 轮：节头从一行孤零零的小字升级为「标签 + 右侧延伸细线」的小节头，
+/* 节头从一行孤零零的小字升级为「标签 + 右侧延伸细线」的小节头，
    分组边界一眼可辨。段间距统一由 :not(:first-child) 给出（18px），
    各 .ptitle 上的内联 margin-top 已删，别再加回去 —— 否则节奏又散了。 */
 .ptitle{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--t3);
   letter-spacing:.6px;margin-bottom:12px}
 .ptitle::after{content:"";flex:1;height:1px;background:var(--line)}
 .pgroup .ptitle:not(:first-child){margin-top:18px}
-/* ★ 2026-10-18：dev 页节头改紧凑单行隔离线（用户要求）——隐标签文字、
+/* dev 页节头改紧凑单行隔离线——隐标签文字、
    留白 18/12 收到 12/10，只留一条 ::after 细线。 */
 #pg-dev .ptitle{font-size:0;margin:12px 0}
-/* ★ 节头紧邻的行去底线——分隔由节头的 ::after 细线单独承担，
+/* 节头紧邻的行去底线——分隔由节头的 ::after 细线单独承担，
    否则行底线 + 节头线构成 12px 双线。 */
 #pg-dev .row:has(+ .ptitle){border-bottom:0;padding-bottom:2px}
-/* ★ eq 页同款：均衡开关行底线 + 「预设」节头线构成双行——节头紧邻行
+/* eq 页同款：均衡开关行底线 + 「预设」节头线构成双行——节头紧邻行
    去底线，分隔由节头细线单独承担。 */
 #pg-eq .row:has(+ .ptitle){border-bottom:0;padding-bottom:2px}
-/* ★ eq 页同款：均衡开关行底线 + 「预设」节头线构成双行——节头紧邻行
+/* eq 页同款：均衡开关行底线 + 「预设」节头线构成双行——节头紧邻行
    去底线，分隔由节头细线单独承担。 */
 #pg-eq .row:has(+ .ptitle){border-bottom:0;padding-bottom:2px}
 
@@ -368,7 +368,7 @@ html[data-viz="1"][data-vizstage="dark"] .thm{
   --t1:#F5F5F7; --t2:rgba(245,245,247,.58); --t3:rgba(245,245,247,.42);
   --line:rgba(255,255,255,.09); --glass:rgba(255,255,255,.062);
   --glass2:rgba(255,255,255,.10)}
-/* ★ 光改 --t1 不够：`var()` 是在**声明该属性的那条规则所命中的元素**上解析的。
+/* 光改 --t1 不够：`var` 是在**声明该属性的那条规则所命中的元素**上解析的。
      .head h1 与 .brand .logo 自己都没有 color 声明（h1 靠继承、logo 用
      background:currentColor），继承到的是 .frame 上已经算完的 var(--t1)
      —— 在 .head / .brand 上重定义 --t1 对它们毫无影响。所以这两条要给
@@ -389,9 +389,9 @@ html[data-viz="1"][data-vizstage="light"] .thm{
   --glass2:rgba(255,255,255,.72)}
 html[data-viz="1"][data-vizstage="light"] .brand,
 html[data-viz="1"][data-vizstage="light"] .head{color:var(--t1)}
-/* ---------- 律动空间：进页面时的操作提示（第 28 轮新增） ----------
+/* ---------- 律动空间：进页面时的操作提示（新增） ----------
    原先这串提示挂在标题副标上（「拖拽转视角 · 滚轮缩放 · 双击复位 ·
-   点击生成涟漪」），把副标写成了说明书。用户要求副标只回答「这一页是干什么的」，
+   点击生成涟漪」），把副标写成了说明书。副标只回答「这一页是干什么的」，
    所以从副标里拿掉了 —— 但不能直接删：这一页的交互在界面上一个字都没有，
    双击复位尤其致命（转晕了只能重开页面；整页唯一能救回来的操作却没人知道）。
    改成一个进来就浮出来、5 秒后自己淡出、一动手立刻消失的浮层：
@@ -423,7 +423,7 @@ html[data-viz="1"][data-vizstage="light"] .vhint{
      解析的，所以在这里重定义它用到的变量即可。
    这是设计稿里唯一一处为桥接层元素写的样式；改这个 id 时必须同步改 build_center.py。
 
-   第 26 轮：这里原先还有一份给「左下角连接状态徽章 #__live」的同款规则，
+   这里原有一份给「左下角连接状态徽章 #__live」的同款规则，
    那个浮层已经并进右上角设备胶囊（#devState 在 .devpill 内部，本来就吃
    上面那套前景变量），两条规则随之删除 —— 留着就是死代码。 */
 html[data-viz="1"][data-vizstage="dark"] #__toast{
@@ -433,8 +433,8 @@ html[data-viz="1"][data-vizstage="light"] #__toast{
   --t1:#14161A; --t3:rgba(20,22,26,.46);
   --line:rgba(0,0,0,.10); --glass2:rgba(255,255,255,.72)}
 
-/* ★ 2026-10-20 晚：录音灵动岛（#recIsland）。三态 data-state=idle|rec|saved；
-   ★ 23:05 用户拍板从底部挪**顶部偏右**：top:26 与设备胶囊同行、right:200
+/* 晚：录音灵动岛（#recIsland）。三态 data-state=idle|rec|saved；
+   ★ 23:05 用户位置定在**顶部偏右**：top:26 与设备胶囊同行、right:200
    让开胶囊（约 150px 宽）——底部被右侧面板和托盘挤满，saved 卡片会盖住
    「环绕类型」等行。隐藏态 pointer-events:none + 上浮淡出（从顶部落下），
    出现/收起走同一条 transition。颜色全走主题变量（__toast 教训）。 */
@@ -520,7 +520,7 @@ html[data-viz="1"][data-vizstage="light"] #__toast{
    控制面板）全都锚在窗口边缘上，正好压在地形上。实测：
      · 面板 420×467 固定右下，横向吃掉 34% 的地形，且不接受指针穿透 ——
        想转过去看的那半圈，正好在面板底下转不动；
-     · 面板内容当时 502px（第 31 轮复测已降到 410px），而 max-height 只给
+     · 面板内容当时 502px（复测已降到 410px），而 max-height 只给
        calc(100vh - 238px)。
        1080×674 实测被裁 163px，「起伏速度 / 振幅 / 配色 / 署名」全部掉到
        折叠线以下；滚动条又被全局隐藏（见 .panel::-webkit-scrollbar），
@@ -536,14 +536,14 @@ html[data-viz="1"][data-vizstage="light"] #__toast{
 html[data-viz="1"] .rail{
   display:flex;flex-direction:column;
   position:absolute;z-index:4;top:0;right:0;bottom:0;width:380px;
-  /* ★ 底色必须是与舞台无关的实色。原来用 var(--glass)（半透明）——
+  /* 底色必须是与舞台无关的实色。原来用 var(--glass)（半透明）——
      舞台颜色现在跟着**配色**走，换一套浅底配色（Glacier Day #D8E6EA）之后
      侧栏下面会变成浅色，而侧栏文字仍按**明暗主题**取色，深色主题下就成了
      浅字压浅底。--railbg 只跟明暗主题走。 */
   background:var(--railbg);border-left:1px solid var(--line);
   animation:slid .5s var(--ease)}
 @keyframes slid{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
-/* ★ 宽度必须写成 calc(100% - 380px)，不能写 width:auto。
+/* 宽度必须写成 calc(100% - 380px)，不能写 width:auto。
    canvas 是**替换元素**，width:auto 会退回它的内在尺寸 —— 也就是 resize()
    写进去的 width 属性（绘制缓冲，单位是设备像素）。于是形成自反馈：
    缓冲宽 → CSS 宽 → 下一帧再按 clientWidth 写回缓冲宽，实测一路涨到 1410px
@@ -587,7 +587,7 @@ html[data-viz="1"] .panel{
   margin-top:15px;border:0;border-top:1px solid var(--line);border-radius:0;
   background:none;backdrop-filter:none;-webkit-backdrop-filter:none;
   padding:12px 24px 10px;animation:none;overflow:visible}
-/* 读数区与面板现在是同一条竖列的上下邻居，不可能重叠，layoutHud() 的
+/* 读数区与面板现在是同一条竖列的上下邻居，不可能重叠，layoutHud 的
    分档缩字号在这页没有意义，一律压平 —— 否则 fitHud 一旦判定失败，
    46px 会被降到 44 甚至 30px，8 段电平条还会被整条隐藏。
    尺寸统一取「紧凑档」再往下一档：这一列的高度是硬约束（见下面参数区的注释），
@@ -612,7 +612,7 @@ html[data-viz="1"] .hud.tiny .r{padding:2px 0;font-size:11.5px}
 html[data-viz="1"] .hud{text-align:left}
 html[data-viz="1"] .hud .r{grid-template-columns:1fr 88px}
 html[data-viz="1"] .hud .r b{text-align:right}
-/* 第 25 轮：两行读数（节拍触发 / 渲染帧率）并成一行的左右两半。
+/* 两行读数（节拍触发 / 渲染帧率）并成一行的左右两半。
    原来各占一行、行高 18px + 行距 10px，两行吃掉 46px；并成一行只剩 18px。
    侧栏总高是硬约束（默认窗口 1280×800 / 视口 705px），这里是最大的一块
    可回收空间 —— 参数区（画面 / EQ / 配色 / 致谢）比这两根数字更需要高度。 */
@@ -646,10 +646,10 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
 #pg-vis .slider > span:first-child{flex:0 0 52px;font-size:11.5px;
   color:var(--t2);white-space:nowrap}
 /* ---------- 配色：8 列 × 2 行色板网格 ----------
-   第 24 轮：原先是**单行横向滚动**（19 颗 × 34px = 638px 硬塞进 331px），
+   原先是**单行横向滚动**（19 颗 × 34px = 638px 硬塞进 331px），
    只有前 9 颗看得见，滚动条又被 scrollbar-width:none 隐掉 —— 没有滚动提示
    等于另外 9 套配色不存在。配色从 4 套扩到 17 套之后才暴露这个问题。
-   第 25 轮：用户定死「8 个一行、共两行、色板大一些」，于是内置配色收成 16 套。
+   配色「8 个一行、共两行、色板大一些」，于是内置配色收成 16 套。
    固定 repeat(8,1fr) 而不是 auto-fill —— auto-fill 的列数是内容宽度算出来的，
    不同窗口宽下会变成 9 列 / 11 列，与「8 个一行」的排布意图不符。
    331px 内容宽下每颗 = (331 − 7×8) / 8 ≈ 34px，比原来的 26px 大 32%。
@@ -662,8 +662,8 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
 .vsw-btn:hover{transform:scale(1.09)}
 /* 选中环用 box-shadow 画在按钮外面，不改变尺寸 —— 用 border 会让整排跳动 */
 .vsw-btn.on{box-shadow:0 0 0 2px var(--railbg),0 0 0 3.5px var(--accent)}
-/* ---------- 色板拖拽换位（第 26 轮） ----------
-   第 26 轮起配色顺序可以拖：按住一枚拖到别处就换位，顺序存本机。
+/* ---------- 色板拖拽换位 ----------
+   配色顺序可以拖：按住一枚拖到别处就换位，顺序存本机。
    为什么自己写而不用 HTML5 draggable（见脚本里的 swDrag 注释）：
    draggable 的拖影是浏览器生成的位图，样式不可控，而且它会把「点击选中」
    和「拖拽换位」拆成两套事件，凭同一个位移阈值二分更干净。 */
@@ -672,7 +672,7 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
 .vsw-btn.drop-on{transform:scale(1.16);
   box-shadow:0 0 0 2px var(--railbg),0 0 0 3.5px var(--accent)}
 .vsw-grid.dragging{cursor:grabbing}
-/* 跟着指针走的那一枚。★ pointer-events:none 是必须的 —— 否则
+/* 跟着指针走的那一枚。pointer-events:none 是必须的 —— 否则
    elementFromPoint 永远命中它自己，落点永远算不出来。 */
 .vsw-ghost{position:fixed;z-index:99;pointer-events:none;border-radius:50%;
   border:1px solid var(--line);opacity:.94;
@@ -684,7 +684,7 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
   color:var(--t3);cursor:pointer;padding:0;border-bottom:1px solid var(--line)}
 .vsw-cap button:hover{color:var(--accent);border-bottom-color:var(--accent)}
 /* ---------- 致谢 ----------
-   第 25 轮：只留用户指定的两行 —— 上一轮多加的「特此感谢原作者的开源贡献」
+   只保留两行 —— 早先多加的「特此感谢原作者的开源贡献」
    与许可声明都被要求删掉，正文严格按给定文案。
    `sonic-topography` 用 .u 走等宽体，与 Markdown 里的反引号语义一致。
    ★ 两个链接必须 target="_blank"：WebView2 里同窗打开会把整个应用导航走（白屏）。 */
@@ -705,7 +705,7 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
    ★ 弹层箱的居中基准要减掉半个侧栏宽（left:50% - 190px），否则视觉上
      偏右 190px。
 
-   ★★ 第 28 轮重排。用户的评价是「有些乱」，参照物是 Photoshop：
+   ★★ 重排。评价是「有些乱」，参照物是 Photoshop：
      「功能复杂但规范」。回看旧版乱在哪：
        1. 一列到底。列表 / 取色器 / 说明 / 三个按钮 / 自动轮换竖着排成
           六大段，段与段之间只有一条 1px 细线和一行小字分隔，层级靠间距
@@ -772,7 +772,7 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
      11.5px 下约 46px，加上色点 14 + 间距 7 + 内边距 16 ≈ 83px，
      两列并排要 166px，190px 留了点余量。
 
-   ★★ 第 28 轮追加修补（这里原本是 display:flex + flex-wrap）：
+   ★★ 追加修补（这里原本是 display:flex + flex-wrap）：
        实测 960×600 下 .vm-body 被上方 max-height 压到 217px，
        但 flex 单行的行高取「子项内容高度的最大值」（292px），
        子项**不跟着收缩**，于是 .vm-main 里的 .vm-note 溢出到 .vm-foot 上，
@@ -814,7 +814,7 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
 .vm-prev{height:38px;border-radius:11px;border:1px solid var(--line);
   margin-bottom:12px;background:var(--ghost)}
 
-/* 字段区：两列，标签列固定 46px。★ 固定宽度是这一轮对齐的关键 ——
+/* 字段区：两列，标签列固定 46px。固定宽度是这一轮对齐的关键 ——
    旧版用 flex 让每个格子自己算，结果右边界参差。
    ★ 两列不等宽（1 : 1.4）而不是 1 : 1：三行配对是
        底色 | 雾色      两个都只有「标签 + 色块」，窄列绰绰有余
@@ -874,15 +874,14 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
    而面板里要放下 画面 / 频段 / 配色 / 致谢 四块。
    这里的每一个数字都是量出来的，不是估的；改它必须重跑
    .workbuddy-ai/tmp/probe2.py（量每个块的高度 + rail.scrollHeight 与 clientHeight 之差）。
-   ★ 第 26 轮复测（默认窗口 1280×800，视口 1264×705）：
+   ★ 复测（默认窗口 1280×800，视口 1264×705）：
        devpill 33 / vsrc 51 / hud 117 / panel 411 —— **侧栏溢出 0**，
        内容底 667，视口底 705，余量 38px。
      #pg-vis 子块：ptitle17 slider18×3 ptitle17 vizEq63 ptitle17 vizTheme80
                    vsw-cap17 vcredit53
-     第 26 轮只动了文案与交互（读数区标签去掉「· 系统回环」、色板小标题
+     只动了文案与交互（读数区标签去掉「· 系统回环」、色板小标题
      由「地面 EQ · 频段驱动」改为「频段」、色板说明行多一个「拖动排序」、
-     色板顺序由 ΔE 重排），**这些都不改高度** —— 上表两个数字与第 25 轮
-     的差异来自当轮末次微调后的复量，不是本轮引入的。
+     色板顺序由 ΔE 重排），**这些都不改高度** —— 上表两个数字与的差异来自当轮末次微调后的复量，不是本轮引入的。
    ★ 这一轮为了「不留滚动条」把上半部分压得很狠（总共回收 96px）：
        · 音源块 81→51：标签并进名字行、状态并进进度条行（原各占一行）
        · 读数区 154→117：42px 大数字收到 34px；两行读数并成一行左右两半
@@ -894,7 +893,7 @@ html[data-viz="1"] .hud .bandrow .bar{flex:1;min-width:0;margin-top:0}
 #pg-vis .slider{margin-top:7px}
 #pg-vis .veq .r{padding:0}
 /* —— 侧栏滚动：滚的是**整条侧栏**，不是面板那一截 ——
-   第 25 轮用户指出「上下部分是一个整体」，只在下半截出现滚动条很突兀。
+   「上下部分是一个整体」，只在下半截出现滚动条很突兀。
    原先的方案是让 .panel 自己滚（overflow-y:auto + 一条 6px 细滚动条），
    于是设备行 / 音源 / 读数区钉死不动、只有参数区在滚 —— 视觉上侧栏
    被切成两段，滚动条那根竖线的起点也正好落在中缝上。
@@ -944,7 +943,7 @@ html[data-viz="1"] .rail::-webkit-scrollbar{width:0;height:0;display:none}
 .btn:disabled{opacity:.42;cursor:default}
 .btn:disabled:hover{border-color:var(--line)}
 
-/* ★ 第 53 轮（I 档）：官方「前置条件不满足」的提示条。
+/* （I 档）：官方「前置条件不满足」的提示条。
    对应原面板 Skin/FaceLift/apoSpeakerDolbyHPVS.cml 尾部的
      <Canvas Name="WarningContent" Visibility="Hidden">
        <Button Name="ChannelsSetting" Text="ml_SpeakerDolbyHPVS_ChannelsSetting"/>
@@ -966,7 +965,7 @@ html[data-viz="1"] .rail::-webkit-scrollbar{width:0;height:0;display:none}
 .pfoot{margin-top:11px;font-size:10.5px;color:var(--t3);line-height:1.5;word-break:break-all}
 
 /* ============================================================
-   第 58 轮 · 交付前视觉精修（只动呈现层，不改任何布局口径）
+   · 交付前视觉精修（只动呈现层，不改任何布局口径）
    ------------------------------------------------------------
    约束：本文件大量数字被 diag_panel.js / probe2.py 等验收脚本量过
    （面板内距、行高、侧栏分档），这一轮刻意**不改任何影响布局的
@@ -1027,7 +1026,7 @@ select{box-shadow:0 2px 8px -4px rgba(0,0,0,.28)}
 .head.swap{animation:headswap .38s var(--ease)}
 @keyframes headswap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-/* ---------- 开发者模式（第 58 轮） ----------
+/* ---------- 开发者模式 ----------
    「参数」页面向调试/取证（195 个驱动参数、PropertyControl 字样），
    交付版默认从 dock 收起：html.devmode 才显示。入口（见 JS）：
      · 左上角 logo 2 秒内连点 5 次；
@@ -1040,7 +1039,7 @@ html.devmode .dock button[data-dev]{display:flex}
 .brand .logo{pointer-events:auto;cursor:pointer}
 
 /* ============================================================
-   第 59 轮 · 右下卡片（.panel）功能摆放精修
+   · 右下卡片（.panel）功能摆放精修
    ------------------------------------------------------------
    三件事 + 一个联动：
    ① 分组节头（见上面 .ptitle 的改注）；
@@ -1049,8 +1048,8 @@ html.devmode .dock button[data-dev]{display:flex}
       环绕族下拉/滑杆）缩进 + 左侧红色细条，跟上面的开关成对可读。
       静态行在设计稿加 .ctl-sub，动态行由 addSpaceSlider/addSpaceSelect
       加同一个类，两条线口径一致；
-   ③ 底部渐隐：面板内容可滚时，底部 12px 渐隐提示「下面还有」（2026-10-20
-      用户拍板从 24px 减半——滚动条隐藏后它是「下面还有」的唯一线索，
+   ③ 底部渐隐：面板内容可滚时，底部 12px 渐隐提示「下面还有」（
+      用户从 24px 减半——滚动条隐藏后它是「下面还有」的唯一线索，
       保留但别盖住末行内容）——
       .panel.scrolled 才显示，滚到底自动隐藏（JS 见 dock 监听器后那段）；
    ④ 开关联动降暗：开关关着时从属控件整体降不透明度（.grp-dim），
@@ -1071,7 +1070,7 @@ html.devmode .dock button[data-dev]{display:flex}
   opacity:0;transition:opacity .3s var(--ease)}
 .panel.scrolled::after{opacity:1}
 
-/* ★ 2026-10-17 声音页节头改版（变体 2，用户拍板），19:10 推广到全部页面：
+/* 声音页节头改版（变体 2），19:10 推广到全部页面：
    节头文字隐去、原位置只留一条细分隔线 —— 少一层文字噪声，保留分组节奏。
    各页首个节头（预设/麦克风/设备/画面/当前状态/参数/输出）是页标题的
    重复，作为首元素直接隐藏；中间节头（自定义 EQ 方案/驱动组件/声道配置/
@@ -1084,7 +1083,7 @@ html.devmode .dock button[data-dev]{display:flex}
 .pgroup > .ptitle:first-child{display:none}
 #pg-space > .dials{margin-bottom:4px}
 
-/* ★ 2026-10-18 虚拟环绕摆位工具条（桥接层 addSpaceVssEditor 注入）：
+/* 虚拟环绕摆位工具条（桥接层 addSpaceVssEditor 注入）：
    「旋转 | 平移」分段胶囊 + 逆时钟/顺时钟/重置三颗图标圆钮。
    替代旧版「两个 chip + 一排文字按钮」。id 由桥接层依赖，样式在这里。 */
 .vss-tools{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -1104,15 +1103,15 @@ html.devmode .dock button[data-dev]{display:flex}
 .ibtn svg{width:14px;height:14px;fill:none;stroke:currentColor;
   stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
-/* ★ 2026-10-18 EQ 面板重设计：宽松化 + 十段竖推子 + 自定义方案次卡
+/* EQ 面板重设计：宽松化 + 十段竖推子 + 自定义方案次卡
    + 面板加高（曲线在窗口左侧，面板向下延伸不遮挡）。
    ★ 加高幅度以 hud 底边为限：205 曾让卡片顶(177)越过读数区底(180) 3px，
      212 → 卡片顶 184，留 4px 呼吸缝。 */
 .panel:has(#pg-eq.on){max-height:calc(100vh - 212px)}
-/* ★ 设备页读数区较高（驱动状态三行文本），与卡片顶仅 2px 余量——
+/* 设备页读数区较高（驱动状态三行文本），与卡片顶仅 2px 余量——
    预留到 6px，防止字体渲染差异导致贴边。 */
 .panel:has(#pg-dev.on){max-height:calc(100vh - 242px)}
-/* ★ dev 页末行（录音机）底线与卡片底边只隔 12px，读作双线——去行底线，
+/* dev 页末行（录音机）底线与卡片底边只隔 12px，读作双线——去行底线，
    由卡片底边单独收口。作用域限定 pg-dev，不影响其它页（彼处末行下还有
    从属滑杆，需要那条线）。 */
 
@@ -1146,22 +1145,22 @@ html.devmode .dock button[data-dev]{display:flex}
   <!-- 浅色主题下给地形垫的深色「舞台」，只在 html[data-theme=light][data-viz=1] 下显示 -->
   <div class="vizplate"></div>
   <!-- 律动空间的操作提示：进来浮出、5 秒淡出、一动手就消失（见 .vhint 的注释）。
-       第 28 轮从标题副标里搬出来的 —— 副标改成功能说明，这串交互提示没地方放。 -->
+       从标题副标里搬出来的 —— 副标改成功能说明，这串交互提示没地方放。 -->
   <div class="vhint" id="vizHint">拖拽转视角 · 滚轮缩放 · 双击复位 · 点击生成涟漪</div>
 
   <div class="brand">
     <span class="logo"></span>
     <i>AUDIO CENTER</i>
-    <!-- 作者署名（2026-10-20 用户要求）：与副标同字号但更低调（透明度 .75、
+    <!-- 作者署名：与副标同字号但更低调（透明度 .75、
          字距略小），视觉上是一行小字的两段，不抢产品身份。 -->
     <em id="brandAuthor" title="打开抖音主页">by iKF Audio Center</em>
   </div>
 
   <div class="head">
-    <!-- ★ 第 31 轮定名：声场 → 声音 / 均衡 → 均衡器 / 全部参数 → 参数。
+    <!-- 定名：声场 → 声音 / 均衡 → 均衡器 / 全部参数 → 参数。
          三页都是「用户会拿它找什么」而不是「我们内部怎么叫」：
          「声场」在音响语境里专指音箱布局，盖不住这一页的输出 + 听音环境 +
-         四组音效（第 30 轮从均衡页搬来），改用更上位的「声音」；
+         四组音效（从均衡页搬来），改用更上位的「声音」；
          「均衡」补成「均衡器」，与「设备 / 参数 / 声音」这套双三字名一致。
          副标也跟着走 —— 名字只剩「声音」以后，「音效」那半得由副标交代，
          所以是「音量、音效与音箱方位」。 -->
@@ -1189,7 +1188,7 @@ html.devmode .dock button[data-dev]{display:flex}
     <button data-s="dev" title="设备">
       <svg viewBox="0 0 24 24"><path d="M4.4 14.6v-2.8a7.6 7.6 0 0 1 15.2 0v2.8"/><rect x="2.2" y="13.4" width="4.4" height="6.4" rx="2.2"/><rect x="17.4" y="13.4" width="4.4" height="6.4" rx="2.2"/></svg>
     </button>
-    <!-- 第 58 轮：参数页收进开发者模式 —— 默认 display:none（见 CSS
+    <!-- 参数页收进开发者模式 —— 默认 display:none（见 CSS
          .dock button[data-dev]），logo 连点 5 次或 Ctrl+Alt+P 显隐。
          DOM 与 #pg-api 绑定原样保留。 -->
     <button data-s="api" data-dev title="参数">
@@ -1214,7 +1213,7 @@ html.devmode .dock button[data-dev]{display:flex}
   <!-- 设备状态胶囊。
        非律动空间页：右上角一枚玻璃胶囊（见 .devpill 的基础规则）；
        律动空间页：变成侧栏第一行（见 html[data-viz="1"] .devpill）。
-       ★ 状态文字动态写（第 26 轮）：原来驱动连接状态是**左下角另一个浮层**
+       ★ 状态文字动态写（）：原来驱动连接状态是**左下角另一个浮层**
          （#__live，由运行时的 badge() 注入），胶囊这边写死的「已连接」——
          同一件事说两遍，而且左下角那个位置夹在 dock 与主题切换之间很孤立。
          现在 badge() 直接改 #devState，连不上 / 连接中 / 异常都在这里显示，
@@ -1222,7 +1221,7 @@ html.devmode .dock button[data-dev]{display:flex}
   <div class="devpill"><i></i><b id="devName">iKF-V11</b><span id="devState">已连接</span></div>
 
   <!-- 音源块：与上面的设备行合成同一张卡（这一页的「设备」就是「音源」，
-     所以两者之间不画分隔线）。第 23 轮从面板里提到这里 —— 它是整页唯一的
+     所以两者之间不画分隔线）。从面板里提到这里 —— 它是整页唯一的
      状态入口（开始/停止 + 实时电平），原来压在参数区最下面，等于把主开关藏起来。
 
      音源只有一条路 —— 后端 WASAPI 回环，启动时自动锁定耳机端点（每个输出
@@ -1232,7 +1231,7 @@ html.devmode .dock button[data-dev]{display:flex}
      按钮，做兜底不常驻。端点名 / 采样率 / 声道由 applySourceText() 写进
      #vizName / #vizState。 -->
   <div class="vsrc">
-    <!-- 第 25 轮：从 4 行压到 2 行。
+    <!-- 从 4 行压到 2 行。
          原来「音源」独占一行小标签、「待机」再独占一行，两块小字各自
          吃掉 20px 上下间距。现在标签并进名字那一行、状态并进进度条那一行，
          省下约 30px —— 侧栏总高是硬约束（默认窗口 1280×800 视口只有 705px），
@@ -1263,7 +1262,7 @@ html.devmode .dock button[data-dev]{display:flex}
           <svg viewBox="0 0 100 100"><circle class="dring" cx="50" cy="50" r="41"/><circle class="dval" cx="50" cy="50" r="41"/></svg>
           <div class="dnum">78</div><div class="dlab">音量</div>
         </div>
-        <!-- ★ 2026-10-22（用户拍板「吸附到驱动档位」）：这两个旋钮的
+        <!-- （「吸附到驱动档位」）：这两个旋钮的
              data-tiers 是**驱动能分出的档数**，不是界面随便定的 ——
                动态低音 BM_Slider_BassLevel 0..10 ⟹ 10 档（11 个位置，步长 10）
                语音清晰 VOICECLARITY_LEVEL 0..6  ⟹ 6 档（7 个位置，步长约 16.7）
@@ -1286,11 +1285,11 @@ html.devmode .dock button[data-dev]{display:flex}
         <button class="sw" data-p="MuteControl" data-label="耳机静音"></button>
       </div>
 
-      <!-- ★ 2026-10-20 晚（用户拍板）：「耳机录音」—— 录耳机里正在播放的
+      <!-- 晚：「耳机录音」—— 录耳机里正在播放的
            声音（渲染端点 WASAPI loopback 采集），写 16bit 立体声 WAV 到
            「音乐\iKF Audio Center\」。原麦克风页「录音机」（录麦克风）废弃
            移除；副标状态行也删。
-           ★ 同日更晚（用户拍板）：入口由按钮改成**开关**；录音中底部弹出
+           ★ 同日更晚（）：入口由按钮改成**开关**；录音中底部弹出
            灵动岛（脉冲红点 + EQ 跳柱 + 实时计时，点岛即停），停止后岛
            展开成「已保存」卡片：文件名 + 所在目录 +「打开文件夹」（资源
            管理器 /select 选中该 WAV，走新端点 POST /api/recorder/open）。
@@ -1298,13 +1297,13 @@ html.devmode .dock button[data-dev]{display:flex}
            同步循环；API 仍是 POST /api/recorder/start|stop + GET status。 -->
       <div class="row" id="recRow">
         <div><div class="nm">耳机录音</div></div>
-        <!-- ★ 2026-10-20 晚（用户拍板）：悬浮文字与 data-p 开关的默认注
+        <!-- 晚：悬浮文字与 data-p 开关的默认注
              「· 可写」对齐 —— 本开关无 data-p 吃不到桥接层默认值，写死。 -->
         <button class="sw" id="recBtn" data-label="耳机录音"
           title="耳机录音 · 可写"></button>
       </div>
 
-      <!-- ★ 第 52 轮（H 档）：官方 apoSpeakerVol.cml（输出页）的**逐声道音量**。
+      <!-- （H 档）：官方 apoSpeakerVol.cml（输出页）的**逐声道音量**。
            该页 8 根竖滑杆的 Tag 就是 Windows 声道序：0=FL 1=FR 2=FC 3=LFE
            4=BL 5=BR 6=SL 7=SR。本机耳机端点是**立体声端点**，实测只有
            Tag 0/1 可读写；Tag 2..7 读回 0x10004（该声道不存在），把
@@ -1331,7 +1330,7 @@ html.devmode .dock button[data-dev]{display:flex}
         <span class="v" id="volRVal">50</span>
       </div>
 
-      <!-- 第 59 轮：面板拆成 输出 / 环境 / 音效 三段（节头见 .ptitle）。
+      <!-- 面板拆成 输出 / 环境 / 音效 三段（节头见 .ptitle）。
            「房间大小」原来紧跟在拨盘下面，但它是环境混响的参数，
            语义在「环境」段 —— 挪到这里，与「环境类型」和动态插入的
            环绕族控件（桥接层插在 #spFxStart 之前 = 本段尾部）同段。 -->
@@ -1346,7 +1345,7 @@ html.devmode .dock button[data-dev]{display:flex}
         <select id="envSel" style="min-width:92px"><option>—</option></select>
       </div>
 
-      <!-- ★ 第 30 轮：下面四组是从「均衡」页挪过来的。
+      <!-- 下面四组是从「均衡」页挪过来的。
            它们都是**音效处理**而不是频响塑形：智能音量管输出动态、
            音频增艳补高频细节（与上面那排的「动态低音」「语音清晰」
            同属 Xear 音效族）、升降 Key 与人声消除是成品音效。
@@ -1354,7 +1353,7 @@ html.devmode .dock button[data-dev]{display:flex}
            + 2 个滑杆，溢出了 705px 的视口），也模糊了「均衡 = 频响曲线」
            这条主线。
 
-           ★ 第 59 轮：面板拆成 输出 / 环境 / 音效 三段，这里的分界就是
+           ★ 面板拆成 输出 / 环境 / 音效 三段，这里的分界就是
            下面的「音效」节头。#spFxStart 这个 id 也从「智能音量」那行
            **挪到了节头上** —— 它是桥接层 addSpaceSwitch/addSpaceSelect/
            addSpaceSlider/addDolbyWarn 的插入锚点（insertBefore），
@@ -1362,19 +1361,19 @@ html.devmode .dock button[data-dev]{display:flex}
            （虚拟环绕 / 环境音效 / 耳机环绕族 / Dolby 族本就属于环境），
            锚点的语义（「动态行插在我前面」）一行没变。
 
-           ★ 第 53 轮（I 档）：Dolby 那一组后面（同样是 insertBefore 本锚点）
+           ★ （I 档）：Dolby 那一组后面（同样是 insertBefore 本锚点）
              还会挂一条「只支持立体声(2 声道)」的前置条件提示 —— 官方
              apoSpeakerDolbyHPVS.cml 的 WarningContent + ChannelsSetting 按钮，
              由桥接层 addDolbyWarn() / dolbyGate() 建与门控，样式即上面的 .warn。 -->
       <div class="ptitle" id="spFxStart">音效</div>
       <div class="row">
-        <!-- ★ 2026-10-19：原第 61 轮在这里挂过「全景音效」开关（GFSControl =
+        <!-- 原在这里挂过「全景音效」开关（GFSControl =
              HKCU\SOFTWARE\C-Media\Hook\EnableGFS 读写接口）。真机复测发现该键
              由**官方程序**安装并维护，新框架环境下 HKCU\SOFTWARE\C-Media 整棵
              不存在 → 读回 0x10004、写不进 —— 一个永远点不动的假开关。
-             按用户拍板「反编译确认不可写入的不做成参数」整行移除，
+             按「反编译确认不可写入的不做成参数」整行移除，
              白名单同步摘除（driver.go writable）。若将来做官方键迁移再回来。 -->
-        <!-- ★ 第 46 轮：这里原来绑 GFSControl。查 osConfLib.dll 的字符串表才发现
+        <!-- 这里原来绑 GFSControl。查 osConfLib.dll 的字符串表才发现
              绑错了 —— GFSControl 在**设备控制表**里（邻居 AmplifierControl /
              IsSupportXearSurround71），不是音效参数。官方 Xear Smart Volume 页
              的开关对应 Enable_SMART_VOLUME_GFX，在功能参数表里，且与控件名
@@ -1386,7 +1385,7 @@ html.devmode .dock button[data-dev]{display:flex}
         <div><div class="nm">音频增艳</div></div>
         <button class="sw" data-p="Enable_AUDIOBRILLIANT_LFX" data-label="音频增艳"></button>
       </div>
-      <!-- 第 46 轮：官方 Xear Audio Brilliant 页除开关外还有 Brilliant强度 滑杆
+      <!-- 官方 Xear Audio Brilliant 页除开关外还有 Brilliant强度 滑杆
            （0~6，实测 AUDIOBRILLIANT_LEVEL 可写）。补上。 -->
       <div class="slider ctl-sub">
         <span style="font-size:11.5px;color:var(--t2);white-space:nowrap">增艳强度</span>
@@ -1414,13 +1413,13 @@ html.devmode .dock button[data-dev]{display:flex}
     </div>
 
     <div class="pgroup" id="pg-eq">
-      <!-- ★ 2026-10-18 面板重设计（用户拍板）：①均衡开关置顶；②十段竖推子
+      <!-- 面板重设计：①均衡开关置顶；②十段竖推子
            （频点 30/60/120/250/500/1K/2K/4K/8K/16K 取自官方 apoSpeakerEQ.cml，
              值域 ±20dB 与曲线拖拽一致；推子 / 曲线节点 / 预设共用同一份
              S.eq，驱动写回统一由桥接层 push() 差量完成，无第二套机制）；
            ③自定义方案包成次卡；④面板加高（见 style 块 :has 规则）。
-           ★ 第 28 轮：开关名是「均衡开关」（Enable_EQ_GFX 总开关），
-             不是页面名；★ 第 30 轮：音效四组在声场页，本页只留频响相关。 -->
+           ★ 开关名是「均衡开关」（Enable_EQ_GFX 总开关），
+             不是页面名；★ 音效四组在声场页，本页只留频响相关。 -->
       <div class="row">
         <div><div class="nm">均衡开关</div></div>
         <button class="sw on" data-p="Enable_EQ_GFX" data-label="均衡开关"></button>
@@ -1452,7 +1451,7 @@ html.devmode .dock button[data-dev]{display:flex}
     <div class="pgroup" id="pg-mic">
       <div class="ptitle">麦克风</div>
 
-      <!-- ★ 2026-10-18：麦克风静音置顶；麦克风音量块改为与开关行同节奏 ——
+      <!-- 麦克风静音置顶；麦克风音量块改为与开关行同节奏 ——
            「标签 + 右对齐读数」一行 + 下方滑杆（读数 micVolVal 由桥接层
            syncSlider 写入，滑杆行本身不再带标签）。 -->
       <div class="row" style="padding-top:0">
@@ -1497,13 +1496,13 @@ html.devmode .dock button[data-dev]{display:flex}
         <span class="v" id="echoVal">—</span>
       </div>
 
-      <!-- ★ 第 62 轮（A2 · 麦克风专项三开关）：官方 MenuMicIn 菜单实有的三张页
+      <!-- （A2 · 麦克风专项三开关）：官方 MenuMicIn 菜单实有的三张页
            （apoMicInAEC / apoMicInENC / apoMicInBeamForming，各页只有一个开关）。
            绑定证据 = exe 串表 MicInAECHandler/MicInENCHandler 与控件同簇 +
            参数名唯一对应 + port_probe 实测 capture 端点写探测全通。
            定名照官方 zh-CN 词条：AEC=回音消除；ENC 官方未译，定「通话降噪」
            与上面「环境降噪」(Noise Reduction) 区分；BeamForming 官方词条为
-           「指向性麦克风」，2026-10-20 用户拍板改定名「麦克风收音」。
+           「指向性麦克风」， 改定名「麦克风收音」。
            ★ 同族 MICARRAY_BEAMWIDTH / ENC_SELFCALIB 官方 exe 0 引用，不做。 -->
       <div class="row">
         <div><div class="nm">回音消除</div></div>
@@ -1528,19 +1527,19 @@ html.devmode .dock button[data-dev]{display:flex}
         <span class="v" id="aaVal">—</span>
       </div>
 
-      <!-- ★ 2026-10-20 内嵌监听：官方 RunListen2Device 依赖的监听引擎
+      <!-- 内嵌监听：官方 RunListen2Device 依赖的监听引擎
            COM 服务器（CLSID {E642D042-…}）在整套 WHQL 驱动包里不存在，
            官方原版同样开不了（恒返 0x80040154）。开关改走内嵌 WASAPI
            监听（等价系统「侦听此设备」），取证见
            工具/监听取证-监听COM组件缺失.md。POST /api/listen {on}。 -->
       <div class="row">
         <div><div class="nm">麦克风监听</div></div>
-        <!-- ★ 2026-10-20 晚（用户拍板）：悬浮文字对齐「· 可写」口径
+        <!-- 晚：悬浮文字对齐「· 可写」口径
              （内嵌 WASAPI 监听可写可开，与 data-p 开关默认注一致）。 -->
         <button class="sw" id="listenSw" data-label="麦克风监听"
           title="麦克风监听 · 可写"></button>
       </div>
-      <!-- ★ 2026-10-24：监听增益滑杆（1.0-4.0×，实时）。麦克风原始电平
+      <!-- 监听增益滑杆（1.0-4.0×，实时）。麦克风原始电平
            偏低（系统「侦听此设备」同口径），全声道写入后可调到舒适量。 -->
       <div class="slider ctl-sub" id="listenGainRow" hidden>
         <span style="font-size:11.5px;color:var(--t2);white-space:nowrap">监听增益</span>
@@ -1555,14 +1554,14 @@ html.devmode .dock button[data-dev]{display:flex}
 
     <div class="pgroup" id="pg-dev">
       <div class="ptitle">设备</div>
-      <!-- ★ 2026-10-18 去重 + 根修：型号 / 编解码器 / 音频格式与右上角读数区
+      <!-- 去重 + 根修：型号 / 编解码器 / 音频格式与右上角读数区
            重复，删掉；剩余行全部按 id 由桥接层 bindDevPanel 从 status() 真实
            字段写入（驱动版本=st.driver · 设备 ID=st.hwid 实例路径 ·
            DirectX=st.dx · 音量范围=vol_min…vol_max·步进）。静态值一律「—」，
            不写死、不编造；设计稿独立打开时即显示「—」。
            ★ 旧 setKv(i) 按位置写的实现已在去重后整体错位（驱动版本曾被写成
              编解码器名），这就是「读取不对」的根因，桥接层已改按 id 定位。 -->
-      <!-- ★ 2026-10-18 二次精简（用户拍板）：设备 ID（长实例路径）/ 型号来源 /
+      <!-- 二次精简：设备 ID（长实例路径）/ 型号来源 /
            DirectX 三行对普通用户无用（参数页仍可查），删除；只留两行真值。
            对应 setKvId 调用保留（元素缺失时为安全空操作）。 -->
       <div class="kv"><span>驱动版本</span><b id="drvVer">—</b></div>
@@ -1575,11 +1574,11 @@ html.devmode .dock button[data-dev]{display:flex}
       <!-- 驱动组件：系统里的驱动包由同目录的 iKF-驱动管理.exe 装卸
            （它自提权，主界面因此一次 UAC 都不弹）。 -->
       <div class="ptitle">驱动组件</div>
-      <!-- ★ 2026-10-20 晚：录音功能迁出麦克风页（用户拍板）——声音页
+      <!-- 晚：录音功能迁出麦克风页——声音页
            「耳机录音」行接管，录渲染端点回环（耳机里正在播放的声音）。
            麦克风页不再有任何录音入口。 -->
 
-      <!-- ★ 2026-10-19：「驱动固件」行已移除 —— 装卸驱动统一交给同目录的
+      <!-- 「驱动固件」行已移除 —— 装卸驱动统一交给同目录的
            iKF-驱动管理.exe（自提权），主界面不再提供驱动安装入口。 -->
 
       <div class="row">
@@ -1587,7 +1586,7 @@ html.devmode .dock button[data-dev]{display:flex}
         <button class="sw" data-p="Enable_Channel_COPY_LFX" data-label="声道复制"></button>
       </div>
 
-      <!-- 第 50 轮（E 档）：官方「设定」页的两个声道互换。
+      <!-- （E 档）：官方「设定」页的两个声道互换。
            绑定依据 = XearAudioCenter_x64.exe 字符串表里**紧邻**：
              … WooferCenterSwap | Enable_SwapLfeCn_LFX | SideBackSwap | Enable_SwapSrBk_LFX …
            控件名与参数名是两张互不相干的表，紧邻是它们配对的唯一硬证据。
@@ -1602,17 +1601,17 @@ html.devmode .dock button[data-dev]{display:flex}
         <button class="sw" data-p="Enable_SwapSrBk_LFX" data-label="侧置/后置声道互换"></button>
       </div>
 
-      <!-- 第 50 轮（E 档）：官方「设定」页的声道单选。
+      <!-- （E 档）：官方「设定」页的声道单选。
            官方 Tag 就是**声道数本身**（Channels2/4/6/8 → Tag 2/4/6/8），
            与 Speaker_Channel_Setting 直接对位，没有任何下标换算。
            ★ 这里**不设**「会中断播放」确认框：旧结论说改声道会重初始化端点、
-             打断在播流，第 50 轮拆开重测证明那是误判（当年把 Enable_SS_LFX=0
+             打断在播流，拆开重测证明那是误判（当年把 Enable_SS_LFX=0
              和 Speaker_Channel_Setting 捆在同一次写入；真凶是另一时间片的
              XearSurround71Control=1）。实测 2→8→6→2 全程渲染流不断、
              端点混音格式恒 8 声道，故按普通设置项处理，只留一行说明。 -->
       <div class="ptitle">声道配置</div>
       <div class="chips" id="chChips"></div>
-      <!-- ★ 2026-10-18：说明精简为一句（用户要求简短且官方语气） -->
+      <!-- 说明精简为一句（简短且官方语气） -->
       <div style="font-size:10.5px;color:var(--t3);line-height:1.6;margin-top:9px">
         切换声道组态，耳机默认立体声
       </div>
@@ -1631,7 +1630,7 @@ html.devmode .dock button[data-dev]{display:flex}
     </div>
 
     <div class="pgroup" id="pg-vis">
-      <!-- 第 23 轮：音源块已提到侧栏上部（与设备行合并成一张卡）——
+      <!-- 音源块已提到侧栏上部（与设备行合并成一张卡）——
            它是整页唯一的状态入口，压在参数区最下面等于把主开关藏起来。
            本组只剩 画面 / 频段 / 配色 / 致谢 四块。 -->
 
@@ -1665,7 +1664,7 @@ html.devmode .dock button[data-dev]{display:flex}
         <button id="vizThemeEdit">编辑…</button>
       </div>
 
-      <!-- 致谢（第 25 轮：只留用户指定的两行 —— 上一轮我自作主张多加的
+      <!-- 致谢（只留用户指定的两行 —— 上一轮我自作主张多加的
            「特此感谢原作者的开源贡献」与许可声明都被要求删掉）。
            ★ 两个链接必须 target="_blank"：WebView2 里同窗打开会把整个应用
              导航走（白屏），应用侧没有拦截外链的逻辑。 -->
@@ -1734,7 +1733,7 @@ html.devmode .dock button[data-dev]{display:flex}
 
   </div>
 
-  <!-- ---------- 配色编辑弹层（第 23 轮） ----------
+  <!-- ---------- 配色编辑弹层 ----------
        移植自原项目 src/lib/themes.ts 的「自定义主题」模型：7 个可调字段
        （名称 / 底色 / 雾色 + 雾色跟随底色 / 冷色 / 暖色 / 强调色 / 辉光强度），
        由它们派生 9 个 shader uniform —— 推导公式与原 createCustomThemeColors()
@@ -1743,7 +1742,7 @@ html.devmode .dock button[data-dev]{display:flex}
        放成弹层而不是塞进侧栏：这套东西约 360px 高，而侧栏在默认窗口
        1280×800 下正好用满。
 
-       ★ 第 28 轮重排为「预设列表 / 属性 / 动作」三分。详细理由写在上面
+       ★ 重排为「预设列表 / 属性 / 动作」三分。详细理由写在上面
          .vmodal 那一段 CSS 注释里。**所有 id 一个没改** —— JS 那边零改动，
          这一轮纯结构 + 样式。 -->
   <div class="vmodal" id="vizModal">
@@ -1784,7 +1783,7 @@ html.devmode .dock button[data-dev]{display:flex}
               <input type="range" id="ctGlow" min="40" max="220" step="2" value="110">
               <b id="ctGlowVal">1.10</b></label>
           </div>
-          <!-- ★ 第 28 轮：这里原本是三句话的解释（「暖色是一眼看到的那片
+          <!-- 这里原本是三句话的解释（「暖色是一眼看到的那片
                颜色，低频重的音乐会让着色器的 warmBlend 逼近 1……」），
                62px 高、960×600 下把右栏顶出滚动条，而且和用户提的
                「保留功能介绍、去掉复杂解释」相悖。压成一行功能说明。 -->
@@ -1816,7 +1815,7 @@ html.devmode .dock button[data-dev]{display:flex}
 
 </div>
 
-<!-- ★ 2026-10-20 晚（用户拍板）：录音灵动岛 —— fixed **顶部偏右**浮层
+<!-- 晚：录音灵动岛 —— fixed **顶部偏右**浮层
      （与右上角设备胶囊同一行、其左侧：胶囊 top:26/right:28，统计块
      top:96 起，y 26..64 除胶囊外是空档；底部空间被面板/托盘挤满，
      实测放不下），三态由 data-state 驱动（idle 隐藏 / rec 录音中 /
@@ -1853,7 +1852,7 @@ var W = 1280, H = 800;
 function fit(){
   var s = Math.min(window.innerWidth / W, window.innerHeight / H);
   document.documentElement.style.setProperty('--s', s);
-  layoutHud();   /* 窗口尺寸变了，右上读数区与右下控制面板的避让要重算 */
+  layoutHud;   /* 窗口尺寸变了，右上读数区与右下控制面板的避让要重算 */
 }
 window.addEventListener('resize', function(){
   fit();
@@ -1878,7 +1877,7 @@ var DEV = { model:'iKF-V11', codec:'CM108B', driver:'6.0.11.1103',
 })();
 
 /* ================= 状态 ================= */
-/* ★★ 第 49 轮：这 8 个音箱的角度不是设计稿编的，是**官方安装态的真实值**。
+/* 这 8 个音箱的角度不是设计稿编的，是**官方安装态的真实值**。
    出处：官方驱动装好后跑 `--dump` 的快照（go_installed_dump.txt / go_portable_dump.txt）——
      SS_LF_ANGLE=-32 · SS_C_ANGLE=0 · SS_RF_ANGLE=32 · SS_RS_ANGLE=90
      SS_RB_ANGLE=148 · SS_LB_ANGLE=-148 · SS_LS_ANGLE=-90 · SS_LFE_ANGLE=180
@@ -1901,7 +1900,7 @@ var S = {
     {id:'LS', ang:-90,  base:-90,  dist:0, key:'SS_LS',  name:'左环绕'},
     {id:'L',  ang:-32,  base:-32,  dist:0, key:'SS_LF',  name:'左前置'}
   ],
-  /* ★★ 交互模式。官方那 4 个单选钮 —— 顺时钟环绕 / 逆时钟环绕 / 手动旋转
+  /* 交互模式。官方那 4 个单选钮 —— 顺时钟环绕 / 逆时钟环绕 / 手动旋转
      (WiseArround) / 手动平移 (Manual) —— 经**原始读取实测不是驱动属性**：
        __Manual / __Clockwise / __CounterClockwise / __WiseArround → ret=-1
        （「属性名未登记」）；同块的 SpeakerShifterControl 虽然是真属性（ret=0）
@@ -1910,7 +1909,7 @@ var S = {
      所以这里也只做界面：'rot' 拖动改角度、'move' 拖动改距离，
      顺/逆时钟按钮整体旋转，重置回官方默认。 */
   spkMode:'rot',
-  /* ★ 2026-10-22：初值 '平直' 是错的 —— PRE 里没有这个键（官方叫「预设」），
+  /* 初值 '平直' 是错的 —— PRE 里没有这个键（官方叫「预设」），
      于是芯片一个都不高亮，而芯片初始化又硬编码亮了第 0 个「舞曲」。
      现在初值取「预设」（EQ 全 0 就是官方索引 11），且由 syncEqChips 反查刷新。 */
   active:-1, sel:5, hit:null, pre:'预设',
@@ -1939,7 +1938,7 @@ var HZ  = [30,60,120,250,500,1000,2000,4000,8000,16000];
    频段序：0=30Hz … 9=16kHz，与 EQ_Slider1..10 ↔ Hz30..Hz16K 的配对一致
      （见 FUN_140164170 / FUN_1401647f0 的静态初始化）。 */
 var PRE = {
-  /* ★ 2026-10-24（用户拍板）：「预设」放第一 —— 它是默认/出厂态，最常用。
+  /* ：「预设」放第一 —— 它是默认/出厂态，最常用。
      官方索引仍是键注释里的编号，与驱动写入无关（写入是 10 段值）。 */
   /* 官方索引 11 Default  */ '预设':    [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
   /* 官方索引 0  Dance    */ '舞曲':    [  5,  2,  0,-10, -5,  0,  6, 12, 11, 10],
@@ -1955,7 +1954,7 @@ var PRE = {
   /* 官方索引 10 Vocal    */ '声乐':    [-13, -8,  0,  6, 14,  4, -4, -7, -8,-10]
 };
 
-/* ★ 2026-10-22：预设芯片的高亮必须由**当前 10 段值反查**得出，不许硬编码。
+/* 预设芯片的高亮必须由**当前 10 段值反查**得出，不许硬编码。
    旧实现把第 0 个芯片（Object.keys(PRE)[0] = '舞曲'，官方索引 0）写成默认
    高亮，于是「默认场景」（EQ 全 0 = 官方索引 11「预设」）在均衡页上亮的是
    「舞曲」——用户看到的正是这一处。三条规则：
@@ -1981,7 +1980,7 @@ function syncEqChips(forceCustom){
   if (!box) return hit;
   var chips = box.querySelectorAll('.chip');
   for (var i = 0; i < chips.length; i++){
-    /* ★ 2026-10-24：hit 为空（自定义组合）时点亮末位"自定义"芯片 ——
+    /* hit 为空（自定义组合）时点亮末位"自定义"芯片 ——
        自定义场景带的 EQ 此前在右下角无任何显示。 */
     var isCustom = chips[i].getAttribute('data-custom') === '1';
     chips[i].classList.toggle('on', isCustom ? (hit === '') : (chips[i].textContent === hit));
@@ -2001,7 +2000,7 @@ function eqGeom(){
 }
 
 /* ================= 7.1 虚拟音箱摆位（官方 7.1 Virtual Speaker Shifter） =================
-   ★ 第 49 轮。官方 apoSpeakerVirtual.cml 那张页的控件清单是：
+   ★ 。官方 apoSpeakerVirtual.cml 那张页的控件清单是：
      开关 + 4 个模式单选钮 + Reset + 8 个可拖拽的音箱图标 + 8 根**只读** dB 条
      （`Style="HProgress"`，Dolby 那套的进度条同款）—— 页面上**没有角度/距离滑杆**，
    角度距离全靠拖动图标改。所以本面板也不做滑杆，直接让声场图可拖。
@@ -2015,7 +2014,7 @@ function spkR(R, s){
   return R * Math.max(0.45, Math.min(1.55, 1 + (s.dist || 0) / 400));
 }
 
-/* 顺/逆时钟环绕的步长。★ 官方 .cml 只写了 RepeatClick="True"（可连点/长按重复），
+/* 顺/逆时钟环绕的步长。官方 .cml 只写了 RepeatClick="True"（可连点/长按重复），
    **没有给步长**，驱动侧也没有这个属性可查 —— 所以 15° 是**本面板的约定**，
    报告与界面里都如实标注，不冒充官方值。 */
 var VSS_STEP = 15;
@@ -2064,7 +2063,7 @@ function renderSpace(){
       + (cy-Rd*Math.cos(a)).toFixed(1)+'" stroke="var(--line)" stroke-width="0.5"/>';
   });
 
-  /* ★ 2026-10-19 静态闪烁修复：脉冲环不再读 S.pulse（随机数已废），
+  /* 静态闪烁修复：脉冲环不再读 S.pulse（随机数已废），
      固定半径 + .pulseRing 的 CSS 呼吸动画（透明度 0.40↔0.16，
      与原随机区间 0.10~0.40 的观感一致）。 */
   g += '<circle class="pulseRing" cx="'+cx+'" cy="'+cy+'" r="'+(R*0.295).toFixed(1)
@@ -2088,11 +2087,10 @@ function renderSpace(){
     var a = s.ang*Math.PI/180, Rd = spkR(R, s);
     var x = cx + Rd*Math.sin(a), y = cy - Rd*Math.cos(a), act = S.active === i;
     var dr = act ? R*0.033 : R*0.023;
-    /* ★ 第 30 轮：音箱的悬停提示。它接的是原先写在**页头副标**里的那句
-       「拖动音箱写回方位（由驱动决定）」—— 那属于「怎么操作」，第 28 轮
-       已判定它不该占副标（副标只回答「这一页是干什么的」）。
+    /* 音箱的悬停提示。它接的是原先写在**页头副标**里的那句
+       「拖动音箱写回方位（由驱动决定）」—— 那属于「怎么操作」，已判定它不该占副标（副标只回答「这一页是干什么的」）。
        挂在元素上零视觉负担，悬停即见，换页也不用清理。
-       ★ 第 49 轮：提示按当前交互模式给具体动作，别再说空话。 */
+       ★ 提示按当前交互模式给具体动作，别再说空话。 */
     g += '<g class="spk" data-i="'+i+'">'
       + '<title>' + s.id + ' · ' + (S.spkMode === 'move'
           ? '拖动改距离（' + (s.dist > 0 ? '+' : '') + s.dist + '）'
@@ -2231,7 +2229,7 @@ function hud(){
       + (S.spkMode === 'move' ? '拖动改距离' : '拖动改角度') + '</div>';
     /* 两列排布：右列 0°→+148°（中置 → 右后置），左列 −32°→+180°（左前置 → 低音），
        与中央声场图的右半圈 / 左半圈一一对应。
-       ★ 第 49 轮：偏差标记改看「与官方默认的角度差 + 距离」，两项任一偏离才高亮；
+       ★ 偏差标记改看「与官方默认的角度差 + 距离」，两项任一偏离才高亮；
        距离非 0 时在角度后面补一个淡一点的 d±N。 */
     h += '<div class="cols">';
     [[0,1,2,3],[7,6,5,4]].forEach(function(col){
@@ -2262,7 +2260,7 @@ function hud(){
     h += '<div class="k">输入电平</div>';
     h += '<div class="big">'+Math.round(S.mic*100)+'<span class="u">%</span></div>';
     h += '<div class="sub">峰值 −'+(26-Math.round(S.mic*22))+' dB · 麦克风</div>';
-    /* 数值由桥接层 patchHud() 按采集端点实测填充 */
+    /* 数值由桥接层 patchHud 按采集端点实测填充 */
     h += '<div class="rows">';
     [['环境降噪','—'],['魔音变声','—'],['麦克风回音','—'],['麦克风增强','—']].forEach(function(r){
       h += '<div class="r"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>';
@@ -2277,7 +2275,7 @@ function hud(){
       + '<div class="r"><span>编解码器</span><b>'+DEV.codec+'</b></div>'
       + '<div class="r"><span>采样率</span><b>48 kHz / 24 bit</b></div></div>';
   } else if (S.section === 'vis'){
-    /* 数值由 WebGL 帧循环直接改写（见 VIS 的 frame()），这里只负责首帧骨架。
+    /* 数值由 WebGL 帧循环直接改写（见 VIS 的 frame），这里只负责首帧骨架。
        不能每帧重建 innerHTML —— hud() 末尾会调 layoutHud() 重算分档与 --hud-top，
        高频重建会让读数区在 compact / mini 之间来回抖。
 
@@ -2341,7 +2339,7 @@ function hud(){
 
 /* 右上读数区与右下控制面板的纵向避让
    ---------------------------------------------------------------
-   面板锚定窗口底边（bottom:28px），高度随当前分组变化（第 31 轮实测
+   面板锚定窗口底边（bottom:28px），高度随当前分组变化（实测
    1280×800：均衡器页 385px，声音页 697px）；HUD 锚定窗口顶边
    （top:96px）。两者同在窗口右侧，
    窗口一矮就必然重叠 —— 实测 1080×674 时面板顶边 285px、HUD 底边 482px，
@@ -2364,7 +2362,7 @@ function fitHud(top){
   var panel = document.querySelector('.panel');
   var LV = ['compact', 'mini', 'tiny'];
   document.documentElement.style.setProperty('--hud-top', top + 'px');
-  /* 一律用 offsetTop / offsetHeight，不要用 getBoundingClientRect()：
+  /* 一律用 offsetTop / offsetHeight，不要用 getBoundingClientRect：
      面板的入场动画 @keyframes rise 带 transform:translateY(14px)，
      而 rect 是「渲染后」的盒子、会被 transform 拉偏 ——
      切换分组时动画刚好重启，读到的 panelTop 比真实位置低 14px，
@@ -2380,7 +2378,7 @@ function fitHud(top){
   return el.offsetHeight <= avail;
 }
 
-/* 面板几何一变就重算避让（第 27 轮）
+/* 面板几何一变就重算避让
    ---------------------------------------------------------------
    以前只在两个地方调 layoutHud()：window.resize 与 hud()。
    而面板的高度还会因为**别的原因**变：切页换 .pgroup、面板里的动态内容
@@ -2414,7 +2412,7 @@ function fitHud(top){
 
 function render(){
   var g;
-  /* ★ 2026-10-18：曲线 / 预设 / 节点拖拽改了 S.eq，推子每帧回填跟随
+  /* 曲线 / 预设 / 节点拖拽改了 S.eq，推子每帧回填跟随
      （syncEqFaders 内部只在值变化时写，拖推子时值相同 = 无扰动）。 */
   if (typeof syncEqFaders === 'function') syncEqFaders();
   /* 可视化页的中央画面由 #viz 画布（WebGL）负责，SVG 舞台留空。
@@ -2523,7 +2521,7 @@ function profToast(msg, bad){
 function renderProfile(){
   var PC = window.PROFILES;
   if (!PC || !PC.list){
-    /* ★ 2026-10-21（用户拍板）：主程序启动时 Open 只试一次 —— 装完驱动
+    /* ：主程序启动时 Open 只试一次 —— 装完驱动
        立刻打开、端点还在重建窗口期时，这里会一直空着且无路可退。补一个
        重新检测入口（桥接层 document 级的 [data-reconnect] 委托处理）。 */
     return '<text x="640" y="400" text-anchor="middle" font-size="17" fill="var(--t3)">'
@@ -2658,7 +2656,7 @@ function renderProfile(){
 
 /* ================= 交互 ================= */
 /* 每页的标题与副标。
-   第 28 轮：用户指出副标写得太像说明书 —— 原先那一串是「怎么操作」
+   副标写得太像说明书 —— 原先那一串是「怎么操作」
    （「拖动虚线圈改变房间大小 · 拖动音箱写回方位」），一句话两条指令，
    读起来是给调试的人看的；这款软件最终是给普通用户用的，副标应该回答
    「这一页是干什么的」。所以全部改成一句话的功能说明，最长 9 个字。
@@ -2666,8 +2664,8 @@ function renderProfile(){
      点击生成涟漪）**没有丢**：挪成了进页面时浮在画布上的一条提示，
      5 秒后自己淡出，或者一动手就消失（见 .vhint）。
      它本来就不该常驻在标题下面 —— 那会把副标写成说明书。 */
-/*   ★ 第 62 轮：副标写法用户拍板**回摆到操作式**（0817 版风格：
-     告诉用户这一页能做什么、怎么操作），第 28 轮「副标去说明书化」
+/*   副标写法**回摆到操作式**（0817 版风格：
+     告诉用户这一页能做什么、怎么操作），「副标去说明书化」
      的决定就此作废。行内 .sub 说明也全删（副标接过说明职责）。
      实现词（osConfLib/PropertyControl 之类）依然不出现。
      ★ 只动副标不动页名，同步点 = hSub 默认值 + 本表，两处。 */
@@ -2680,7 +2678,7 @@ var TITLES = {
   profile: ['自定义场景', '特效组态管理'],
   api:   ['参数', '开发者选项']
 };
-/* ★ 2026-10-18：首屏标题/副行也走 TITLES —— 此前静态 HTML 里写死的副行
+/* 首屏标题/副行也走 TITLES —— 此前静态 HTML 里写死的副行
    只在切页时才被 TITLES 覆盖，首次打开显示的是旧文案（用户报告的
    「首次打开页面内容显示有误」即此）。TITLES 从此是唯一真源。 */
 document.getElementById('hTitle').textContent = TITLES[S.section][0];
@@ -2695,13 +2693,13 @@ document.getElementById('dock').addEventListener('click', function(e){
   });
   var panel = document.querySelector('.panel');
   panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = '';
-  /* 第 58 轮：页头与面板同款的上浮入场（.head 本身是 pointer-events:none，
+  /* 页头与面板同款的上浮入场（.head 本身是 pointer-events:none，
      纯动画不影响任何交互；retrigger 手法与 panel 一致）。 */
   var headEl = document.querySelector('.head');
   headEl.classList.remove('swap'); void headEl.offsetWidth; headEl.classList.add('swap');
   document.getElementById('hTitle').textContent = TITLES[S.section][0];
   document.getElementById('hSub').textContent   = TITLES[S.section][1];
-  /* ★ 第 27 轮修的顺序缺陷：VIS.setActive() 原来是**最后**一步调的，
+  /* 修的顺序缺陷：VIS.setActive 原来是**最后**一步调的，
      而它是唯一开关 <html data-viz="1"> 的地方 —— 于是 render() / hud() 跑的时候
      data-viz 还是**上一页**的值：
        · 从律动空间切走：data-viz 仍是 "1"，侧栏还按 380px 通高在摆，
@@ -2719,7 +2717,7 @@ document.getElementById('dock').addEventListener('click', function(e){
   render(); hud();
 });
 
-/* ---------- 开发者模式（第 58 轮） ----------
+/* ---------- 开发者模式 ----------
    「参数」页默认不在 dock 里（CSS .dock button[data-dev]{display:none}）。
    入口两条：左上角 logo 2 秒内连点 5 次；任意页面 Ctrl+Alt+P。
    状态存本机 localStorage('ikf.dev')，重启保留。
@@ -2754,7 +2752,7 @@ document.getElementById('dock').addEventListener('click', function(e){
   });
 })();
 
-/* ---------- 面板底部渐隐（第 59 轮） ----------
+/* ---------- 面板底部渐隐 ----------
    .panel::after 是一枚 sticky 在滚动口底边的渐隐条，只有 .scrolled 才显示。
    这里负责给 .scrolled 翻牌：没滚到底 → 显示「下面还有」；
    滚到接近底部 → 摘掉，最后一行控件不被盖住。
@@ -2774,7 +2772,7 @@ document.getElementById('dock').addEventListener('click', function(e){
   upd();
 })();
 
-/* 纯视觉开关的乐观翻转。★ 第 30 轮起本文件已没有 [data-sw] 元素了 ——
+/* 纯视觉开关的乐观翻转。起本文件已没有 [data-sw] 元素了 ——
    所有真开关都改成 data-p 直连，由桥接层按驱动读回值同步状态
    （乐观翻转会和它抢状态）。这段留着是给**不需要驱动的装饰性开关**用的：
    将来往稿子里加一个 [data-sw] 按钮，它就能点。 */
@@ -2782,7 +2780,7 @@ document.addEventListener('click', function(e){
   var s = e.target.closest('[data-sw]'); if (s) s.classList.toggle('on');
 });
 
-/* 作者署名 → 抖音主页（2026-10-20）：snssdk1128:// 是抖音自定义协议，
+/* 作者署名 → 抖音主页：snssdk1128:// 是抖音自定义协议，
    不能让 WebView2 自己导航（整个应用会被导航走），走 Go 侧
    /api/openurl（白名单协议 + 系统 ShellExecute）。serve 单开设计稿时
    fetch 不可达，静默降级为不可点。 */
@@ -2807,7 +2805,7 @@ document.addEventListener('click', function(e){
 document.querySelectorAll('.thm button').forEach(function(b){
   b.addEventListener('click', function(){
     document.documentElement.dataset.theme = b.dataset.th;
-    /* 2026-10-20（用户要求）：主题持久化 —— 选择记入 localStorage，
+    /* ：主题持久化 —— 选择记入 localStorage，
        启动时由下方恢复块读回。WebView2 的 localStorage 随用户数据目录
        落盘（便携包内「iKF Audio Center」目录），重启即恢复。 */
     try { localStorage.setItem('ikf-theme', b.dataset.th); } catch(_){}
@@ -2816,7 +2814,7 @@ document.querySelectorAll('.thm button').forEach(function(b){
   });
 });
 
-/* 主题持久化恢复块（2026-10-20）：必须在首次 render() 之前执行 ——
+/* 主题持久化恢复块：必须在首次 render 之前执行 ——
    主题变量（--fade/--glass2 等）被首帧渲染消费。恢复后同步 .thm 按钮
    的高亮态，避免「实际是浅色、按钮还停在深色」。 */
 (function(){
@@ -2838,7 +2836,7 @@ document.querySelectorAll('.thm button').forEach(function(b){
       音量旋钮贴着面板底边，向下拖很容易拖出窗口。
    3) 支持滚轮，且每次数值变化都派发 dialchange，
       让桥接层按「变化即写」而不是只等 pointerup。
-   4) ★ 2026-10-22 档位吸附（data-tiers）：驱动量程比拨盘窄时
+   4) ★  档位吸附（data-tiers）：驱动量程比拨盘窄时
       （动态低音 0..10、语音清晰 0..6），45 这种中间值是**写不进去**的，
       写进去被四舍五入，回读再换算回来就成了 50 ⟹ 界面「自己变」。
       有 tiers 就只落在真实档位上（见上方 .dial 的注释），
@@ -2906,13 +2904,13 @@ rr.addEventListener('input', function(){
 });
 
 /* 预设 */
-/* ★ 2026-10-24：末位追加"自定义"芯片 —— 自定义场景（Profile）带的 EQ
+/* 末位追加"自定义"芯片 —— 自定义场景（Profile）带的 EQ
    组合不在 PRE 表里，preOf 反查为空时此前整个芯片区全灰，用户看不到
    "当前 EQ 来自自定义场景"。现在 hit 为空即点亮"自定义"。 */
 document.getElementById('eqChips').innerHTML = Object.keys(PRE).map(function(k){
   return '<button class="chip">'+k+'</button>';
 }).join('') + '<button class="chip" data-custom="1" title="当前 EQ 不匹配任何内置预设（多来自自定义场景或手动调节）">自定义</button>';
-  /* 高亮不在这里硬编码 —— 交给 syncEqChips() 按当前 S.eq 反查。
+  /* 高亮不在这里硬编码 —— 交给 syncEqChips 按当前 S.eq 反查。
      旧写法把第 0 个芯片（'舞曲'，官方索引 0）直接点亮，默认场景（EQ 全 0）
      因此在均衡页上显示「舞曲」，与初始化目标不符。 */
   syncEqChips();
@@ -2929,7 +2927,7 @@ document.getElementById('eqChips').innerHTML = Object.keys(PRE).map(function(k){
     render(); hud();
   });
 
-  /* ★ 2026-10-18 十段竖推子：与曲线节点 / 预设共用同一份 S.eq ——
+  /* 十段竖推子：与曲线节点 / 预设共用同一份 S.eq ——
      拖推子改 S.eq[i]，render() 重画曲线，驱动写回由桥接层 push() 按差量
      完成（与节点拖拽同一条通道，没有第二套机制）；render() 每帧把 S.eq
      回填到推子，节点拖拽 / 预设切换时推子自动跟随。
@@ -2953,7 +2951,7 @@ document.getElementById('eqChips').innerHTML = Object.keys(PRE).map(function(k){
       var i = +inp.dataset.i;
       S.eq[i] = Math.max(-20, Math.min(20, Math.round(+inp.value)));
       inp.value = S.eq[i];
-      /* ★ 2026-10-22：推子也是改 S.eq 的入口，芯片高亮必须跟着反查走，
+      /* 推子也是改 S.eq 的入口，芯片高亮必须跟着反查走，
          否则拖完全 0 还亮着「舞曲」。 */
       syncEqChips();
       render(); hud();
@@ -2998,7 +2996,7 @@ stage.addEventListener('pointerdown', function(e){
           /* 手动平移：只改距离，角度不动。半径比值 → ±100 刻度。
              ★ 基准半径必须用 spaceGeom().R（含房间缩放的当前值），
              不能用裸的 RB —— RB 是未缩放的画布半径，房间改过之后两者不等。
-             ★ 也别写成 R：这个作用域里**没有** R（第 49 轮 CDP 交互测试就是这么
+             ★ 也别写成 R：这个作用域里**没有** R（CDP 交互测试就是这么
              抓到 ReferenceError 的 —— 静态 DOM 断言完全看不出来）。 */
           var d = Math.hypot(p.x-cx, p.y-cy);
           s.dist = Math.round(Math.max(-100, Math.min(100, (d/SG.R - 1) * 400)));
@@ -3013,8 +3011,8 @@ stage.addEventListener('pointerdown', function(e){
       function up(){
         S.active = -1; render(); hud();
         window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up);
-        /* ★ 松手才写驱动：驱动写是同步 IO，拖动过程中逐帧写会把线程打爆
-           （第 46 轮旋钮同一条教训）。桥接层负责防抖 + 写回。
+        /* 松手才写驱动：驱动写是同步 IO，拖动过程中逐帧写会把线程打爆
+           （旋钮同一条教训）。桥接层负责防抖 + 写回。
            设计稿单独打开时该钩子不存在 —— 那就只动界面，不假装已写入。 */
         if (window.__vssCommit) window.__vssCommit(idx);
       }
@@ -3043,7 +3041,7 @@ stage.addEventListener('pointerdown', function(e){
       var p = loc(ev);
       S.eq[i] = Math.max(-20, Math.min(20, Math.round((EG.mid-p.y)/EG.amp*20)));
       render(); hud();
-      /* ★ 2026-10-22：拖曲线同样走反查（拖回全 0 会重新点亮「预设」）。 */
+      /* 拖曲线同样走反查（拖回全 0 会重新点亮「预设」）。 */
       syncEqChips();
     }
     function up3(){ window.removeEventListener('pointermove',mv3); window.removeEventListener('pointerup',up3); }
@@ -3074,7 +3072,7 @@ stage.addEventListener('pointerdown', function(e){
   }
 });
 
-/* 动画循环（2026-10-19 瘦身 —— 静态闪烁修复）
+/* 动画循环（瘦身 —— 静态闪烁修复）
    · 声音页退出循环：中央脉冲环已改 CSS 呼吸动画（.pulseRing），
      原来的「随机脉冲 + 每帧整张 SVG innerHTML 重建」是静态闪烁根因；
      拖拽 / 旋转 / 切模式 / 参数写回仍按需调 render()。
@@ -3157,7 +3155,7 @@ var P = [
 ["DTSAPO4_Enable","音效","读写","DTS APO4 开关"],["DTSAPO4_OpModeControl","音效","读写","DTS APO4 模式控制"],
 ["DTSAPO4_GetOpModeList","音效","只读","获取 DTS APO4 模式列表"],
 ["Enable_MAGICVOICE","麦克风","读写","魔音变声开关"],["MagicVoice_Selection","麦克风","读写","变声音色选择"],
-/* ★ 第 31 轮：这四条原来标「麦克风」，是错的 —— 它们走的是**渲染端点**。
+/* 这四条原来标「麦克风」，是错的 —— 它们走的是**渲染端点**。
    证据三处：① 驱动侧 WRITABLE[EP_RENDER] 里同时登记了 VOCALCANCEL 与 KEYSHIFT；
    ② PROFILE_GROUPS 把二者映射到官方 ApoEffect 组 Karaoke / KeyShift，
       而官方面板里它们就住在 apoSpeakerKaraoke.cml（Speaker = 播放侧）；
@@ -3632,7 +3630,7 @@ var VIS = (function(){
              warmCore:warmCore.slice(), warmEdge:warmEdge.slice(),
              ripple:ripple.slice(), glow:glow };
   }
-  /* 十六进制型主题：等价于原 createBuiltInTheme() 的推导 */
+  /* 十六进制型主题：等价于原 createBuiltInTheme 的推导 */
   function hexTheme(bg, fog, cool, warm, accent, glow){
     var base = hex(bg);
     return { base1:base, base2:mix3(base, [1,1,1], 0.12), fog:hex(fog),
@@ -3695,7 +3693,7 @@ var VIS = (function(){
       [1.000, 0.180, 0.750],   /* warmEdge #FF2EBF 品红 */
       [0.950, 0.800, 1.000],   /* ripple   #F2CCFF 淡兰紫 */
       1.25),
-    /* ---------- 第 25 轮新设计的三套（补色相空白） ----------
+    /* ---------- 新设计的三套（补色相空白） ----------
        补之前先把 16 套的身份色（warmCore，也就是屏幕上真正那片颜色）数了一遍，
        发现严重偏红：色相 5°~18° 区间的**身份色**占了 5 套
        （绯红 15 / 夜巡 5 / 蓝调时刻 18 / 冰川白昼 16 / 破晓青柠 12），
@@ -3751,7 +3749,7 @@ var VIS = (function(){
       [1.000, 0.839, 0.894],   /* ripple   #FFD6E4 淡粉白 */
       1.20)
   };
-  /* ---------- 原项目 src/lib/themes.ts 的内置主题（第 23 轮补上，第 25 轮删剩 9 套） ----------
+  /* ---------- 原项目 src/lib/themes.ts 的内置主题（补上，删剩 9 套） ----------
      数值型那 5 套（ink-wash / nocturnal / neon-tokyo / cyber-forest /
      minimal-monochrome）原版就是 new Color(r,g,b) 直接写在工作色空间的，
      所以走 linTheme 原样照抄；十六进制型那几套走 hexTheme，
@@ -3789,7 +3787,7 @@ var VIS = (function(){
     'glacier-day':  hexTheme('#D8E6EA','#E5EEF0','#2D8EA3','#D96F4D','#2F5963',0.82),
     'daybreak-lime':  hexTheme('#D9E7C8','#E6EFD9','#2A7C72','#C65B47','#5C6F42',0.80)
   };
-  /* ---------- 第 25 轮：从原项目 13 套里删掉 4 套 ----------
+  /* ---------- 从原项目 13 套里删掉 4 套 ----------
      判据是**并排渲染后实际看起来是否重复**（不是看数值）：
        · coral-reef  珊瑚礁 —— 底色 #40252A 与绯红同是「暗红棕」，身份色
                               珊瑚红 #E8705F 与绯红 #FF4219 只差 7°，并排看撞脸；
@@ -3800,11 +3798,11 @@ var VIS = (function(){
        · blue-hour   蓝调时刻 —— 身份色鲑红 #F28C72（18°）已被绯红/夜巡覆盖，
                               冷色 #8BC5E7 又落在电光的冰青附近，两边都不占。
      删完剩 9 套原版 + 4 套自设计 + 3 套新设计 = 16 套，正好 8 列 × 2 行。 */
-  /* ★ 顺序 = 色板网格的排布顺序（8 列 × 2 行，见 .vsw-grid），
+  /* 顺序 = 色板网格的排布顺序（8 列 × 2 行，见 .vsw-grid），
      而且**用户可以拖** —— 按住一枚拖到别处即可换位，顺序存本机
      （THEME_ORDER_KEY），见下面的 swDrop()。
 
-     第 26 轮用 CIE76 ΔE 重排了一遍：把 16 套的色板圆点（左上暖色 →
+     用 CIE76 ΔE 重排了一遍：把 16 套的色板圆点（左上暖色 →
      右下冷色的对角渐变，见 palSwatch）两半各自转 Lab，取平均色差，
      在 8×2 网格上求 Σ(ΔE)^0.6 的最大值（左右相邻权 1.0、上下 0.6；
      指数取 0.6 而不是 1，是为了惩罚「有一对特别像」，又不至于为了
@@ -3831,7 +3829,7 @@ var VIS = (function(){
   ];
   Object.keys(BUILTIN_ORIGINALS).forEach(function(k){ PALETTES[k] = BUILTIN_ORIGINALS[k]; });
   /* id → 中文名。原来每处都 THEME_LIST.filter(...)[0] 查一遍，
-     第 26 轮渲染色板改成按 themeOrder 遍历（顺序不再等于 THEME_LIST），
+     渲染色板改成按 themeOrder 遍历（顺序不再等于 THEME_LIST），
      顺手做成映射表。 */
   var THEME_CN = {};
   THEME_LIST.forEach(function(t){ THEME_CN[t[0]] = t[1]; });
@@ -3875,7 +3873,7 @@ var VIS = (function(){
   var CT_ACTIVE = 'ikf-viz-active-custom-v1';
   var PAL_KEY   = 'ikf-viz-palette-v1';
   var ROT_KEY   = 'ikf-viz-rotation-v1';
-  /* 色板顺序（第 26 轮）：拖拽换位后的排列。存的是「键」数组 ——
+  /* 色板顺序：拖拽换位后的排列。存的是「键」数组 ——
      内置套就是配色 id，自定义套是 'custom:<预设 id>'（前缀见 CUSTOM_ID）。 */
   var ORDER_KEY = 'ikf-viz-theme-order-v1';
   var CUSTOM_ID = 'custom';
@@ -3923,7 +3921,7 @@ var VIS = (function(){
   function readPrefs(){
     try{
       var arr = JSON.parse(localStorage.getItem(CT_KEY) || 'null');
-      /* ★ 第 25 轮：空存储时**不再**塞一套「默认自定义」。
+      /* 空存储时**不再**塞一套「默认自定义」。
          原来空存储会 seed 一套 normCt({})（白底红暖色），于是色板网格
          永远多出第 17 颗 —— 16 套内置 + 1 套用户从没存过的「幽灵预设」，
          8 列 × 2 行的排布当场破成 8+8+1。用户没存过的配色不该占一格。
@@ -3945,7 +3943,7 @@ var VIS = (function(){
       var r = JSON.parse(localStorage.getItem(ROT_KEY) || 'null');
       if (r){ rot.on = !!r.on; rot.sec = Math.max(3, Math.min(300, +r.sec || 10)); }
     }catch(e){}
-    /* 色板顺序：只读原始数组，合并交给 normOrder() —— 它要知道
+    /* 色板顺序：只读原始数组，合并交给 normOrder —— 它要知道
        customPresets 读出来是什么（自定义预设可能被删掉，键要跟着剔除）。 */
     try{
       var od = JSON.parse(localStorage.getItem(ORDER_KEY) || 'null');
@@ -4023,7 +4021,7 @@ var VIS = (function(){
      前景明暗按 WCAG 相对亮度判：阈值 0.35。0.5 太靠上 ——
      冰川白昼的雾色 #E5EEF0 亮度约 0.79、锦鲤池的 #0F2C2A 约 0.01，
      中间那一大片暗底（绯红 0.005 / 苔藓玻璃 0.013 / 极简黑白 0.006）
-     用 0.5 也能分对，但「浅但不白」的底色（如第 25 轮删掉的青瓷 #EEF4F1）
+     用 0.5 也能分对，但「浅但不白」的底色（如删掉的青瓷 #EEF4F1）
      会更安全地落在浅侧 —— 阈值低一点，判成浅色舞台只会让文字变深，
      而浅色文字压在浅底上是彻底看不见的，两边的代价不对称。 */
   var vizStageTick = 0;
@@ -4126,7 +4124,7 @@ var VIS = (function(){
   var eq = [50,50,50,50,50,50,50,50];
   var smooth = [0,0,0,0,0,0,0,0];
   var prevBrightness = 0;
-  var motionSpeed = 50, amplitude = 70; /* 2026-10-20 用户拍板：振幅默认 70 */
+  var motionSpeed = 50, amplitude = 70; /* 振幅默认 70 */
 
   /* 节拍触发：与原 pulseTrigger / snareTrigger / meteorTrigger 的频段与冷却一致 */
   var TRIG = [
@@ -4185,7 +4183,7 @@ var VIS = (function(){
   }
 
   /* ---------------- 进页面时的操作提示 ----------------
-     第 28 轮：这串交互提示原来写在标题副标里，副标改成功能说明之后
+     这串交互提示原来写在标题副标里，副标改成功能说明之后
      搬到这里。规则：进本页浮出 → 5.2 秒后自己淡出 → 一动手立刻消失。
      只在本页 active 时才浮出，切走时无条件收起（含清掉定时器）。 */
   var hintEl = document.getElementById('vizHint');
@@ -4204,7 +4202,7 @@ var VIS = (function(){
   /* ---------------- 交互（轨道相机） ---------------- */
   var drag = null;
   cv.addEventListener('pointerdown', function(e){
-    hintHide();                       /* 一动手就把提示收掉 */
+    hintHide;                       /* 一动手就把提示收掉 */
     drag = { x:e.clientX, y:e.clientY, moved:0, t:performance.now() };
     try { cv.setPointerCapture(e.pointerId); } catch(_){}
   });
@@ -4565,7 +4563,7 @@ var VIS = (function(){
      是两件事：左栏选内置只换地形配色，字段仍然在编辑自定义预设。 */
   function editingCt(){ return activeCustom() || normCt(CT_DEF); }
 
-  /* 预览条（第 28 轮新增）：把**地形此刻真正用的那套**配色按
+  /* 预览条（新增）：把**地形此刻真正用的那套**配色按
      「能量 → 颜色」的顺序铺成一条渐变。停靠点与着色器一致：
        底色（地形低处）→ 雾色（舞台 / 外圈）→ 冷色（只在纯高频露头）
        → 暖色（主色，低频多的时候一眼看到的就是它）→ 强调色（界面）
@@ -4592,14 +4590,14 @@ var VIS = (function(){
   }
 
   /* 色板网格 = themeOrder 里的每一项（内置 16 套 + 用户存的自定义预设）。
-     第 25 轮删掉了末尾那颗「＋」：它与下面「编辑…」打开的是同一个弹层，
+     删掉了末尾那颗「＋」：它与下面「编辑…」打开的是同一个弹层，
      留着会把 8×2 的排布挤成 8+8+1。新建走弹层里的「另存为新预设」。
-     第 26 轮起，顺序不再是固定常量而是 themeOrder —— 用户拖一下就换位，
+     起，顺序不再是固定常量而是 themeOrder —— 用户拖一下就换位，
      存在本机（ORDER_KEY），见下面的 swDrop / normOrder。
 
      ★ 每颗按钮带两个 data：
          data-key            位置标识（'custom:<id>' 或内置 id），拖拽换位按它算；
-         data-pal / data-ct  点击选中用，沿用第 24 轮就有的两个分支。
+         data-pal / data-ct  点击选中用，沿用就有的两个分支。
        两者分开是因为「顺序」和「选中谁」是两件事：拖拽过程中不改选中。 */
   function renderSws(){
     if (!themeEl) return;
@@ -4621,7 +4619,7 @@ var VIS = (function(){
     themeEl.innerHTML = h;
     if (themeNameEl) themeNameEl.textContent = themeName();
   }
-  /* 弹层里的配色列表与主色板**同序**（第 26 轮）：原来这里走 THEME_LIST，
+  /* 弹层里的配色列表与主色板**同序**：原来这里走 THEME_LIST，
      「编辑…」弹层里是固定内置序、主色板却按用户拖过的顺序摆，同一个东西
      两套顺序，找一个配色要两头对。现在统一走 themeOrder，
      顺带内置与自定义预设也自动排在一起（原来内置一整段、自定义一整段）。 */
@@ -4698,7 +4696,7 @@ var VIS = (function(){
     paletteMode = CUSTOM_ID;
     writeCustom(); writePrefs();
     renderSws(); renderModalList();
-    /* 这里**不能**调 syncCtInputs()（会把用户正在输入的名字回写覆盖掉），
+    /* 这里**不能**调 syncCtInputs（会把用户正在输入的名字回写覆盖掉），
        所以预览条要单独刷一次。 */
     renderCtPrev();
   }
@@ -4709,7 +4707,7 @@ var VIS = (function(){
   }
   function closeModal(){ if (modalEl) modalEl.classList.remove('on'); }
 
-  /* 自动轮换按**用户在色板上看到的顺序**走 —— 第 26 轮起那个顺序是
+  /* 自动轮换按**用户在色板上看到的顺序**走 —— 起那个顺序是
      themeOrder（可拖拽），不再是 THEME_LIST。键的格式（内置 id /
      'custom:<预设 id>'）与 applyRot 里解析用的前缀一致，不用转换。 */
   function rotIds(){ normOrder(); return themeOrder.slice(); }
@@ -4728,7 +4726,7 @@ var VIS = (function(){
     }, rot.sec * 1000);
   }
 
-  /* ---------------- 色板拖拽换位（第 26 轮） ----------------
+  /* ---------------- 色板拖拽换位 ----------------
      按住一枚色块拖到别处就能换位置，顺序存本机（ORDER_KEY）。
 
      为什么自己写而不用 HTML5 draggable：
@@ -4743,7 +4741,7 @@ var VIS = (function(){
      ★ 用「时间戳」而不是标志位抑制拖拽后的 click：pointerup 与 click 之间
        没有可靠的 task 间隙，置标志再 setTimeout 清零会偶尔清得太早，
        于是「拖完顺手把配色也切了」。
-     ★★ 第 27 轮修的真缺陷：**pointerdown 里不能立刻 setPointerCapture**。
+     ★★ 修的真缺陷：**pointerdown 里不能立刻 setPointerCapture**。
        捕获一旦建立，pointerup 就被重定向到捕获节点（网格 .vsw-grid），
        而 click 的落点是「按下点与抬起点的最近公共祖先」—— 于是 click
        的 target 从按钮变成网格，`e.target.closest('.vsw-btn')` 恒为 null，
@@ -4806,7 +4804,7 @@ var VIS = (function(){
       if (!b || !b.dataset.key) return;
       swDrag = { key: b.dataset.key, el: b, over: null, ghost: null,
                  x: e.clientX, y: e.clientY, moved: false, pid: e.pointerId };
-      /* ★ 这里**故意不建立**指针捕获 —— 见上面 ★★ 的说明。
+      /* 这里**故意不建立**指针捕获 —— 见上面 的说明。
          捕获推迟到位移越过阈值时（pointermove 里）再建。 */
     });
     themeEl.addEventListener('pointermove', function(e){
@@ -5032,7 +5030,7 @@ var VIS = (function(){
         beDevName = o.dev || '';
         state.name = beDevName || '默认播放设备';
         hideFallback();
-        applySourceText();   /* 状态行自带 ' · 48 kHz · 8 声道' 后缀 */
+        applySourceText;   /* 状态行自带 ' · 48 kHz · 8 声道' 后缀 */
         backendPoll();
       })
       .catch(function(err){
@@ -5081,7 +5079,7 @@ var VIS = (function(){
         beFails = 0;
         if (o.rate && o.rate !== beRate){
           beRate = o.rate; beCh = o.ch || 0;
-          applySourceText();   /* 状态行刷新采样率/声道 */
+          applySourceText;   /* 状态行刷新采样率/声道 */
         }
         /* base64 → 512 字节。atob 给出的是 binary string，charCodeAt 即字节值。 */
         var s = atob(o.bins || '');
@@ -5234,21 +5232,21 @@ var VIS = (function(){
         raf = requestAnimationFrame(frame);
         /* 切回来时面板要反映后台一直在跑的捕获状态（捕获不随切页中断） */
         applySourceText();
-        hintShow();               /* 进来才浮出那串操作提示 */
+        hintShow;               /* 进来才浮出那串操作提示 */
       } else {
-        hintHide();               /* 切走无条件收起 */
+        hintHide;               /* 切走无条件收起 */
         delete document.documentElement.dataset.viz;
         /* data-vizstage 留着不删：它的所有选择器都挂在 [data-viz="1"] 下，
            留着不影响其余六页；删掉反而会让再切回来时的第一帧没有前景色。 */
         if (raf) cancelAnimationFrame(raf);
         raf = 0;
-        /* ★ 切页**不断流**：捕获是「伴随耳机播放」的那一路，页面看不见
+        /* 切页**不断流**：捕获是「伴随耳机播放」的那一路，页面看不见
            不代表该停 —— 停了再开要重锁端点、屏幕捕获还要重新授权。
            WebGL 帧循环停掉就行（不画了），采集与轮询继续在后台跑，
            回到本页即无缝接上。真想停就点「停止」。 */
       }
     },
-    theme: function(){ /* 配色在帧循环里按 paletteMode 解析，无需额外处理 */ },
+    theme: function{ /* 配色在帧循环里按 paletteMode 解析，无需额外处理 */ },
     stats: function(){ return state; },
     /* 给无头回归用的只读快照（配色状态没法从 DOM 反推）。
        命名刻意避开业务语义 —— 它不是对外 API，只是测量的抓手。 */
@@ -5277,12 +5275,12 @@ fetch('/api/ping', {cache:'no-store'})
   });
 
 /* ================= 驱动组件 · 装/卸系统里的驱动包 =================
-   ★ 2026-10-19：本块已整体移除 —— 装卸驱动统一交给同目录的
+   ★ ：本块已整体移除 —— 装卸驱动统一交给同目录的
    iKF-驱动管理.exe（自提权、可接管开机入口），主界面不再提供
    驱动安装/卸载入口，也就不再调用 /api/driver 与 /api/driver/setup。
    后端两个端点保留（--serve 回归链与排障仍可用）。 */
 
-/* ★ 2026-10-20 耳机录音（用户拍板）—— 声音页开关 + 底部灵动岛。录渲染
+/* 耳机录音—— 声音页开关 + 底部灵动岛。录渲染
    端点回环（耳机里正在播放的声音），后端 WASAPI loopback 采集直接写
    16bit 立体声 WAV 到「音乐\iKF Audio Center\」。
    状态机：开关 .on ⟺ 录音中；岛 data-state idle|rec|saved。
@@ -5394,7 +5392,7 @@ fetch('/api/ping', {cache:'no-store'})
 })();
 
 document.getElementById('devName').textContent = DEV.model;
-/* ★ 2026-10-18：#dvModel 随「型号」kv 行删除 —— 型号已由 hud dev 分支
+/* #dvModel 随「型号」kv 行删除 —— 型号已由 hud dev 分支
    大字显示，这里不再重复写（devName 胶囊仍保留）。 */
 render(); hud(); renderTable();
 setTimeout(fit, 60);

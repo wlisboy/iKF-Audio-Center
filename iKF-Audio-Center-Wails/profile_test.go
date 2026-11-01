@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// excludedFromScene 回归（2026-10-19）：档内存的是带通道后缀的名字
+// excludedFromScene 回归 ：档内存的是带通道后缀的名字
 // （VolumeScalarControl#0），只按 sceneExclude 裸名精确匹配会漏 ——
 // 电影档 63 项里混着 #0/#1、apply 照写、hasExcludedItem 也查不出来。
 // 口径：裸名命中名单 或 名字含 "#"（多通道虚拟参数）都算排除。
@@ -21,7 +21,7 @@ func TestExcludedFromScene(t *testing.T) {
 		{"AAVolumeControl", true},
 		{"DevSampleRateControl", true},
 		{"Speaker_Channel_Setting", true}, // 设备级声道拓扑，播种实读 5.1 曾把设备页切回 5.1
-		// APO 未实现家族（2026-10-19 用户拍板：场景只收确认生效的）
+		// APO 未实现家族 场景只收确认生效的）
 		{"Enable_SS_LFX", true},          // 虚拟环绕（四次 A/B 均噪声底）
 		{"SS_LB_ANGLE", true},            // SS 家族子参数随总开关一起排除
 		{"SS_LFE_DIST", true},
@@ -30,7 +30,7 @@ func TestExcludedFromScene(t *testing.T) {
 		{"Enable_BM_GFX", true},          // 动态低音（BassManagement 零命中）
 		{"Enable_SURRSENS_LFX", true},    // 环绕增强：模块有实体但 A/B 未确认生效
 		{"Enable_VOICECLARITY_LFX", true},// 语音清晰度（双证据未实现）
-		// ★ 2026-10-19 深夜修正：升降调/人声消除是真模块（CKeyShifterLib/
+		// 升降调/人声消除是真模块（CKeyShifterLib/
 		// CVocalCancellationLib 有 vftable+构造体，K 档 GFX bit13/14），
 		// 之前依据「空壳」笔误被排除——恢复场景收录
 		{"Enable_KEYSHIFT_GFX", false},
@@ -62,7 +62,7 @@ func TestExcludedFromScene(t *testing.T) {
 	}
 }
 
-// builtin 判定回归（2026-10-19）：CPL\profile 目录整棵被标 builtinDir 时，
+// builtin 判定回归 ：CPL\profile 目录整棵被标 builtinDir 时，
 // 只有内置名单内的名字才是内置档 —— 用户自建场景同名目录里必须是非内置。
 func TestBuiltinMark(t *testing.T) {
 	cases := []struct {
@@ -70,8 +70,8 @@ func TestBuiltinMark(t *testing.T) {
 		stem       string
 		want       bool
 	}{
-		{true, "默认", true}, // 2026-10-20 改名（原「原厂默认」）
-		{true, "游戏", false}, // ★ 2026-10-24：移出 builtin 名单（普通场景）
+		{true, "默认", true}, // 改名（原「原厂默认」）
+		{true, "游戏", false}, // 移出 builtin 名单（普通场景）
 		{true, "音乐", true},
 		{true, "电影", true},
 		{true, "UserDefine", true},
@@ -91,7 +91,7 @@ func TestBuiltinMark(t *testing.T) {
 }
 
 // 集成：真机驱动就绪时，在 dist 的 CPL/profile 放一个用户自建档，
-// Profiles() 必须把它标成非内置（出现在场景墙），且官方档仍是内置。
+// Profiles 必须把它标成非内置（出现在场景墙），且官方档仍是内置。
 // 驱动不可用（CI/无设备）时跳过。
 func TestProfilesBuiltinOnDevice(t *testing.T) {
 	d := NewDriver()

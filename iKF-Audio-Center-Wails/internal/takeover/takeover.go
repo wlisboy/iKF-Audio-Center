@@ -74,7 +74,7 @@ func ExePath() (string, error) {
 	return filepath.Abs(p)
 }
 
-// 官方卸载器会删掉的入口注册表（2026-10-20 本机实测，官方程序卸载后）：
+// 官方卸载器会删掉的入口注册表 本机实测，官方程序卸载后）：
 //
 //	Run\Cm108BSound 值            ← 没了
 //	CLSID\{125C480D}\Shell 子树   ← 整个没了（Command 键不存在）
@@ -83,7 +83,7 @@ func ExePath() (string, error) {
 // 因此 Write 必须能在「键被删」的残局上从零重建：CreateKey（RegCreateKeyExW
 // 会自动补齐中间路径）而非 OpenKey，并把官方安装器写过的显示元数据补回来，
 // 否则控制面板里出现的是一个无名空项。元数据逐字取自卸载前实读（见
-// 工具/卸载审计-2026-10-20.md）。
+// 工具/卸载审计- .md）。
 
 // clsidRoot 官方控制面板 CLSID 根键与官方安装器写过的显示元数据。
 const clsidRoot = `CLSID\{125C480D-543D-49C8-8840-4D28400ED72A}`
@@ -104,7 +104,7 @@ const nsPath = `SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel\
 // 全部「缺了才写」（官方卸载删掉的补回来，还在的绝不覆盖——比如 Command
 // 指向新程序后这里不会碰它）。需要管理员，调用方自理。
 //
-// DefaultIcon 例外（2026-10-28）：官方值 %WINDIR%\CM108B.ico 只有官方
+// DefaultIcon 例外 ：官方值 %WINDIR%\CM108B.ico 只有官方
 // setup 会装（OemIcon\CM108B.ico → C:\Windows），纯 INF 装驱动不产生它；
 // 值存在但文件不存在 = 控制面板项空白图标。因此图标按「缺了或指空文件
 // 都算缺失」处理，由调用方按接管/回滚分别补值（iconFor）。
@@ -185,7 +185,7 @@ func Write() (int, error) {
 	}
 	n := 1
 
-	// 2) 控制面板项：官方卸载会把 Shell 子树整棵删掉（2026-10-20 实测），
+	// 2) 控制面板项：官方卸载会把 Shell 子树整棵删掉 实测），
 	//    必须 CreateKey 从零重建（RegCreateKeyExW 自动补齐中间路径），
 	//    并补回官方显示元数据 —— 否则控制面板里是无名空项。
 	//    图标传本程序自身（内嵌资源，文件必存在）；若官方 CM108B.ico 在，
@@ -207,7 +207,7 @@ func Write() (int, error) {
 
 // UndoWrite 把两处入口改回旧面板（撤销接管），返回成功改写的项数。
 // 与 Write 对称：任何一项失败都立即返回。官方卸载可能已删掉 Shell 子树
-// （2026-10-20 实测），与 Write 同样用 CreateKey 重建 + 补官方元数据 ——
+//  实测），与 Write 同样用 CreateKey 重建 + 补官方元数据 ——
 // 回滚后控制面板项要能正常显示旧面板。
 func UndoWrite() (int, error) {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, RunPath,
@@ -235,7 +235,7 @@ func UndoWrite() (int, error) {
 	return 2, nil
 }
 
-// DeleteEntry 删除两处入口（2026-10-20 用户拍板：托盘要「可写也要可删」）：
+// DeleteEntry 删除两处入口 托盘要「可写也要可删」）：
 //
 //	Run\Cm108BSound 值整个删掉      ← 开机不再自启（删除≠改回旧面板）
 //	CLSID Shell\Open\Command 默认值删掉 ← 控制面板项不再是「打开旧面板」

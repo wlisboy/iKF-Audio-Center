@@ -240,7 +240,7 @@ func (m *MicRecorder) statusRust() map[string]interface{} {
 	}
 	out["on"] = st.running != 0
 	out["recording"] = st.running != 0 // ★与 Python 线字段名对齐：前端 tick()
-	// 按 st.recording 判断（字段缺失=灵动岛计时恒 00:00，2026-10-24 真机）
+	// 按 st.recording 判断（字段缺失=灵动岛计时恒 00:00， 真机）
 	out["rate"] = int(st.rate)
 	out["ch"] = int(st.ch)
 	out["frames"] = st.frames

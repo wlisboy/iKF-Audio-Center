@@ -98,7 +98,7 @@ MOCK = r"""<script>
         body = items(nm.replace(/\+/g, ' '));
       }
       else if (url.indexOf('/api/status') >= 0)
-        /* ★ 第 28 轮补：/api/status 多了 test_channels（每项四字段，第四项是
+        /*补：/api/status 多了 test_channels（每项四字段，第四项是
            测试音 wav 文件名），设备页的声道 chip 行全靠它渲染 —— 预览里不补
            就是一片空白，看不到这一轮修好的东西。第四项同时进了 chip 的 tooltip。 */
         body = {ok:true, connected:true, device:'iKF King Pro', model:'iKF King Pro',
@@ -110,7 +110,7 @@ MOCK = r"""<script>
                                ['RB',32,'右后','R-BackSurround.wav'],
                                ['LS',512,'左环绕','L-Surround.wav'],
                                ['RS',1024,'右环绕','R-Surround.wav']]};
-      /* ★ 第 30 轮补：/api/params 的真实契约是 {name:{r,v,w,t}}，**直接返回、
+      /*补：/api/params 的真实契约是 {name:{r,v,w,t}}，**直接返回、
          不包壳**（见 app.go 的契约表与 center_src.py 的 param_map）。这里原来
          返回 {ok, values:{}, dirty} —— 前端拿到的 PM['Enable_EQ_GFX'] 是
          undefined，统一处理器于是把所有开关判成「不可写」整片置灰，
@@ -176,7 +176,7 @@ MOCK = r"""<script>
     localStorage.setItem('iKF.activeProfile', active);
   } catch(_){ active = '电竞 · 低延迟'; }
 
-  /* ★ 切页走真的 dock 点击 —— .pgroup 的显隐、标题/副标文案、render()/hud()、
+  /* ★ 切页走真的 dock 点击 —— .pgroup 的显隐、标题/副标文案、render/hud、
      VIS.setActive() 全挂在那个 click 监听里。只写 S.section 会得到
      「舞台对了但右侧面板还是声音页内容」的半成品。 */
   window.addEventListener('load', function(){ setTimeout(function(){

@@ -85,7 +85,7 @@ func selfTest() {
 	}
 	fmt.Printf("属性总数 : %d（通用 %d + OEM %d）\n", len(allNames), len(genericNames), len(oemNamesList))
 	fmt.Printf("可读     : %d\n", ok)
-	/* ★ 2026-10-22：这一行原写「本机不支持」。ret=2 的实测含义是
+	/* ret=2 的实测含义是
 	   「存在但从未写过」（卸载/重装驱动清空 FxProperties 后全变 2，
 	   写一次就回 0），不是本机不支持。同一件事两套说法，和界面上
 	   麦克风页徽章那处一起改成「未写入」。 */
@@ -179,8 +179,8 @@ func roundTrip() {
 // serveHTTP 用普通 net/http 暴露同一套 /api/*，便于用 curl 做契约回归。
 // 正常运行时不会走到这里 —— 那时服务跑在 Wails 的内部 scheme 上，不占端口。
 //
-// ★ 健壮性审计 #1（2026-10-31）：这套 API 无任何鉴权，能改设备参数、删场景。
-//   以前 `--serve :18500`（文档写法）里 ":host" 会绑 0.0.0.0 = 局域网裸奔。
+// 注意：这套 API 无任何鉴权，能改设备参数、删场景。
+//   `--serve :18500`（文档写法）里 ":host" 会绑 0.0.0.0 = 局域网裸奔。
 //   现在默认强制回环：host 为空/0.0.0.0/:: 一律改绑 127.0.0.1；只有**显式**
 //   写出非回环 IP 才按原样绑定，并打一条醒目警告。
 func serveHTTP(addr string) {
@@ -209,7 +209,7 @@ func serveHTTP(addr string) {
 }
 
 // serveAddrLoopback 把监听地址收口到回环（健壮性审计 #1）。
-// 接受 ":端口"、"host:端口"、"端口" 三种写法。host 为空 / 0.0.0.0 / ::
+// 接受 ":端口"、"host:端口"、"端口" 三种写法。host 为空 / 0.0.0.0 / ：
 // （= 绑全部网卡）一律改回 127.0.0.1；只有显式写出非回环 IP 或主机名
 // 才放行原样绑定 —— 那是调用者明知故犯，留一条警告即可。
 func serveAddrLoopback(addr string) string {
@@ -252,7 +252,7 @@ func isLoopbackHost(host string) bool {
 // 而回环采集在「系统静音」时返回全 0 是**正确行为** —— 不给信号源就
 // 分不清「链路坏了」和「本来就没声音」。自己播一段就都清楚了。
 //
-// ★ 第 28 轮注：原先这条注释写着「驱动自带的 PlayTestSound 在本机返回
+// 此前注释曾写「驱动自带的 PlayTestSound 在本机返回
 //   0x10001，所以走不通」—— 那个结论是错的。0x10001 是因为调用方把
 //   设备上下文当成了 wav 路径（见 driver.go 的 PlayTest），修好之后
 //   PlayTestSound 是可用的，--tone 也重新走驱动自带的测试音。
@@ -488,7 +488,7 @@ func loopbackDevices() {
 //
 // 接受两种写法：
 //
-//	"端点 ID"   原样采用（Devices() 列出来的那种 GUID 串）
+//	"端点 ID"   原样采用（Devices 列出来的那种 GUID 串）
 //	"名字子串"  在端点友好名里做不区分大小写的包含匹配，取第一个命中
 //
 // 子串写法是为了省事：本机耳机端点叫「扬声器 (iKF-V11)」，敲
@@ -613,7 +613,7 @@ func loopbackTest(secs float64, tone bool, wav string, devArg string) {
 	// 锁耳机 → 采得到；跟随默认（本机默认是 FxSound Speakers）→ 采不到，
 	// 频谱恒 0。频谱全 0 而帧数照涨时，先怀疑端点对不上，别怀疑 FFT。
 	if tone {
-		// 掩码 1 = 左前。★ 第 28 轮以前这里写的是 0x6BF —— 一串既不是单个
+		// 掩码 1 = 左前。掩码必须是单个通道位。0x6BF 不是
 		// 声道、也不在驱动「整组」白名单里的位，加上第一个参数传错，
 		// 无论传什么都返 0x10001，看不出是参数问题。
 		tr := drv.PlayTest(1)
@@ -733,7 +733,7 @@ func loopbackTest(secs float64, tone bool, wav string, devArg string) {
 	}
 	fmt.Printf("结论     : 链路健康，频谱%s\n", verdict)
 	if globalMax == 0 {
-		// ★ 这里以前只写「FFT 或归一化有问题」，把人往错的方向引。
+		// 这里不能只写「FFT 或归一化有问题」——会把人往错的方向引。
 		//   实测（本机装 FxSound）：跟随默认端点时帧数照涨、频谱恒 0，
 		//   锁到耳机端点后同一个测试音立刻有内容 —— 端点对不上是第一嫌疑。
 		fmt.Println("可能原因 :")
@@ -785,7 +785,7 @@ func f64(v interface{}) float64 {
 		return float64(t)
 	case int64:
 		return float64(t)
-	// 下面这几个是 Status()/Start() 里以窄整型放进去的
+	// 下面这几个是 Status/Start 里以窄整型放进去的
 	// （bits/tag/sub/mask 等）。漏掉会静默返回 0，
 	// 表现是「字段明明有值，自检打出来是 0」。
 	case uint16:

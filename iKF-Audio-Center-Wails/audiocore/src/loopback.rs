@@ -1,6 +1,6 @@
-//! WASAPI 回环采集会话 —— Go loopback.go session() 的 Rust 移植。
+//! WASAPI 回环采集会话 —— Go loopback.go session 的 Rust 移植。
 //!
-//! 线程模型：open() 在调用线程上完成设备打开（同步，失败即 Err），
+//! 线程模型：open 在调用线程上完成设备打开（同步，失败即 Err），
 //! 采集循环跑在自带线程上（MTA 无 apartment 亲和，指针移交安全）。
 //!
 //! 逐条复刻的行为（改语义 = 破坏双跑对比，不许）：
@@ -120,7 +120,7 @@ unsafe impl Send for LbHandles {}
 /// 一路会话。Go 的 Loopback + worker(stop,done) 合体。
 pub struct LoopbackSession {
     pub state: Arc<LoopbackState>,
-    /// ★Arc 共享：capture_loop 与 spectrum()/level()/close() 必须是**同一个**
+    /// ★Arc 共享：capture_loop 与 spectrum/level/close 必须是**同一个**
     /// Spectrum 实例——S5 前版曾用局部实例导致"采集在跑、频谱全零"的断链。
     spec: Arc<Mutex<Spectrum>>,
     stop: Arc<AtomicBool>,
@@ -217,7 +217,7 @@ impl LoopbackSession {
         }
     }
 
-    /// 最新 512 字节频谱（Go Spectrum() 的数据源）。
+    /// 最新 512 字节频谱（Go Spectrum 的数据源）。
     pub fn spectrum(&self, out: &mut [u8; BINS]) -> bool {
         match self.spec.lock() {
             Ok(sp) => {
@@ -232,7 +232,7 @@ impl LoopbackSession {
         self.spec.lock().map(|s| s.level).unwrap_or(0.0)
     }
 
-    /// 停止并回收采集线程，清空会话可见字段（Go Stop() 的语义）。
+    /// 停止并回收采集线程，清空会话可见字段（Go Stop 的语义）。
     pub fn close(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(h) = self.th.take() {
@@ -323,7 +323,7 @@ unsafe fn parse_mix_format(mix: *mut WAVEFORMATEX) -> (SessionInfo, u16, i32) {
     )
 }
 
-/// 采集循环（Go session() 的 5ms 轮询段）。COM 指针的所有权在这里，
+/// 采集循环（Go session 的 5ms 轮询段）。COM 指针的所有权在这里，
 /// 结束时逆序释放。
 unsafe fn capture_loop(
     h: LbHandles,
@@ -339,7 +339,7 @@ unsafe fn capture_loop(
     let capture: IAudioCaptureClient = std::mem::transmute(h.capture);
     let dev: IMMDevice = std::mem::transmute(h.dev);
     let mix = h.mix as *mut WAVEFORMATEX;
-    // ★按需短锁：MutexGuard 不能横跨轮询循环持有（spectrum()/close() 会
+    // ★按需短锁：MutexGuard 不能横跨轮询循环持有（spectrum/close 会
     // 永远等锁）。push/compute 各自短暂加锁，微秒级不构成争用。
     let mut last_fft = Instant::now();
     if let Ok(mut d) = state.dev.lock() {
@@ -416,10 +416,10 @@ unsafe fn capture_loop(
         state.err_code.store(1, Ordering::SeqCst);
     }
     state.running.store(false, Ordering::SeqCst);
-    // rate 等字段保留（Go 版 Status 在流断后仍读得到最后格式），Stop() 才清零。
+    // rate 等字段保留（Go 版 Status 在流断后仍读得到最后格式），Stop 才清零。
 }
 
-/// 端点枚举：(id, name, is_default)（Go Devices() 的数据同源）。
+/// 端点枚举：(id, name, is_default)（Go Devices 的数据同源）。
 pub fn list_render_endpoints() -> Result<Vec<(String, String, bool)>, String> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);

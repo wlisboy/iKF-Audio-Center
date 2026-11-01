@@ -57,7 +57,7 @@ fn reg_has(reg: &OnceLock<Mutex<HashSet<usize>>>, h: usize) -> bool {
 // panic="abort" 下任何 panic 直接 __fastfail（0xC0000409），GUI 进程没有
 // stderr，panic 消息全部丢失 —— 这正是历史报错"查不到故障原因"的直接
 // 原因。hook 在 abort 前把现场追加到本 DLL 旁 log\yyyy-mm-dd.txt —— 与
-// 主程序 setupFileLog 同一份按天日志（★2026-10-25 用户要求 log 目录只
+// 主程序 setupFileLog 同一份按天日志（ log 目录只
 // 保留按天文件），panic 行自带 [时间][pid] 前缀，与 exe 的行容易区分。
 // 注意 hook 是进程级的：本 DLL 只被自家 exe / 测试进程加载，不存在
 // 覆盖宿主 hook 的问题。

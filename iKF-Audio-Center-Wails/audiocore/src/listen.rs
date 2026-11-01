@@ -1,15 +1,15 @@
-//! 麦克风监听会话 —— Go listen.go session() 的 Rust 移植。
+//! 麦克风监听会话 —— Go listen.go session 的 Rust 移植。
 //!
 //! 链路：默认麦克风（capture，自身混音格式）→ 软件上混 → 默认渲染端点
 //! （render，自身混音格式，样本写**全部声道**——多声道端点的物理声道
-//! 映射可能不在 FL/FR（2026-10-24 实证 winmm 上混写 FC），全声道写入
+//! 映射可能不在 FL/FR（实测 winmm 上混写 FC），全声道写入
 //! 保证任何映射都能听到）。
 //!
-//! ★ 2026-10-20 静音 bug 教训（Go 版注释逐条继承）：两端都必须用各自的
+//! 静音 bug 教训（Go 版注释逐条继承）：两端都必须用各自的
 //! 原生混音格式初始化，**不依赖 WASAPI 引擎的任何格式转换**（AUTOCONVERTPCM
 //! 两种摆法都实测全静音）。共享模式混合格式必为 float32，其他直接拒绝。
 //!
-//! 与 loopback.rs 同构的线程模型：open() 同步打开两端，主循环在自带线程。
+//! 与 loopback.rs 同构的线程模型：open 同步打开两端，主循环在自带线程。
 
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -236,7 +236,7 @@ unsafe fn parse_tag(mix: *mut WAVEFORMATEX) -> (i32, i32, i32, i32) {
     let mut tag = wf.wFormatTag as i32;
     if wf.wFormatTag == 0xFFFE {
         // SubFormat 在 EXTENSIBLE 偏移 24（见 loopback.go wfSubFormatOffset）；
-        // 读 Data1 低 16 位 —— 直接按内存布局取，避免 GUID::to_u128 的字节序歧义
+        // 读 Data1 低 16 位 —— 直接按内存布局取，避免 GUID：to_u128 的字节序歧义
         // （与 Go uint16(ext.SubFormat.Data1) 等价）。
         let d1 = std::ptr::read_unaligned((mix as *const u8).add(24) as *const u32);
         tag = (d1 & 0xFFFF) as i32;
@@ -275,7 +275,7 @@ unsafe fn device_name(dev: &IMMDevice) -> String {
     s
 }
 
-/// 主循环（Go session() 主循环的逐行移植）。
+/// 主循环（Go session 主循环的逐行移植）。
 unsafe fn listen_loop(h: LsHandles, state: &Arc<ListenState>, stop: &Arc<AtomicBool>) {
     let cli_c: IAudioClient = std::mem::transmute(h.cap_client);
     let capture: IAudioCaptureClient = std::mem::transmute(h.capture);

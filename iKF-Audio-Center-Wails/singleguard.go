@@ -1,6 +1,6 @@
 //go:build windows
 
-// 单实例守卫（2026-10-20 用户报障：连点两次 exe 会起两个进程）。
+// 单实例守卫 连点两次 exe 会起两个进程）。
 // ====================================================================
 //
 // 为什么不用 Wails 的 SingleInstanceLock：v2.16 的实现有 bug ——
@@ -8,10 +8,10 @@
 // 但查找用 FindWindowW，它只搜顶层窗口、搜不到消息专用窗口（Win32
 // API 规定，必须用 FindWindowExW 并以 HWND_MESSAGE 为父窗口）。
 // 于是第二个实例永远找不到第一个 → 锁形同虚设（实测双开，且两个
-// WebView2 抢同一用户数据目录互杀）。
+// WebView2 抢同一数据目录互杀）。
 //
 // 自己实现，三步：
-//   1. guardSingleInstance 在 main() 最开头调用（先于 drv.Open）——
+//   1. guardSingleInstance 在 main 最开头调用（先于 drv.Open）——
 //      CreateMutex 判重；已有实例则 FindWindowExW(HWND_MESSAGE,…)
 //      定位其消息窗口、WM_COPYDATA 转交通知，然后退出；
 //   2. 第一实例的接收窗口（本文件 siWndProc）收到后唤出主界面
@@ -92,7 +92,7 @@ func siNotify(hwnd uintptr) {
 }
 
 // siStartReceiver 注册消息窗口类、建隐藏窗口，并在独立 OS 线程上泵消息。
-// （GetMessageW 有线程亲和性——与托盘消息循环同一条铁律。）
+// （GetMessageW 有线程亲和性——与托盘消息循环同一条铁律）
 func siStartReceiver() {
 	go func() {
 		runtime.LockOSThread()

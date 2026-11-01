@@ -1,6 +1,6 @@
 // iKFTool —— iKF Audio Center 日志诊断工具（独立 CLI，不碰驱动/不占单实例）。
 //
-// 职责划分（2026-10-25 用户定）：驱动管理=装/卸驱动，iKFTool=日志诊断，
+// 职责划分：驱动管理=装/卸驱动，iKFTool=日志诊断，
 // 主程序=运行使用。本工具全程**只读**（注册表读 / wevtutil / 文件哈希），
 // 主程序开着也能跑。
 //
@@ -15,10 +15,10 @@
 //	  -arm      给主程序/驱动管理布防 WER 本地崩溃转储（HKCU，免提权）
 //	  -arm-off  撤销布防
 //
-// 输出：控制台全文 + 追加进 exe 旁 log\yyyy-mm-dd.txt（★2026-10-25 用户
+// 输出：控制台全文 + 追加进 exe 旁 log\yyyy-mm-dd.txt 用户
 // 要求 log 目录只保留主程序的按天日志，不再单独写诊断报告文件）。
 //
-// ★ 注意：builtinScenes 名单与 model/device-model.toml 的 [scene] builtin
+// 注意：builtinScenes 名单与 model/device-model.toml 的 [scene] builtin
 //   人工同步 —— 主程序那边是 go:embed 真源，这里只做分类展示。
 package main
 
@@ -97,7 +97,7 @@ func profileItems(text string) []profileItem {
 }
 
 // builtinScenes 内置场景名单。★与 model/device-model.toml [scene].builtin
-// 人工同步（2026-10-24 版：游戏已移出，出厂默认 = 默认/音乐/电影）。
+// 人工同步（出厂默认 = 默认/音乐/电影）。
 var builtinScenes = map[string]bool{
 	"默认": true, "音乐": true, "电影": true,
 	"UserDefine": true, "UserDefineFormwork": true, "HiFi": true,
@@ -133,7 +133,7 @@ type sceneFile struct {
 	fi   os.FileInfo
 }
 
-// ---------------- 诊断新段（2026-10-25，定位=日志诊断） ----------------
+// ---------------- 诊断段（定位=日志诊断） ----------------
 
 // runCmd 跑一条外部命令（超时兜底），stdout+stderr 合并返回。
 func runCmd(timeout time.Duration, name string, args ...string) (string, error) {
@@ -205,7 +205,7 @@ func secRuntime(w func(string, ...interface{})) {
 		w("WebView2 : %s", wv2)
 	}
 	// ★已安装杀软（root\SecurityCenter2）：静默终止/注入型 fail-fast 的
-	// 头号嫌疑就是杀软（2026-10-25 远端模式：启动正常→2-3 分钟→无声死亡），
+	// 头号嫌疑就是杀软 启动正常→2-3 分钟→无声死亡），
 	// 这个字段必须自动带出来。productState 原样记录，由人工判读开关状态。
 	if out, err := runCmd(30*time.Second, "powershell", "-NoProfile", "-Command",
 		"Get-CimInstance -Namespace root/SecurityCenter2 -Class AntiVirusProduct | ForEach-Object { $_.displayName + '  productState=0x' + $_.productState.ToString('X6') }"); err == nil && strings.TrimSpace(out) != "" {
@@ -254,7 +254,7 @@ func secIntegrity(w func(string, ...interface{}), exe string) {
 
 // avProcs 国产杀软/管家的特征进程表。★SecurityCenter2 不可靠：本机实测
 // 火绒在跑（HipsDaemon/HipsTray）但 SecurityCenter2 只报 Defender —— 所以
-// 进程级探测才是真源（2026-10-25 教训）。增量补常见厂商即可。
+// 进程级探测才是真源。增量补常见厂商即可。
 var avProcs = []struct{ proc, name string }{
 	{"hipsdaemon.exe", "火绒"}, {"hipstray.exe", "火绒"}, {"usysdiag.exe", "火绒"},
 	{"360safe.exe", "360"}, {"360tray.exe", "360"}, {"360sd.exe", "360"},
@@ -336,7 +336,7 @@ func secProcsLogs(w func(string, ...interface{}), exe string) {
 }
 
 // secCrash 崩溃取证：事件日志（异常代码+出错模块）→ WER 归档 → 转储目录
-// → 按天日志里的 panic 行。判据（2026-10-23 定）：事件里出错模块=exe 自身
+// → 按天日志里的 panic 行。判据：事件里出错模块=exe 自身
 // → Go fatal；=osConfLib.dll → 原生侧；=杀软 DLL → 注入；无记录 → 加载
 // 阶段就死了（代码一行没跑）。
 func secCrash(w func(string, ...interface{}), exe string) {
@@ -439,7 +439,7 @@ func secCrash(w func(string, ...interface{}), exe string) {
 // armDumps -arm / -arm-off：布防/撤销 WER 本地转储（HKCU 免提权）。
 // DumpType=1 minidump：含崩溃线程栈（fail-fast 现场够用），体积小到发得动微信；
 // full dump 在 Go 进程上动辄几百 MB，没人会真发。
-// ★ 2026-10-25 追加 GOTRACEBACK=crash（用户级环境变量）：Go 运行时 fatal
+// 设置 GOTRACEBACK=crash（用户级环境变量）：Go 运行时 fatal
 //   error（concurrent map / deadlocked / unexpected fault…）默认是
 //   print→exit(2)，**不留任何 dump**（远端 25264 静默消失就是这么死的）；
 //   设为 crash 后改走 fail-fast → WER → dump。注意 procdump -e 抓不到
@@ -776,7 +776,7 @@ func main() {
 	}
 
 	// ---- 落盘 ----
-	// ★ 2026-10-25：不再单独写 诊断报告-<时间戳>.txt —— log 目录只保留
+	// 不再单独写 诊断报告-<时间戳>.txt —— log 目录只保留
 	//   主程序的按天日志。报告追加进同一份 log\yyyy-mm-dd.txt（O_APPEND
 	//   多写者安全，与 setupFileLog 的单行写互不踩踏），控制台照常全文。
 	rep := b.String()

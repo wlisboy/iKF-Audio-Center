@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "src", "center_src.py")
 DESIGN = os.path.join(ROOT, "design", "audio-center.html")
-# ★ S3 起属性名清单改由 device-model.toml [names] 承载（源文件运行时装载），
+# S3 起属性名清单改由 device-model.toml [names] 承载（源文件运行时装载），
 # propnames.json 退役 —— 构建不再注入 __GENERIC__/__OEM__。
 OUT = os.path.join(ROOT, "iKF-Audio-Center.py")
 
@@ -65,7 +65,7 @@ BRIDGE_JS = r"""
 
      ★ 但「回环没测到」≠「耳机里没变化」，两个已知盲区：
        ① 生产回环 `_push_frames` 把多声道下混成 (L+R)/2 ＝ Mid，会在数学上
-          抹掉 Mid/Side 空间类效果。已用逐声道 MultiTap 补测（ab_ch.py 第 8 轮，
+          抹掉 Mid/Side 空间类效果。已用逐声道 MultiTap 补测（ab_ch.py，
           改喂环绕/后置信号：掩码 512=SL / 16=BL / 4=C）—— 结论不变，
           盲区排除了，负结果依旧。
        ② **WASAPI 回环采的是音频引擎交给驱动之前的那份数据**（还早于端点主
@@ -87,7 +87,7 @@ BRIDGE_JS = r"""
   var UNPROVEN = {
     Enable_AUDIOBRILLIANT_LFX: 1,   /* 音频增艳 —— APO 里连 Brilliant 字都没有 */
     Enable_VIRTUALBASS_LFX: 1,
-    /* ★ 2026-10-19 深夜：Enable_SURRSENS_LFX（环绕增强）移出本表 ——
+    /* Enable_SURRSENS_LFX（环绕增强）移出本表 ——
        CXearSurrMaxLib 有实体（vftable + 0x4e748 对象构造，K 档 LFX 唯一
        真模块），标「未实现」与反编译事实不符。它 A/B 未测到生效有前置
        条件解释（需虚拟环绕/扬声器移位/真实多声道之一开启，开关副标题
@@ -100,16 +100,16 @@ BRIDGE_JS = r"""
     Enable_NEOPC_LFX: 1,
     Enable_BM_GFX: 1,
     Enable_SS_LFX: 1,                 /* 虚拟环绕 —— 四次测量均在噪声底，但见盲区② */
-    /* ★ 2026-10-19 深夜：Enable_CONLAB_HPSPK_LFX（耳机环绕）移出本表 ——
-       第 44 轮真·应用流 A/B 测到 19.9（伪影底 9~11 的两倍），且场景收录
+    /* Enable_CONLAB_HPSPK_LFX（耳机环绕）移出本表 ——
+       应用流 A/B 实测 19.9（伪影底 9~11 的两倍），且场景收录
        口径（Go 侧）已把它当生效项保留；悬浮文字再挂「官方 APO 未实现」
-       自相矛盾（用户实测指出）。改走下方 SW_TIP 专属说明。
-       （历史备注：第 48 轮更正过「环绕增强」原绑的 Enable_SURRMAX_FOR_HPSPK
+       自相矛盾（实测指出）。改走下方 SW_TIP 专属说明。
+       （历史备注：「环绕增强」曾误绑 Enable_SURRMAX_FOR_HPSPK
        是零引用假名，真开关是 Enable_SURRSENS_LFX。） */
-    Enable_VOICECLARITY_LFX: 1        /* 语音清晰 —— 2026-10-18 入表（A/B 回环实测
+    Enable_VOICECLARITY_LFX: 1        /* 语音清晰 —— 入表（A/B 回环实测
                                          双音+噪声源、LEVEL/NOISESUPP=100，全频段
                                          噪声底且可逆）。
-                                         ★★ 2026-10-19 深夜 REA-OUT 复核修正：
+                                         REA-OUT 复核修正：
                                          原证据②「APO 内 VoiceClar 字符串零命中
                                          → 模块未实现」**方法无效** —— APO 根本
                                          不含任何 osConfLib 参数名（RFX_ENVIRONMENT/
@@ -121,7 +121,7 @@ BRIDGE_JS = r"""
                                          不含该位 ⟹ 本机不构建；渲染侧（GFX/LFX）
                                          无任何它的构建器。文案已按此修正
                                          （见 UNPROVEN_NOTE）。 */
-    /* ★★ 第 56 轮（L 档）：本表与 bindDevPanel 里的 APO_IMPL 是**两张不同问题的表**：
+    /*本表与 bindDevPanel 里的 APO_IMPL 是**两张不同问题的表**：
          · 本表 UNPROVEN  = 「**回环 A/B 测没测到变化**」（测量事实）
          · APO_IMPL       = 「**主机侧 APO 建没建这个模块**」（反编译事实，K 档）
        两者可同时成立：模块建了，但只在设备输出端生效 ⟹ 回环测不到。
@@ -132,7 +132,7 @@ BRIDGE_JS = r"""
          不改变「测过、没测到」这个事实。 */
   };
 
-  /* ★ 第 56 轮（L 档）：本机「主机侧真的有实现」的 APO 模块表。
+  /*本机「主机侧真的有实现」的 APO 模块表。
      来源 = K 档取证（docs/K档取证-LFX与采集侧位表.md）：逐位反编译 APO 的模块
      构造器、读完对象 vftable 才写进这里 —— 不靠猜，也不靠「参数名字像」。
        GFX 侧：bit1 CReverbLib(环境音效) · bit2 CEQ15BandLib(均衡) ·
@@ -150,9 +150,9 @@ BRIDGE_JS = r"""
     'Enable_SURRSENS_LFX': 'CXearSurrMaxLib'
   };
   window.__apoImpl = APO_IMPL;
-  /* 提示文案（★ 2026-10-18 终稿：统一且简短——
+  /* 提示文案 终稿：统一且简短——
      「同一件事只有一个说法」。
-     ★ 2026-10-19 深夜修正：此前这里写「6 个置位里仅 bit1 真建模块，
+     REA-OUT 复核修正：6 个置位里仅 bit1 真建模块，
      bit2/7/13/14 是空壳」——与 K 档取证原文不符，系笔误。K 档 §2.2/2.5：
      GFX 位 1/2/13/14（CReverbLib/CEQ15BandLib/CKeyShifterLib/
      CVocalCancellationLib）与 LFX 位 7（CXearSurrMaxLib）都是真模块
@@ -161,7 +161,7 @@ BRIDGE_JS = r"""
      CKeyShifterLib/CVocalCancellationLib/CXearSurrMaxLib 均有真实 vftable
      与构造体（CMEffectAPO_108B.dll.c 506603/507208/515290 行）。 */
   var UNPROVEN_TEXT = '官方 APO 未实现 · 反编译确认';
-  /* ★ 2026-10-19 深夜（REA-OUT 复核）：个别项的专属修正文案 —— 覆盖默认句。
+  /* （REA-OUT 复核）：个别项的专属修正文案 —— 覆盖默认句。
      语音清晰：官方 APO **有**模块类 CVoclaEffectLib（真 vftable + 0x528 对象，
      CMEffectAPO_108B.dll.c 515709 行构造器），但构建器 FUN_1801d3d50 只挂在
      **采集侧 bit23** 的位分发上，本机采集掩码 0x00028200 不含该位 ⟹ 本机
@@ -172,13 +172,13 @@ BRIDGE_JS = r"""
   };
   window.__unprovenNote = function(p){ return (p && UNPROVEN_NOTE[p]) || UNPROVEN_TEXT; };
   window.__unprovenNoteShort = function(p){ return (p && UNPROVEN_NOTE[p]) || UNPROVEN_TEXT; };
-  /* ★ 2026-10-19：个别开关的专属悬浮说明 —— 覆盖默认的「· 可写」。
-     ★ 2026-10-19 深夜（用户拍板）：耳机环绕仍用「· 可写」，此表暂空，
+  /* 个别开关的专属悬浮说明 —— 覆盖默认的「· 可写」。
+     耳机环绕仍用「· 可写」，此表暂空，
        保留机制供以后有需要时加行。 */
   var SW_TIP = {};
   /* 声场页两个已入 UNPROVEN 的旋钮（悬停提示与开关口径一致） */
   var DIAL_NOTE = { bass: '动态低音', clear: '语音清晰' };
-  /* 旋钮 → 对应 UNPROVEN 参数名（专属修正文案分流用，2026-10-19 深夜） */
+  /* 旋钮 → 对应 UNPROVEN 参数名（专属修正文案分流用） */
   var DIAL_NOTE_P = { bass: 'Enable_BM_GFX', clear: 'Enable_VOICECLARITY_LFX' };
 
   var LAST = { eq: null, room: null, vol: null };
@@ -217,12 +217,12 @@ BRIDGE_JS = r"""
   }
 
   /* ---------------- 设备连接状态 ----------------
-     第 26 轮：这里原来是左下角一个**独立浮层**（#__live，left:26px/bottom:74px）。
+     这里原是左下角一个**独立浮层**（#__live，left:26px/bottom:74px）。
      问题是它和设备胶囊说的是同一件事 —— 胶囊写「iKF-V11 已连接」，
      浮层写「驱动已连接 · iKF7.1.dll」，同一句话分两处写；而左下角那个位置
      夹在左侧导航 dock 与主题切换按钮之间，孤零零一个胶囊，像掉出来的。
      现在并进胶囊：#devState 就是它的落点，圆点按状态变色（正常绿 / 异常灰）。
-     第 28 轮：用户指出「已连接 · osConfLib.dll」这一串太突兀 ——
+     「已连接 · osConfLib.dll」一串太突兀 ——
      名字里带 .dll 的文件名对普通用户没有意义，而「已连接」本身就已经表示
      驱动接通了（这正是用户的原话）。所以状态文字只留「已连接」，
      驱动文件名改挂 title，鼠标停上去才看得到。
@@ -245,17 +245,17 @@ BRIDGE_JS = r"""
     parts.push(text);
     if (detail) parts.push(detail);
     if (p) p.title = parts.join(' · ');
-    /* ★ 2026-10-21：未连接/异常时把胶囊变成「重新检测」的入口（markDown
+    /* 未连接/异常时把胶囊变成「重新检测」的入口（markDown
        负责光标与 data-reconnect）。「正在连接 …」也是 ok=false，但那不是
        可点的失败态，所以按文案判，不按 ok 判。 */
     markDown((text === '未连接驱动' || text === '连接异常') && !RECONNECTING);
   }
 
   /* ---------------- 驱动重连 ----------------
-     ★ 2026-10-21（用户拍板）：Open 只在进程启动时试一次。iKF-驱动管理
+     Open 只在进程启动时试一次。iKF-驱动管理
      装完驱动会 pnputil /restart-device 重建音频端点，用户点完「已安装
      完成」立刻打开主程序，很容易撞在重建窗口期里 —— 一次失败界面就
-     永久停在「未连接驱动」，以前唯一的出路是彻底关掉重开。
+     永久停在「未连接驱动」，只能彻底关掉重开。
      现在给一条自恢复路径：点右上角设备胶囊的状态，或场景页那句「点此
      重新检测」→ 后端 POST /api/driver/reopen 松开旧上下文重枚举端点。
      成功后整页 reload：面板本来就还没绑定（未连接时提前 return），
@@ -285,7 +285,7 @@ BRIDGE_JS = r"""
     postRaw('/api/driver/reopen', {}).then(function(o){
       RECONNECTING = false;
       if (o && o.ready){
-        /* ★ 2026-10-22：后端已经把「采集端点没起来」重试到 4.4 秒，走到
+        /* 后端已经把「采集端点没起来」重试到 4.4 秒，走到
            这里通常两者都齐了。万一麦克风端点确实还没回来，先给一句提示
            再刷新（刷新会盖掉 toast，所以延迟 1.5 秒），否则用户只会看到
            麦克风页整页不可用，不知道还能再点一次。 */
@@ -334,7 +334,7 @@ BRIDGE_JS = r"""
     if (n) n.textContent = '—';
     var l = el.querySelector('.dlab');
     if (l && l.textContent.indexOf('不可用') < 0){
-      /* ★ 第 47 轮：原文存一份。旋钮会被反复 dim / undim（切端点、
+      /*原文存一份。旋钮会被反复 dim / undim（切端点、
          参数从不可读变可读），不存原文的话后缀会一路叠上去擦不干净。 */
       if (l.dataset.orig === undefined) l.dataset.orig = l.textContent;
       l.textContent += ' · 不可用';
@@ -344,9 +344,9 @@ BRIDGE_JS = r"""
     if (el.classList && el.classList.contains('sw')) tagSwitch(el, true);
   }
 
-  /* dim() 的逆操作。开关那条路走 tagSwitch(sw,false)，旋钮这条路的
+  /* dim 的逆操作。开关那条路走 tagSwitch(sw,false)，旋钮这条路的
      标签是 .dlab + 读数 .dnum，tagSwitch 管不到，所以单独一个。
-     ★ 第 47 轮：旋钮现在会「先灰后亮」（第 46 轮接了参数、但 bindVolume
+     旋钮现在会「先灰后亮」（参数已接、但 bindVolume
        里留着的硬置灰又把它按死了 —— 见 bindVolume 的注释），必须能还原。 */
   function undim(el){
     if (!el) return;
@@ -370,10 +370,10 @@ BRIDGE_JS = r"""
     nm.textContent = nm.dataset.orig + (off ? ' · 不可用' : '');
   }
 
-  /* ---------------- 开关联动降暗（第 59 轮） ----------------
+  /* ---------------- 开关联动降暗 ----------------
      开关关着时，它从属的滑杆/下拉整体降不透明度（.grp-dim，样式在设计稿
-     第 59 轮段）—— 只表达「现在不生效」，**不禁用**：不设
-     pointer-events:none，拖了/选了照常写驱动，行为与以前完全一致。
+     对应段）—— 只表达「现在不生效」，**不禁用**：不设
+     pointer-events:none，拖了/选了照常写驱动，行为与早先完全一致。
      映射 = data-p -> 从属控件 id 列表；从属框取最近容器
      （.slider / .row），降暗连标签一起降，口径与静态缩进一致。
      联动不挂在各个同步点上（同步/乐观翻转/失败回滚有四五处），
@@ -431,7 +431,7 @@ BRIDGE_JS = r"""
   function onoff(d){
     if (!d) return null;
     if (d.r === 0) return d.v === '1' ? '开' : '关';
-    /* ★ 2026-10-22：ret=2 是「存在但从未写过」，不是「本机不支持」——
+    /* ret=2 是「存在但从未写过」，不是「本机不支持」——
        铁律第 2 条。这里原来判 `d.r !== 0` 就返回 null，于是**刚装完驱动、
        一次都没设置过**时，麦克风页右上四行全显示「设备不支持」，用户看到
        的就是「麦克风功能整个废了」；可下面四个开关其实都能点（w=true 走
@@ -453,7 +453,7 @@ BRIDGE_JS = r"""
       bindUnsupportedAll();
       return null;
     }
-    /* ★ 第 28 轮：状态文字只写「已连接」，驱动文件名走 title。
+    /* 状态文字只写「已连接」，驱动文件名走 title。
        普通用户看不懂 osConfLib.dll，而「已连接」本身就表示驱动接通了。 */
     badge('已连接', true, '驱动 ' + (st.dll || '').split('\\').pop());
 
@@ -533,7 +533,7 @@ BRIDGE_JS = r"""
 
   /* ---------------- 2. 设备页 ---------------- */
   function bindDevPanel(st){
-    /* ★ 2026-10-18 根修：kv 行去重后数量变了，旧的按位置 setKv(i) 整体
+    /* 根修：kv 行去重后数量变了，旧的按位置 setKv(i) 整体
        错位 —— 驱动版本被写成编解码器名（产品名式长串）、DirectX 行写成
        设备 ID、音量范围写成「来自设备描述符」。改为按 id 定位，行序以后
        随便调都不会错位。取值全部来自 status() 真实字段：
@@ -545,13 +545,13 @@ BRIDGE_JS = r"""
       if (b) b.textContent = (val === null || val === undefined || val === '') ? '—' : val;
     }
     setKvId('drvVer', st.driver);
-    /* 设备 ID / 型号来源 / DirectX 三行已随 2026-10-18 精简删除
+    /* 设备 ID / 型号来源 / DirectX 三行已随 精简删除
        （参数页可查），对应写入一并移除。 */
     setKvId('devVol', (st.vol_min === null || st.vol_max === null)
       ? '—'
       : (st.vol_min.toFixed(1) + ' … ' + st.vol_max.toFixed(1) + ' dB'));
-    /* ★ 2026-10-18：步进信息降为浅色小字后缀——主值干净，细节不丢。
-       （全角括号挤在右对齐值里显得杂乱，用户反馈改版。） */
+    /* 步进信息降为浅色小字后缀——主值干净，细节不丢。
+       （全角括号挤在右对齐值里显得杂乱，故改版。） */
     var dvEl = document.querySelector('#pg-dev #devVol');
     if (dvEl && st.vol_step && st.vol_min !== null && st.vol_max !== null){
       dvEl.innerHTML = dvEl.textContent
@@ -559,7 +559,7 @@ BRIDGE_JS = r"""
         + st.vol_step + '</span>';
     }
 
-    /* ★ 2026-10-18：说明写入器已删——它的 font-size:10.5px 选择器会命中
+    /* 说明写入器已删——它的 font-size:10.5px 选择器会命中
        声道配置的说明行并覆写成设备说明（用户截图抓到）。设备说明行本身
        已随精简删除，无再写入的必要。 */
   }
@@ -579,8 +579,8 @@ BRIDGE_JS = r"""
       dial.title = '主音量 ' + (st.vol_db === null ? '—' : st.vol_db.toFixed(2) + ' dB')
         + ' · 上下拖拽或滚轮调节';
     }
-    /* ★ 第 47 轮删除：这里原来无条件把「动态低音」「语音清晰」两个旋钮
-       dim() 成「本机 APO 未实现此效果」。那句话在**第 46 轮接好线之后就
+    /*删除：这里原来无条件把「动态低音」「语音清晰」两个旋钮
+       dim() 成「本机 APO 未实现此效果」。那句话在**参数接好线之后就
        不成立了** —— 两个旋钮现在分别绑 BM_Slider_BassLevel（配 Enable_BM_GFX）
        与 VOICECLARITY_LEVEL（配 Enable_VOICECLARITY_LFX），两项都已进白名单
        且 write 探测通过。留着这句硬置灰的后果是：旋钮带 data-val 却
@@ -649,13 +649,13 @@ BRIDGE_JS = r"""
      data-p / data-label（麦克风侧再加 data-ep="capture"），
      状态由下方统一处理器按驱动读回值同步，点击也由全局委托处理。
 
-     ★ 第 30 轮撤掉了原来那张 SWITCH_MAP。它按「#pg-* 内 button.sw
+     撤掉了原来那张 SWITCH_MAP。它按「#pg-* 内 button.sw
      的出现顺序」索引着填 data-p，隐患是**界面一改顺序就悄悄错位**；
      而这轮恰好把四组开关从均衡页搬到了声场页。既然统一处理器本来就
      支持属性直连，那张表就是纯负担，故删除 —— 顺序不再有任何隐式约束。
 
      语义备忘：**「智能音量」绑 Enable_SMART_VOLUME_GFX，不再绑 GFSControl**。
-     第 46 轮查 osConfLib.dll 的字符串表才看穿原先的错判 —— 那个表分成
+     查 osConfLib.dll 的字符串表才能确认早先的错判 —— 那个表分成
      两块：功能参数表（Enable_* / *_LEVEL / SS_* …）和**设备控制表**
      （GetDeviceFriendlyName / GetSupportFeature / AmplifierControl /
      IsSupportXearSurround71 / GFSControl / SpectrumControl…）。
@@ -670,16 +670,16 @@ BRIDGE_JS = r"""
     /* 声场页补真实控件（挂在「环境类型」那一组下，
        见 addSpaceSwitch 里的锚点说明）。
 
-       ★ 第 47 轮（B 档 · 环绕族）：把官方面板三张环绕页翻完之后，
+       （B 档 · 环绕族）：把官方面板三张环绕页翻完之后，
          真正有界面可接的只有下面这些：
-           apoSpeakerVirtual.cml              7.1 声场扩展（Enable_SS_LFX，第 30 轮已接）
+           apoSpeakerVirtual.cml              7.1 声场扩展（Enable_SS_LFX，已接）
            apoSpeakerXearSurroundHeadPhone.cml 开关 + 模式单选 + 房间大小三选
            apoSpeakerSurroundMax.cml          **整页只有一个开关**
          参数表里那 12 项 SURRSENS_* 与 4 项 DHDVS 官方从来没做过界面 ⟹ 不接。
          ★ 房间大小在耳机页是 RadioButton Tag 0=大 / 1=中 / 2=小（**与直觉反序**），
          所以下面选项顺序必须显式写成「大 / 中 / 小」，不能照「小中大」的习惯排。
 
-       ★ 第 47 轮续：官方**耳机菜单**（MenuHeadset.cml）里除了
+       续：官方**耳机菜单**（MenuHeadset.cml）里除了
          `HeadsetXearSurroundHeadPhone` 还有 `HeadsetXearSurroundSpeakers`
          （Xear Surround Speaker），那张页有两根滑杆：声场扩展 0~3、
          扬声器角度 5~30（步进 5）。XearAudioCenter_x64.exe 的字符串表里
@@ -694,12 +694,12 @@ BRIDGE_JS = r"""
          「启动 Xear Surround Max，必须先打开 Virtual Surround、Speaker Shifter
          或是 Real Multi-Channel 输出」—— 它是有前置条件的，必须写出来。 */
     addSpaceSwitch('Enable_SS_LFX', '虚拟环绕', '');
-    /* ★ 第 49 轮：紧接着补「虚拟音箱摆位」编辑器（官方 7.1 Virtual Speaker
+    /*紧接着补「虚拟音箱摆位」编辑器（官方 7.1 Virtual Speaker
        Shifter 页）。必须紧跟开关之后 —— 下方所有动态行都插在 #spFxStart
        之前，所以插入顺序就是显示顺序，「虚拟环绕 → 摆位编辑器 → 环境音效」。 */
     addSpaceVssEditor();
     addSpaceSwitch('Enable_RFX_GFX', '环境音效', '');
-    /* ★ 2026-10-19（用户拍板）：「房间大小」滑杆归属「环境音效」组 ——
+    /* 「房间大小」滑杆归属「环境音效」组 ——
        把设计稿静态放在「环境」段的滑杆行搬到环境音效开关行之后，
        加 .ctl-sub 缩进（与耳机环绕从属控件同一口径）。绑定/同步都走
        roomRange/roomVal 两个 ID，DOM 搬家不影响任何逻辑；sortSpaceRows
@@ -721,16 +721,16 @@ BRIDGE_JS = r"""
       '', ['大房间', '中房间', '小房间']);
     addSpaceSlider('sfxRange', 'CONLAB_HPSPK_SFX', '声场扩展', 0, 3, 1);
     addSpaceSlider('spkRange', 'CONLAB_HPSPK_SPKANGLE', '扬声器角度', 5, 30, 5);
-    /* ★★ 第 48 轮更正：这一项原先绑 `Enable_SURRMAX_FOR_HPSPK` —— 绑错了。
+    /* 这一项
        该名字在 XearAudioCenter_x64.exe 的字符串表里出现 **0 次**，只在
        osConfLib.dll 的参数表（第 136 项）里躺着，官方面板从不用它。
        Surround Max 页真正的总开关是 `Enable_SURRSENS_LFX` —— 它在 exe 与 dll
        里都有，且与 `Enable_DHDVS_LFX` / `Enable_SS_LFX` / `Enable_PLIIX_LFX` /
        `Enable_NEOPC_LFX` 排在同一块，那正是「每个官方页一个 LFX 总开关」的清单。
        （SURRSENS = Surround Sensation，Surround Max 的前身名。）
-       教训与第 46 轮 GFSControl 同类：**名字像 ≠ 就是它**，必须落到 exe 引用上。 */
+       教训与 GFSControl 同类：**名字像 ≠ 就是它**，必须落到 exe 引用上。 */
     addSpaceSwitch('Enable_SURRSENS_LFX', '环绕增强', '');
-    /* ---- C 档：Dolby Headphone / Dolby Virtual Speaker（第 48 轮）----
+    /* ---- C 档：Dolby Headphone / Dolby Virtual Speaker----
        官方页 apoSpeakerDolbyHPVS.cml（**耳机菜单里有**）控件结构：
          总开关 + 「VS 还是 HP」二选一 + VS 组(Reference/Wide) + HP 组(Studio/Cinema/Hall)
        对应参数由 exe 字符串表坐实：总开关 Enable_DHDVS_LFX、二选一 DHDVS_USEDH、
@@ -745,12 +745,12 @@ BRIDGE_JS = r"""
       '', ['工作室', '影院', '大厅']);
     addSpaceSelect('dhVsSel', 'DVS_Mode', 'Dolby 扬声器模式',
       '', ['Reference', 'Wide']);
-    /* ★★ 第 53 轮（I 档）：Dolby 还有一条**官方自己写出来的前置条件** ——
+    /*Dolby 还有一条**官方自己写出来的前置条件** ——
        喇叭组态必须是立体声(2 声道)，而且官方给它做了界面（见 addDolbyWarn 注释）。
        这里紧跟 Dolby 组把提示块建出来：动态行都是 insertBefore(#spFxStart)，
        所以这一行调用就落在 Dolby 组正下方。门控在 syncExtras 里的 dolbyGate()。 */
     addDolbyWarn();
-    /* ★ 2026-10-18：声音页行序整理——可写/实测有效的功能排在前，
+    /* 声音页行序整理——可写/实测有效的功能排在前，
        UNPROVEN（实测无效·官方未实现）的整组沉到卡片末尾；
        纯 DOM 重排，界面不显示任何分组标记。排序在全部动态注入之后执行。 */
     sortSpaceRows();
@@ -806,7 +806,7 @@ BRIDGE_JS = r"""
   /* ---------------- 5.5 扩展功能：静音 / 环境类型 / 变调 / 人声消除 / GFS
      这 5 组是本机 23 项可写参数里此前没有界面入口的部分。
 
-     RFX_ENVIRONMENT 的索引语义已由静态反编译确认（2026-10-14 第三轮）：
+     RFX_ENVIRONMENT 的索引语义已由静态反编译确认）：
        · CMEffectAPO_108B.dll 内 FUN_18021efd0 对 *(this+0x27C) 做 switch，
          case 0="Default"、1="Generic"、2="Paddedcell"…23="Underwater"、24="KTV"；
        · 原面板 Skin/FaceLift/apoSpeakerEM.cml 的 RadioButton Tag 与之吻合
@@ -846,7 +846,7 @@ BRIDGE_JS = r"""
        HKCU\SOFTWARE\C-Media\Hook\EnableGFS 这个 DWORD 的读写接口
        （osConfLib.dll 分发表 ID 0x10029 → FUN_180011ff0，内部只做
        RegQueryValueExW / RegSetValueExW），它是布尔开关而不是 8 档模式。
-       ★ 第 46 轮更正：它**不是**「智能音量」（见 bindSwitches 上方的
+       更正：它**不是**「智能音量」（见 bindSwitches 上方的
          语义备忘），所以现在界面上不再给它专用入口 —— 参数页仍可读可写。
        这里兜底清掉残留的旧下拉。 */
     var gfs = $('gfsSel');
@@ -854,7 +854,7 @@ BRIDGE_JS = r"""
       var oldRow = gfs.closest('.row');
       if (oldRow) oldRow.remove(); else gfs.remove();
     }
-    /* ★ 第 52 轮（H 档）：官方 apoSpeakerVol.cml（输出页）的**逐声道音量**。
+    /*官方 apoSpeakerVol.cml（输出页）的**逐声道音量**。
        参数名带 "#<声道索引>" 后缀，由驱动层的 _pc() 拆成「真实属性名 + 声道
        索引」再调 PropertyControl —— 与其它滑杆共用同一条读 / 写 / 置灰路径，
        没有第二套机制。滑杆刻度 0..100 ↔ 驱动标量 0..1（scale = 100）。
@@ -871,7 +871,7 @@ BRIDGE_JS = r"""
        解锁则两根完全独立。 */
     BAL_LOCK = true;
     var bl = $('balLock');
-    /* ★ 2026-10-17（可发现性）：默认锁定是模仿官方 LockButton 的默认勾选，
+    /* （可发现性）：默认锁定是模仿官方 LockButton 的默认勾选，
        但实测用户会以为「左右声道没法单独控制」。三处补信号 ——
        ① 行标签常显「左右声道 · 已联动/独立」；② 锁定态下拖滑杆给一次性
           toast 指路；③ 开关 title 原本就有联动/独立文案。 */
@@ -917,7 +917,7 @@ BRIDGE_JS = r"""
     });
     /* 变调 / 人声消除 / 增艳强度 滑杆：绝对值直接写。input 只刷读数，
        change（松手）才写驱动，避免拖动时连续写寄存器。
-       ★ 第 47 轮起这份名单由 sliderCfgs() 统一给出：静态三根 + 声场页
+       起这份名单由 sliderCfgs() 统一给出：静态三根 + 声场页
          动态补的滑杆（addSpaceSlider 建的）走同一条路径，不会漏接同步。 */
     sliderCfgs()
     .forEach(function(cfg){
@@ -948,10 +948,10 @@ BRIDGE_JS = r"""
     });
   }
 
-  /* ---------------- 5.7 三个旋钮接线（第 46 轮） ----------------
-     设计稿里的 .dial 原先只是本地视觉 —— 拖拽 / 滚轮改数字、派发
+  /* ---------------- 5.7 三个旋钮接线----------------
+     设计稿里的 .dial 最初只是本地视觉 —— 拖拽 / 滚轮改数字、派发
      dialchange，但不写任何驱动参数。可它们标的偏偏正好是三个**有对应**
-     的 Xear 音效：「音量」「动态低音」「语音清晰」。第 46 轮按官方页接上：
+     的 Xear 音效：「音量」「动态低音」「语音清晰」。按官方页接上：
        vol   → VolumeScalarControl     标量音量 0..1（= 刻度 / 100）
        bass  → BM_Slider_BassLevel     官方 Xear Dynamic Bass 页，0..10
        clear → VOICECLARITY_LEVEL      官方 Xear Voice Clarity 页，0..6
@@ -976,7 +976,7 @@ BRIDGE_JS = r"""
   var dialOn = {};          /* data-dial -> 上一次写过的开关状态 */
   var dialAt = {};          /* data-dial -> 防抖定时器 id */
   var DIAL_DEBOUNCE = 260;
-  /* ★ 第 52 轮（H 档）：左右声道是否联动。纯界面状态，不落盘、不写驱动
+  /*左右声道是否联动。纯界面状态，不落盘、不写驱动
      （驱动侧没有对应的「平衡锁定」参数 —— 官方那个是 .cml 里的
      LockButton，由面板自己维护）。 */
   var BAL_LOCK = true;
@@ -1042,21 +1042,21 @@ BRIDGE_JS = r"""
       if (p && p.r === 0 && p.v !== '' && +p.v <= env.options.length - 1){
         env.value = p.v;
       } else if (!p || !p.w){
-        /* ★ 第 48 轮改：原先这里判的是 `p.r !== 0`，于是**从未写过（ret=2）**的
+        /* 若按 `p.r !== 0` 判定，**从未写过（ret=2）**的
            参数会被判成「本机不支持」并置灰 —— 与开关那条路（只在不可写时置灰）
            不一致，也违背项目红线：ret=2 只是「没写过」，写一次就 ret=0。
            现在只在**确实不可写**时置灰；r=2 时保持可点，让用户自己去写第一次。 */
         dim(env.parentNode, '环境类型 · 当前设备不支持');
       }
     }
-    /* ★ 第 52 轮（H 档）：左右声道滑杆同步。与其它滑杆同一条路径 ——
+    /*左右声道滑杆同步。与其它滑杆同一条路径 ——
        读不到就整行置灰（syncSlider 内部处理），不额外写第二套判据。 */
     syncSlider('volLRange', 'volLVal', 'VolumeScalarControl#0', pm,
                function(v){ return Math.round(v * 100) + '%'; }, 100);
     syncSlider('volRRange', 'volRVal', 'VolumeScalarControl#1', pm,
                function(v){ return Math.round(v * 100) + '%'; }, 100);
-    /* B 档环绕族下拉（第 47 轮）：环绕模式 / 环绕房间。
-       C 档 Dolby 三档（第 48 轮）：Dolby 方式 / 耳机空间 / 扬声器模式。
+    /* B 档环绕族下拉环绕模式 / 环绕房间。
+       C 档 Dolby 三档：Dolby 方式 / 耳机空间 / 扬声器模式。
        这些 select 都是 bindSwitches 里动态建的，值就是驱动 Tag，直接对位。 */
     [['hrsModeSel', 'CONLAB_HPSPK_MODE', '环绕模式'],
      ['hrsRoomSel', 'CONLAB_HPSPK_ROOMSIZE', '环绕房间'],
@@ -1083,7 +1083,7 @@ BRIDGE_JS = r"""
         var lab = $(cfg[1]);
         if (lab) lab.textContent = cfg[3](+d.v);
       } else if (!d || !d.w){
-        /* ★ 第 48 轮改：判据由 `d.r !== 0` 改成 `!d.w`，理由同上面的下拉 ——
+        /* 判据由 `d.r !== 0` 改成 `!d.w`，理由同上面的下拉 ——
            ret=2（存在但从未写过）不该被当成本机不支持而锁死滑杆。
            新加的「声场扩展 / 扬声器角度」两根滑杆出厂就是 ret=2，
            照老判据会一上来就被按死。 */
@@ -1091,9 +1091,9 @@ BRIDGE_JS = r"""
       }
     });
 
-    /* 声道配置 chips（第 50 轮 / E 档）。
+    /* 声道配置 chips/ E 档）。
        写入值是 Tag 本身（2/4/6/8），所以这里也**不做任何换算**：直接比对数值。
-       置灰判据照第 48 轮的红线 —— 一律用 `!d.w`，**不许**用 `r !== 0`：
+       置灰判据红线 —— 一律用 `!d.w`，**不许**用 `r !== 0`：
        Speaker_Channel_Setting 在本机是 ret=0，但换一台机器完全可能是 ret=2
        （存在、可写、只是没人写过），照 r 判会把它一上来就锁死。 */
     var cbox = $('chChips');
@@ -1109,7 +1109,7 @@ BRIDGE_JS = r"""
         dim(cbox, '声道配置 · 当前设备不支持');
       }
     }
-    /* ★ 2026-10-19 深夜：房间大小滑杆补同步 —— 用户报障「场景里设置的
+    /* 房间大小滑杆补同步 —— 「场景里设置的
        数值，切到对应页面 UI 还保持默认」的最后一处实锤。roomRange 只在
        首帧 bindRoom(status) 里设过一次值，applyParams 的同步清单一直
        没有它：应用场景后 RFX_ROOMSIZE 变了，滑杆与读数却停在旧位置。
@@ -1132,14 +1132,14 @@ BRIDGE_JS = r"""
     } else if (rrr && rroom && !rroom.w){
       dim(rrr.parentNode, '房间大小 · 当前设备不支持');
     }
-    /* ★ 第 53 轮（I 档）：Dolby 组的前置条件门控放在最后 ——
+    /*Dolby 组的前置条件门控放在最后 ——
        它依赖上面那块 Speaker_Channel_Setting 的读回值（同一个 pm）。 */
     dolbyGate(pm);
   }
 
   /* 把驱动读回的三个旋钮参数刷到旋钮刻度上（0..100 归一化）
-     ★ 第 47 轮：这里同时负责**点亮 / 置灰**。判据只看驱动读得回读不回
-       （d.r === 0），不再是写死的「本机没实现」—— 第 46 轮接参数那天，
+     这里同时负责**点亮 / 置灰**。判据只看驱动读得回读不回
+       （d.r === 0），不再是写死的「本机没实现」—— 接参数那天，
        bindVolume 里遗留的硬置灰把刚接好的两个旋钮按死了，本函数看不出来。 */
   function syncDials(pm){
     var list = document.querySelectorAll('.dial[data-dial]');
@@ -1147,7 +1147,7 @@ BRIDGE_JS = r"""
       var key = dial.dataset.dial, cfg = DIAL_CFG[key];
       if (!cfg) return;
       var d = pm[cfg.p];
-      /* ★ 2026-10-17（用户拍板「默认值可交互」）：三态判据 ——
+      /* 三态判据 ——
          ① !d.w → 置灰；② 读得到 → 驱动真值；③ w 但读不到（ret=2）
          → 保留设计稿默认刻度、可交互，title 如实标注。
          ret=2 只是「端点还没写过值」（铁律 2），端点重建后旋钮不再
@@ -1158,12 +1158,12 @@ BRIDGE_JS = r"""
       }
       undim(dial);
       var tick = (d && d.r === 0 && d.v !== '') ? +cfg.from(+d.v) : NaN;
-      /* ★ 2026-10-18：UNPROVEN 旋钮（动态低音/语音清晰）在操作提示后
+      /* UNPROVEN 旋钮（动态低音/语音清晰）在操作提示后
          追加统一悬停句——不覆盖，否则 bindDials 设的提示会被冲掉。 */
       var dialTail = DIAL_NOTE[dial.dataset.dial]
         ? ' · ' + (UNPROVEN_NOTE[DIAL_NOTE_P[dial.dataset.dial]] || UNPROVEN_TEXT)
         : '';
-      /* ★ 2026-10-22：有 data-tiers 的旋钮（动态低音 11 个位置、
+      /* 有 data-tiers 的旋钮（动态低音 11 个位置、
          语音清晰 7 个位置）在操作提示后标出真实档数 —— 拖一格跳 10 是
          驱动量程决定的，不写清楚会以为是滑杆坏了。 */
       var tierNote = dial.dataset.tiers
@@ -1173,9 +1173,9 @@ BRIDGE_JS = r"""
         dial.dataset.val = tick;
         dial.title = cfg.p + ' · 上下拖拽或滚轮调节' + tierNote + dialTail;
       } else {
-        /* 2026-10-20（用户拍板）：动态低音/语音清晰读不到驱动记忆值时
+        /* 动态低音/语音清晰读不到驱动记忆值时
            给一个可交互的初始刻度。
-           ★ 2026-10-22 修正：兜底值必须落在**驱动真实档位**上（原来写死
+           兜底值必须落在**驱动真实档位**上（原来写死
            45，而 bass 只有 0..10、clear 只有 0..6，45 写进去会被四舍五入
            成 5/3，回读再换算就成 50 —— 首次进入界面时数字会「自己跳」）。
            50 是两档中点，两个量程都能精确表示（5/10、3/6）。 */
@@ -1194,7 +1194,7 @@ BRIDGE_JS = r"""
     });
   }
 
-  /* ================= 7.1 虚拟音箱摆位（第 49 轮 D 档） =================
+  /* ================= 7.1 虚拟音箱摆位D 档） =================
      官方 apoSpeakerVirtual.cml 那张页的控件是：
        开关(Enable_SS_LFX) + 4 个模式单选钮 + Reset + 8 个可拖拽音箱 + 8 根只读 dB 条
      页面上**没有角度/距离滑杆** —— 角度距离全靠拖动图标改。所以本面板也不做滑杆，
@@ -1226,7 +1226,7 @@ BRIDGE_JS = r"""
         VSS_LAST[name] = val;
       } else {
         VSS_LAST[name] = undefined;          /* 允许下次重试 */
-        /* 第 60 轮：用户 toast 不再暴露 ret= 码（那是给日志的）；
+        /*toast 不再暴露 ret= 码（那是给日志的）；
            只有后端给了可读 error 才带上，方便报障时口述。 */
         toast(name + ' 设置失败，已恢复原值'
               + (r && r.error ? '（' + r.error + '）' : ''), true);
@@ -1237,7 +1237,7 @@ BRIDGE_JS = r"""
     });
   }
   /* ★★ 把界面状态**立刻**快照进 VSS_PEND，不能等防抖到点再读 S.spk。
-     第 49 轮的教训：任何人在这 260ms 内调一次 __resync()（老代码里
+     教训：任何人在这 260ms 内调一次 __resync()（老代码里
      「松手立刻写角度 + 成功后重拉参数」就是这么干的），syncSpk 就会用
      驱动里的旧值把 s.dist 覆盖回 0，等定时器到点写出去的已是 0。
      快照 + VSS_PEND 双保险：syncSpk 见到挂起的名字就跳过，不覆盖界面。 */
@@ -1296,7 +1296,7 @@ BRIDGE_JS = r"""
   function bindVss(){
     var mr = $('vssModeRot'), mm = $('vssModeMove'), hint = $('vssHint');
     function modeText(m){
-      /* ★ 2026-10-18：底部说明按官方词条（apoHeadPhoneVirtual.xaml）的
+      /* 底部说明按官方词条（apoHeadPhoneVirtual.xaml）的
          用语改写 —— 官方把拖拽语义表达为「音量减弱 / 音量增强」（8 根
          dB 条的标签），聆听者而非听者。工程细节（±100 刻度 / 驱动不钳位）
          留在源码注释里，界面上不再堆给用户。 */
@@ -1322,8 +1322,8 @@ BRIDGE_JS = r"""
       function(){ vssReset(); });
   }
 
-  /* 声场页动态补「虚拟音箱摆位」编辑器（第 49 轮）。
-     ★ 2026-10-18 重设计（用户：旧的三颗文字按钮有点丑）：原来的
+  /* 声场页动态补「虚拟音箱摆位」编辑器。
+     重设计（旧的三颗文字按钮观感差）：原来的
        「两个 chip + 一排三个文字按钮」合并成一条工具条 ——
        左边是「旋转 | 平移」分段选择器（pill 胶囊、accent 填充激活态），
        右边是三颗图标圆钮（逆时钟 ↺ / 顺时钟 ↻ / 重置 ⟲，lucide 线性
@@ -1359,13 +1359,13 @@ BRIDGE_JS = r"""
   }
 
   /* 声场页动态补一个开关。
-     ★ 第 30 轮改成插入到 #spFxStart 之前，而不是 appendChild ——
+     改成插入到 #spFxStart 之前，而不是 appendChild ——
      声场页末尾现在有一组从均衡页挪过来的音效开关，appendChild 会把
      「虚拟环绕 / 环境音效」排到它们后面，跟同属环境类的「环境类型」
      隔断。锚在 #spFxStart（那条 border-top 所在的行）之前，
      两次调用天然保序：第二次插在第一次的后面。 */
   /* 静态滑杆（设计稿里就写好的）+ 动态补的滑杆，统一一份配置。
-     第 46 轮补 AUDIOBRILLIANT_LEVEL：官方 Xear Audio Brilliant 页除开关外
+     补 AUDIOBRILLIANT_LEVEL：官方 Xear Audio Brilliant 页除开关外
      还有一根 Brilliant强度 滑杆（0~6），此前只有开关、强度没入口。 */
   var EXTRA_SLIDERS = [
     ['ksRange', 'ksVal', 'KEYSHIFT_LEVEL', function(v){ return (v > 0 ? '+' : '') + v; }],
@@ -1381,7 +1381,7 @@ BRIDGE_JS = r"""
     if (!g || g.querySelector('button.sw[data-p="' + param + '"]')) return;
     var row = document.createElement('div');
     row.className = 'row';
-    /* 第 62 轮：行内说明全部取消（副标接过说明职责），sub 传空即不渲染 */
+    /*行内说明全部取消（副标接过说明职责），sub 传空即不渲染 */
     row.innerHTML = '<div><div class="nm">' + name + '</div>'
       + (sub ? '<div class="sub">' + sub + '</div>' : '')
       + '</div>'
@@ -1391,7 +1391,7 @@ BRIDGE_JS = r"""
     else g.appendChild(row);
   }
 
-  /* 声场页动态补一个下拉（第 47 轮 B 档 · 环绕族）。
+  /* 声场页动态补一个下拉B 档 · 环绕族）。
      与 addSpaceSwitch 共用同一个锚点，所以插入顺序 = 调用顺序；
      选项值直接用下标（0/1/2），正好等于驱动里的 Tag，无需再换算。
      建完立刻交给统一的 bindSelect，选完即写、失败回滚。 */
@@ -1399,11 +1399,11 @@ BRIDGE_JS = r"""
     var g = $('pg-space');
     if (!g || $(id)) return;
     var row = document.createElement('div');
-    /* 第 59 轮：动态下拉都跟在某个开关后面（环绕模式/房间跟「耳机环绕」、
+    /*动态下拉都跟在某个开关后面（环绕模式/房间跟「耳机环绕」、
        Dolby 三项跟「Dolby 环绕」），按静态滑杆同一口径加 .ctl-sub 缩进。 */
     row.className = 'row ctl-sub';
     var cap = document.createElement('div');
-    /* 第 62 轮：同 addSpaceSwitch，sub 传空即不渲染 */
+    /*同 addSpaceSwitch，sub 传空即不渲染 */
     cap.innerHTML = '<div class="nm">' + name + '</div>'
       + (sub ? '<div class="sub">' + sub + '</div>' : '');
     var sel = document.createElement('select');
@@ -1420,7 +1420,7 @@ BRIDGE_JS = r"""
     bindSelect(id, param, 'render', options, name);
   }
 
-  /* 声场页动态补一根滑杆（第 47 轮 B 档）。
+  /* 声场页动态补一根滑杆B 档）。
      值域由调用方从官方 .cml 的 Slider Minimum/Maximum 抄进来，**不是猜的**；
      建完把配置推进 SPACE_SLIDERS，绑定/同步交给 bindExtras / syncExtras。 */
   function addSpaceSlider(id, param, label, min, max, step){
@@ -1428,7 +1428,7 @@ BRIDGE_JS = r"""
     if (!g || $(id)) return;
     var vid = id + 'Val';
     var row = document.createElement('div');
-    /* 第 59 轮：动态滑杆（声场扩展/扬声器角度）跟在「耳机环绕」开关后面，
+    /*动态滑杆（声场扩展/扬声器角度）跟在「耳机环绕」开关后面，
        同静态滑杆口径加 .ctl-sub。 */
     row.className = 'slider ctl-sub';
     row.innerHTML =
@@ -1443,7 +1443,7 @@ BRIDGE_JS = r"""
     SPACE_SLIDERS.push([id, vid, param, function(v){ return v; }]);
   }
 
-  /* ---------- 5.7 Dolby 的声道前置条件（第 53 轮 I 档） ----------
+  /* ---------- 5.7 Dolby 的声道前置条件I 档） ----------
      ---- 取证（i_probe3.py）----
      Skin/FaceLift/apoSpeakerDolbyHPVS.cml 尾部原文：
        <Canvas Width="643" Height="455" Name="WarningContent" Visibility="Hidden">
@@ -1550,7 +1550,7 @@ BRIDGE_JS = r"""
     bindSlider('aaRange', 'aaVal', 'AAVolumeControl', 'capture',
                function(v){ return v + ' dB'; });
 
-    /* 麦克风监听：2026-10-20 起为内嵌 WASAPI 监听（POST /api/listen
+    /* 麦克风监听： 起为内嵌 WASAPI 监听（POST /api/listen
        {on}）。旧的 RunListen2Device 官方路径依赖的 COM 服务器驱动包里
        没有（官方原版同样开不了），取证见 docs/监听取证-监听COM组件缺失.md */
     var ls = $('listenSw');
@@ -1565,7 +1565,7 @@ BRIDGE_JS = r"""
         postRaw('/api/listen', {on: on}).then(function(r){
           if (r.ok){
             toast('麦克风监听' + (on ? ' 已开启' : ' 已关闭'));
-            /* ★ 2026-10-24：监听增益滑杆随开关显隐（1.0-4.0×，实时） */
+            /* 监听增益滑杆随开关显隐（1.0-4.0×，实时） */
             if (lgr) lgr.hidden = !on;
           } else {
             ls.classList.toggle('on', !on);
@@ -1585,7 +1585,7 @@ BRIDGE_JS = r"""
 
   /* ---------------- 5.7 设备页扩展：采样率 / 声道配置 / 声道测试 / ASIO ---------------- */
 
-  /* E 档（第 50 轮）：官方「设定」页的声道单选。
+  /* E 档官方「设定」页的声道单选。
      apoSpeakerSetting.cml 里 Channels2/4/6/8 的 **Tag 就是声道数本身**
      （2 / 4 / 6 / 8），所以选项值与 Tag 一一对位，没有任何下标换算 ——
      这是本档唯一一处「驱动值 = 界面值」的控件，别照 D 档 RoomSize 那种反序去套。
@@ -1616,7 +1616,7 @@ BRIDGE_JS = r"""
     var box = $('testChips');
     if (box){
       var chans = st.test_channels || [];
-      /* 第四项是测试音 wav 文件名（第 28 轮加的）。挂进 tooltip：
+      /* 第四项是测试音 wav 文件名加的）。挂进 tooltip：
          万一以后某一档不响，界面上能直接看出它在找哪个文件。 */
       box.innerHTML = chans.map(function(c){
         return '<button class="chip" data-mask="' + c[1] + '" title="'
@@ -1639,12 +1639,12 @@ BRIDGE_JS = r"""
           });
       });
     }
-    /* 声道配置（第 50 轮 / E 档）。
+    /* 声道配置/ E 档）。
        ★ 为什么**没有**「会中断播放」确认框 —— 这一条是本次实测推翻的旧结论：
-         原先记的是「写 Speaker_Channel_Setting 会让端点重初始化、活动流当场
-         AUDCLNT_E_DEVICE_INVALIDATED」。第 50 轮把当年那个脚本拆开逐项归因
+         早期笔记写「写 Speaker_Channel_Setting 会让端点重初始化、活动流当场
+         AUDCLNT_E_DEVICE_INVALIDATED」。后来把崩溃复现脚本拆开逐项归因
          （.workbuddy-ai/tmp/e_stream_kill2.py）后发现：
-           · 当年 stream_kill.py 在 t=5.0s 把 Enable_SS_LFX=0 **和**
+           · 复现脚本 stream_kill.py 在 t=5.0s 把 Enable_SS_LFX=0 **和**
              Speaker_Channel_Setting=2 捆在同一次写入，归因本身就是混的；
            · 逐项单测：写 2→8→6→2 期间渲染流**一路在写**、无 err；
            · 真凶是另一时间片的 XearSurround71Control=1（hr=0x88890004）。
@@ -1668,7 +1668,7 @@ BRIDGE_JS = r"""
         post({name: 'Speaker_Channel_Setting', value: v}).then(function(r){
           if (r && r.ok){
             toast('声道配置已改为 ' + chanLabel(v));
-            /* ★ 第 53 轮：Dolby 组的门控跟着这个值走，写完立刻重判一次，
+            /*Dolby 组的门控跟着这个值走，写完立刻重判一次，
                不等下一次轮询（否则会看到「警告已成立、Dolby 行却还在」）。 */
             if (PM['Speaker_Channel_Setting']) PM['Speaker_Channel_Setting'].v = String(v);
             dolbyGate(PM);
@@ -1748,11 +1748,11 @@ BRIDGE_JS = r"""
   }
 
   /* active（「使用中 · X」）不再用 localStorage：那是浏览器本地记忆，
-     与设备无关、跨驱动重装残留 —— 会显示撒谎（2026-10-20 用户实测）。
+     与设备无关、跨驱动重装残留 —— 会显示错误信息（实测）。
      现在由后端 /api/profiles 的 active 字段按设备真值识别（设备参数与
      哪个场景快照完全一致就是哪个，都不一致 = 自定义状态）；
      apply 成功后本地即时更新，下次拉列表时以真值识别为准。 */
-  function profSaveActive(){ /* 兼容占位：active 已改为设备真值识别 */ }
+  function profSaveActive{ /* 兼容占位：active 已改为设备真值识别 */ }
   try { localStorage.removeItem('iKF.activeProfile'); } catch(_){}
 
   function profSelected(){
@@ -1762,7 +1762,7 @@ BRIDGE_JS = r"""
     return null;
   }
 
-  /* 出厂档（驱动自带 + 自建「默认」，2026-10-20 改名）不给改名 / 删除：
+  /* 出厂档（驱动自带 + 自建「默认」， 改名）不给改名 / 删除：
      它是回到基线的唯一入口，删掉就再也回不去了。 */
   function profFactory(sel){
     return !sel || sel.builtin || sel.name === '默认';
@@ -1806,19 +1806,19 @@ BRIDGE_JS = r"""
           + pesc(PROFILES.detailErr) + '</div>';
       } else {
           var d = PROFILES.detail || { count: 0, groups: [] };
-          /* 2026-10-20（用户要求）：详情卡改显「实际应用参数」——
+          /* 详情卡改显「实际应用参数」——
              开启 = 值为 1 的开关型参数（Enable_* / AGCControl，Go 侧算好），
              档位/滑杆跟随所属开关不重复计数。共 N 项 = 档内全量快照条数。
           ★ 曾按「底部遮挡」误解收拢过一轮（合并采集组/折叠零组），12:40
-             用户澄清真实诉求是渐隐提示后拍板完整恢复 15 行——底部按钮
+             确认真实诉求是渐隐提示后完整恢复 15 行——底部按钮
              需滚动才能看到，由减半后的渐隐（12px）提示。 */
           var onN = (typeof d.on === 'number') ? d.on : 0;
           var h = '<div class="pr"><span>开启</span><b>' + onN
              + ' 项 / 共 ' + d.count + ' 项</b></div>';
           (d.groups || []).forEach(function(g){
-            /* ★ 2026-10-19 深夜：分组行从纯统计升级成「页面选项」—— 点击
+            /* 分组行从纯统计升级成「页面选项」—— 点击
                跳到主界面对应设置页（麦克风组→麦克风页、EQ→均衡页、其余
-               渲染组→声场页）。用户反馈：详情列了分组却只能看不能去，
+               渲染组→声场页）。反馈：详情列了分组却只能看不能去，
                「切到页面发现开关不同步」的观感一部分来自这里没有入口。 */
             var nav = g.ep === 'capture' ? 'mic' : (g.label === 'EQ' ? 'eq' : 'space');
             h += '<div class="pr pr-nav" data-nav="' + nav
@@ -1878,7 +1878,7 @@ BRIDGE_JS = r"""
      比对只做在基线里有的键上，且当前读数必须 r===0（读得到）——
      读不到就不下结论，宁可漏报不可误报。
 
-     ★ 2026-10-30 根修（用户报障「没动任何设置，已修改未保存自己亮」）：
+     根修（症状「没动任何设置，已修改未保存自己亮」）：
        r===0 但 v 为空串 = 已知驱动读抖动（lastscene.go / initmanifest.go /
        initstate.go 三处都有「重读一次」兜底，注释原文「--dump 同款」）。
        /api/params 每项只读一次、没有重读保护 —— 一次抖动就把空串当真值
@@ -1934,7 +1934,7 @@ BRIDGE_JS = r"""
            renderProfile 打「出厂默认」徽标，用户自建卡可改可删。
            ★ 之前这里 filter(!x.builtin) 把官方场景全滤掉 —— 便携包下
            用户自建与内置档同住 CPL\profile，Go 侧按目录标 builtin 时
-           连官方场景一起消失，场景墙空白（2026-10-19 真机确认）。
+           连官方场景一起消失，场景墙空白（实测确认）。
            现在 Go 侧按内置名单判定，这里不再二次过滤。 */
         PROFILES.list = p.list || [];
         PROFILES.dir = p.dir || '';
@@ -1951,14 +1951,14 @@ BRIDGE_JS = r"""
           PROFILES.ref = null; PROFILES.base = null; PROFILES.dirty = false;
           profSaveActive();
         }
-        window.PROFILES = PROFILES;      /* 设计稿的 renderProfile() 读它 */
+        window.PROFILES = PROFILES;      /* 设计稿的 renderProfile 读它 */
         paintProfPanel();
         profRefreshWall();
         return p;
       })
       .catch(function(e){
-        /* ★ 2026-10-22：点「重新检测」成功后页面 reload，这时后端刚做完
-           close→open，多个请求挤在一起。以前这里没有 catch —— 一次网络
+        /* 点「重新检测」成功后页面 reload，这时后端刚做完
+           close→open，多个请求挤在一起。这里若无 catch —— 一次网络
            抖动就变成 unhandled rejection，paintProfPanel() 根本不执行，
            场景墙停在空态，用户看到的就是「自定义场景全没了」。
            重试一次，仍失败才提示。 */
@@ -2067,11 +2067,11 @@ BRIDGE_JS = r"""
     profOpenForm('new', '', '');
   };
 
-  /* ---------------- APO 未实现控件的默认隐藏（2026-10-19 用户拍板） ----------------
+  /* ---------------- APO 未实现控件的默认隐藏 ） ----------------
      场景已经不收这些参数（Go 侧 sceneUnproven 名单），主界面把它们默认
      隐藏。★ 调整入口 = **参数页现有 UI**（208 项全量参数表，未实现参数
-     照常可搜可读写），不再设统一开发者开关（用户拍板「统一开关还是算了」）。
-     ★ 2026-10-19 深夜按 REA-OUT 反编译复核修正口径：
+     照常可搜可读写），不再设统一开发者开关。
+     按 REA-OUT 反编译复核修正口径：
        - 升降调（CKeyShifterLib）/ 人声消除（CVocalCancellationLib）是
          **真模块**（vftable + 构造体，K 档 GFX bit13/14）—— 常显
          （之前依据的「空壳」注释是笔误）；
@@ -2099,7 +2099,7 @@ BRIDGE_JS = r"""
      一起处理：升降调/人声消除恢复常显（真模块），brRange（增艳）仍藏。 */
   var UNPROVEN_HIDE_EL = ['dhSel', 'dhHpSel', 'dhVsSel', 'brRange',
                           'vssModeRow', 'vssHint'];
-  /* ★ 2026-10-19 深夜：动态低音 / 语音清晰两个旋钮**加回显示**（用户拍板）——
+  /* 动态低音 / 语音清晰两个旋钮**加回显示**——
      从隐藏清单移除，恢复常显；悬浮提示仍走 UNPROVEN 口径（如实标注）。 */
   var UNPROVEN_HIDE_DIAL = [];
 
@@ -2115,7 +2115,7 @@ BRIDGE_JS = r"""
       else el.classList.add('unproven-row');
       /* ★ 无行容器时必须藏元素自身，绝不能兜底到 parentNode ——
          旋钮卡片（.dial）共用 .dials 容器，兜底到父容器会把主音量
-         一起藏掉（2026-10-19 实测报障：声场页旋钮卡片一个不剩）。 */
+         一起藏掉（实测报障：声场页旋钮卡片一个不剩）。 */
     };
     document.querySelectorAll('button.sw[data-p]').forEach(function(sw){
       if (UNPROVEN_HIDE[sw.dataset.p]) mark(sw);
@@ -2252,7 +2252,7 @@ BRIDGE_JS = r"""
     }
 
     /* 脏标记的触发点之二：写驱动。
-       ★ 原先这里写着「applyParams 是所有参数读数的唯一汇入口，写回后的
+       ★ 早先版本写着「applyParams 是所有参数读数的唯一汇入口，写回后的
        回读也走它」—— 这个假设是错的：参数写入**不经过** applyParams，
        开关（d.v = r.value）、滑杆、下拉都是在各自的 .then 里就地改
        PM/PMC 的本地副本。于是改了参数也不会重算，脏标记永远不亮。
@@ -2265,7 +2265,7 @@ BRIDGE_JS = r"""
       post = function(body){
         return _post(body).then(function(r){
           if (r && r.ok){
-            /* 2026-10-20：记录「主界面刚自己写过」。参数 watch 轮询会
+            /* 记录「主界面刚自己写过」。参数 watch 轮询会
                把这次写当成「外部变化」发 tray:sync，重同步会重设控件、
                和正在进行的拖拽打架 —— 600ms 内的 watch 事件由监听端忽略。 */
             window.__lastLocalWrite = Date.now();
@@ -2322,7 +2322,7 @@ BRIDGE_JS = r"""
     if (!el) return null;
     var fmtv = fmt || function(v){ return v; };
     var k = scale || 1;              /* 滑杆刻度 → 参数值 的换算（标量音量是 100:1） */
-    /* ★ 2026-10-24：注册到统一重同步表 —— 场景 apply 后 applyParams 按表
+    /* 注册到统一重同步表 —— 场景 apply 后 applyParams 按表
        回填（此前 capture 端滑杆不在任何同步路径，应用含麦克风参数的
        自定义场景后页面停在旧值）。新控件走 bindSlider 自动获得同步。 */
     BIND_REG.push({id:id, labId:labId, param:param, ep:ep, fmt:fmtv, k:k});
@@ -2419,7 +2419,7 @@ BRIDGE_JS = r"""
       S.eq = cur.slice();
       S.pre = sel.value;
       render(); hud();
-      /* 复用第 8 节的 push()：它按 LAST.eq 做差量，只写变化的频段。
+      /* 复用第 8 节的 push：它按 LAST.eq 做差量，只写变化的频段。
          必须先把 EQ_W 打开，否则桥接层认为曲线不是本面板改的。 */
       EQ_W = true;
       push();
@@ -2475,11 +2475,11 @@ BRIDGE_JS = r"""
     }
     if (anyEq){
       S.eq = eq; LAST.eq = eq.slice(); EQ_W = true;
-      /* ★ 2026-10-24：驱动 EQ 已被场景改写，本地 EQ 预设选择器不得再
+      /* 驱动 EQ 已被场景改写，本地 EQ 预设选择器不得再
          显示旧选择（否则读数撒谎）——清空并重渲染下拉。 */
       var eps = $('eqProfSel');
       if (eps && eps.value !== ''){ eps.value = ''; }
-      /* ★ 2026-10-22：读回 10 段值后必须反查预设，芯片与 S.pre 跟着走。
+      /* 读回 10 段值后必须反查预设，芯片与 S.pre 跟着走。
          旧实现只更新 S.eq，芯片停在初始化时硬编码的第 0 个「舞曲」上 ——
          默认场景（全 0 = 官方索引 11「预设」）因此在均衡页显示「舞曲」。 */
       if (typeof syncEqChips === 'function') syncEqChips();
@@ -2501,10 +2501,10 @@ BRIDGE_JS = r"""
     /* 扩展控件（静音/环境类型/变调/人声消除/智能音量）的初始状态 */
     syncExtras(pm);
     syncDials(pm);
-    /* ★ 第 49 轮：把驱动读回的 8 角度 + 8 距离刷到声场图与读数区 */
+    /*把驱动读回的 8 角度 + 8 距离刷到声场图与读数区 */
     syncSpk(pm);
 
-    /* ★ 2026-10-24：bindSlider/bindSelect 注册表统一重同步 —— 麦克风页
+    /* bindSlider/bindSelect 注册表统一重同步 —— 麦克风页
        （capture 端）的滑杆/下拉此前不在任何同步路径：应用含麦克风参数
        （降噪/回声/AGC/魔音/采集采样率/麦克风音量）的自定义场景后，
        页面停在旧值。r!==0（未写过/不可读）跳过 —— 不替驱动下结论。 */
@@ -2536,7 +2536,7 @@ BRIDGE_JS = r"""
         sw.removeAttribute('data-dimmed');
         sw.style.opacity = '';
         sw.style.pointerEvents = '';
-        /* ★ 第 56 轮（L 档）：这句提示现在分两种情况 —— 见 __unprovenNote。
+        /*这句提示现在分两种情况 —— 见 __unprovenNote。
            名字在 APO_IMPL 里（主机侧模块**建了**）就不该暗示「没实现」。 */
         sw.title = label + ' · ' + (window.__unprovenNote
           ? window.__unprovenNote(sw.dataset.p)
@@ -2553,8 +2553,8 @@ BRIDGE_JS = r"""
         sw.removeAttribute('data-dimmed');
         sw.style.opacity = '';
         sw.style.pointerEvents = '';
-        /* ★ 2026-10-19：专属说明优先 —— 「可写」是开发者视角的词，
-           用户悬停看到的应该是功能说明（耳机环绕，用户实测指出）。 */
+        /* 专属说明优先 —— 「可写」是开发者视角的词，
+           用户悬停看到的应该是功能说明（耳机环绕，实测指出）。 */
         sw.title = SW_TIP[sw.dataset.p] || (label + ' · 可写');
       } else {
         /* 置灰同时摘掉设计稿写死的 on：死参数不允许显示假开态，
@@ -2576,7 +2576,7 @@ BRIDGE_JS = r"""
     syncSelect('micRateSel', 'DevSampleRateControl', pmc);
     syncSelect('devRateSel', 'DevSampleRateControl', pm);
 
-    /* ★ 2026-10-18：原「麦克风音量」大读数行已并入滑杆行（ micVolVal 一处
+    /* 原「麦克风音量」大读数行已并入滑杆行（ micVolVal 一处
        显示），micVolNum 元素随设计稿删除，这里的写入一并移除。
        设备页「驱动版本」的写入归 bindDevPanel（st.driver），这里不再写
        GetDriverVer —— 同一元素只保留一个写回主人。 */
@@ -2595,7 +2595,7 @@ BRIDGE_JS = r"""
     }
 
     render(); hud(); renderTable(); patchHud();
-    /* 第 59 轮：开关联动降暗的全量刷新。class 变更才有的 MutationObserver
+    /*开关联动降暗的全量刷新。class 变更才有的 MutationObserver
        盖不住「值没变 ⟹ toggle 不产生变更」的同步（典型：初始 off→off），
        所以在每次全量同步末尾主动扫一遍。 */
     linkSweep();
@@ -2603,7 +2603,7 @@ BRIDGE_JS = r"""
     document.documentElement.dataset.bridgeReady = '1';
   }
 
-  /* 滑杆同步。★ 2026-10-17 重设计（用户拍板「默认值可交互」）：
+  /* 滑杆同步。 重设计
      三态而非两态 ——
        ① !d.w                    → 置灰（真不可写，铁律 1）
        ② w 且读得到值（r=0 v≠''） → 显示驱动真值
@@ -2693,7 +2693,7 @@ BRIDGE_JS = r"""
     var el = $('hud');
     if (!el) return;
     if (S.section === 'space'){
-      /* ★ 第 49 轮：这里原来把副标改写成「8 声道声场 · 拖动音箱写回方位
+      /*这里原来把副标改写成「8 声道声场 · 拖动音箱写回方位
          （由驱动决定）」。现在设计稿的 hud() 自己就按当前交互模式写
          「8 个音箱 · 拖动改角度 / 拖动改距离」——**比这句更准**，
          而且它随模式切换即时更新。再覆盖回去只会把模式信息抹掉，
@@ -2785,7 +2785,7 @@ BRIDGE_JS = r"""
       btns[1].addEventListener('click', function(){
         S.eq = [0,0,0,0,0,0,0,0,0,0];
         LAST.eq = null;
-        /* ★ 2026-10-22：归零 = 官方索引 11「预设」，不是当年那个不存在的
+        /* 归零 = 官方索引 11「预设」，不是早前那个不存在的
            「平直」（PRE 里没有这个键，芯片一个都点不亮）。统一走反查。 */
         if (typeof syncEqChips === 'function') syncEqChips();
         else { S.pre = '预设'; }
@@ -2804,8 +2804,8 @@ BRIDGE_JS = r"""
      写 −32 读回 −32），驱动不做值域校验。所以这里必须真写，
      不能在前端替硬件下「不支持」的结论。
 
-     ★★ 第 49 轮：这里原本还有一份 SPK_PROP 映射 + 一套「松手就写角度、
-     成功后 __resync()」的即时写回逻辑（第 30 轮写的），**已整块删除**。
+     这里原本还有一份 SPK_PROP 映射 + 一套「松手就写角度、
+     成功后 __resync()」的即时写回逻辑，**已整块删除**。
      原因是它和新加的虚拟音箱摆位路径**互相打架**，而且只有 CDP 真鼠标测试
      才看得出来：
        新路径松手后要等 260ms 防抖才写（角度+距离 16 项）；
@@ -2818,26 +2818,26 @@ BRIDGE_JS = r"""
      （那份 SPK_PROP 映射也一并删了 —— 设计稿现在每个音箱自带 key 前缀。）*/
 
   function bindHonesty(){
-    /* ★ 第 30 轮删掉了这里对页头副标的覆盖。
+    /*删掉了这里对页头副标的覆盖。
        它原来把 TITLES.space[1] 改写成「拖动虚线圈改变房间大小 ·
-       拖动音箱写回方位（由驱动决定）」—— 那是「怎么操作」，而第 28 轮
+       拖动音箱写回方位（由驱动决定）」—— 那是「怎么操作」，而此前
        已经定下副标只写「这一页是干什么的」。更要命的是它**只改运行时、
        不改设计稿**：稿子上写着「房间、音箱与音效」，装到机器上却变成
        那一长句，两边对不上（这轮改副标时才暴露出来）。
        现在操作提示挂在音箱元素自己的 <title> 上（见设计稿里生成
        <g class="spk"> 的那段），副标归 TITLES 管。 */
-    /* ★ 第 49 轮：这里原来那段「记住按在哪个音箱上、松手写回 SS_*_ANGLE、
+    /*这里原来那段「记住按在哪个音箱上、松手写回 SS_*_ANGLE、
        成功就 __resync()」的写法**整块搬走了** —— 它只写角度、且与新的
        虚拟音箱摆位路径抢同一个交互（详见 10.5 节的说明）。
        现在拖拽的统一出口是设计稿的 window.__vssCommit() → bindVss */
-    /* 立刻刷一次读数区，别等下一次 hud() 才改文案 */
+    /* 立刻刷一次读数区，别等下一次 hud 才改文案 */
     patchHud();
   }
 
   /* ---------------- 11. 未连接时的整体处理 ---------------- */
   function bindUnsupportedAll(){
     document.querySelectorAll('button.sw').forEach(function(s){
-      /* ★ 2026-10-20 晚：「耳机录音」开关是纯 WASAPI 功能，不依赖
+      /* 「耳机录音」开关是纯 WASAPI 功能，不依赖
          C-Media 驱动 —— 驱动未连接照样能录（录的是系统播放端点回环）。
          把它排除在整体置灰外，否则 data-dimmed 的 pointer-events:none
          会吞掉点击（CDP 闸实测：点开关命中 recRow，录音永不启动）。 */
@@ -2851,7 +2851,7 @@ BRIDGE_JS = r"""
       var el = $(id);
       if (el) dim(el.parentNode, '驱动未连接');
     });
-    /* 第 52 轮（H 档）：左右声道滑杆同样属于「驱动未连接就不可用」 */
+    /*左右声道滑杆同样属于「驱动未连接就不可用」 */
     ['volLRange', 'volRRange'].forEach(function(id){
       var el = $(id);
       if (el) dim(el.parentNode, '驱动未连接');
@@ -2870,7 +2870,7 @@ BRIDGE_JS = r"""
     RFX_ROOMSIZE:      [0, 2, 1],
     GFSControl:        [0, 1, 1],
     VolumeScalarControl: [0, 1, 0.01],
-    /* A 档 Xear 音效族（第 46 轮移植）—— 值域逐条取自官方面板 .cml 的
+    /* A 档 Xear 音效族移植）—— 值域逐条取自官方面板 .cml 的
        Slider Minimum/Maximum，不是猜的：
          apoSpeakerXearAudioBrilliant.cml  BrilliantLevel      Minimum 0 Maximum 6
          apoSpeakerXearDynamicBass.cml     BassLevel           Minimum 0 Maximum 10
@@ -2884,20 +2884,20 @@ BRIDGE_JS = r"""
     BM_Slider_Frequency:          [100, 400, 10],
     VOICECLARITY_LEVEL:           [0, 6, 1],
     VOICECLARITY_NOISESUPP_LEVEL: [0, 20, 5],
-    /* B 档 Xear 环绕族（第 47 轮）—— 档位取自
+    /* B 档 Xear 环绕族—— 档位取自
        apoSpeakerXearSurroundHeadPhone.cml 的 RadioButton Tag：
          HPSPK_Mode    Music/Gaming=0 / Movie=1
          HP RoomSize   Large=0 / Medium=1 / Small=2（★ 大在前，与直觉反序）
        ★ Surround Max 只有一个开关，没有可调值域可给。 */
     CONLAB_HPSPK_MODE:     [0, 1, 1],
     CONLAB_HPSPK_ROOMSIZE: [0, 2, 1],
-    /* Xear Surround Speaker 页的两根滑杆（第 47 轮）。值域同样取自 .cml：
+    /* Xear Surround Speaker 页的两根滑杆。值域同样取自 .cml：
          apoSpeakerXearSurroundSpeakers.cml  SFExpansion  Minimum 0  Maximum 3
          apoSpeakerXearSurroundSpeakers.cml  SPKAngle     Minimum 5  Maximum 30（步进 5）
        ★ 绑定靠「控件名↔参数名同名 + exe 字符串表同块」推断，见 bindSwitches 注释。 */
     CONLAB_HPSPK_SFX:      [0, 3, 1],
     CONLAB_HPSPK_SPKANGLE: [5, 30, 5],
-    /* C 档 Dolby Headphone / Virtual Speaker（第 48 轮）—— 档位数是**数
+    /* C 档 Dolby Headphone / Virtual Speaker—— 档位数是**数
        apoSpeakerDolbyHPVS.cml 里 RadioButton 的个数**定的（这几个 RadioButton
        没写 Tag，所以数值顺序按声明顺序推，与上面 SFX/SPKANGLE 同属「顺序推断」）：
          DolbySurroundEffect 组  BtnEnableVS=0 / BtnEnableHP=1   → DHDVS_USEDH 0..1
@@ -2908,7 +2908,7 @@ BRIDGE_JS = r"""
     DHDVS_USEDH: [0, 1, 1],
     DVS_Mode:    [0, 1, 1],
     DH_Mode:     [0, 2, 1],
-    /* D 档 7.1 虚拟音箱摆位（第 49 轮）—— 8 个角度 + 8 个距离。
+    /* D 档 7.1 虚拟音箱摆位—— 8 个角度 + 8 个距离。
        ★★ 值域要说清楚是哪来的，别混：
          · 角度 −180…180 是**符号约定的规范化区间**，依据是官方安装态的
            真实值集恰好横跨这个范围（LF=-32 C=0 RF=32 RS=90 RB=148
@@ -2956,7 +2956,7 @@ BRIDGE_JS = r"""
     if (!d) return { t:'未识别', c:'no' };
     if (UNPROVEN[n]) return { t:'未验证', c:'no' };
     if (d.r === 0) return { t:'支持', c:'ok' };
-    /* ★ 2026-10-22：ret=2 = 「存在但从未写过」，不是「本机不支持」。
+    /* ret=2 = 「存在但从未写过」，不是「本机不支持」。
        上面这段注释本来就写着「徽章只说我们验过没有，不下本机不支持的
        结论」—— ret=2 这一支一直在违反它。名字在 208 表里、PropertyControl
        能返回，说明本机就是有这个参数，只是值还没落盘。 */
@@ -2981,7 +2981,7 @@ BRIDGE_JS = r"""
     /* 合并：设计稿的 P（带中文说明）+ 驱动里多出来的名字。
        采集端点的属性面与渲染端点完全不同，P 那套中文分类只适用于渲染端点。 */
     var rows = [], seen = {};
-    /* 参数页的 UNPROVEN 说明也走同一条文案（第 56 轮 L 档）—— 之前这里有**两处**
+    /* 参数页的 UNPROVEN 说明也走同一条文案L 档）—— 之前这里有**两处**
        写死的说法：静态分类列表那条和渲染表那条。同一件事两套文案，改一处漏一处。
        现在两处都调本函数。 */
     function noteShort(n){
@@ -2995,7 +2995,7 @@ BRIDGE_JS = r"""
     if (CUR_EP !== 'capture'){
       P.forEach(function(p){
         seen[p[0]] = 1;
-        /* ★ 第 56 轮（L 档）：这里原来写的是**固定一句**「（回环 A/B 未测到变化）」，
+        /*这里原来写的是**固定一句**「（回环 A/B 未测到变化）」，
            与开关那边（走 __unprovenNote 分流）不是一套说法 —— 同一件事两套文案。
            现在统一走同一个函数：模块建了的会带上模块名。
            见 lint 闸的 E7 项（它检查的不只是「有没有用函数」，还要求这两条路径
@@ -3011,7 +3011,7 @@ BRIDGE_JS = r"""
       var desc;
       if (UNPROVEN[n]) desc = '可读可写；' + unprovenNote(n);
       else if (d.r === 0) desc = '当前设备可用';
-      /* ★ 2026-10-22：同 rstate —— ret=2 不是「不支持」，是值还没写过。 */
+      /* 同 rstate —— ret=2 不是「不支持」，是值还没写过。 */
       else if (d.r === 2) desc = '未写入过（出厂默认）';
       else if (d.r === -1) desc = '暂无信息';
       else desc = '读取异常';

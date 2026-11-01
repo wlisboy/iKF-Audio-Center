@@ -1,6 +1,6 @@
 //go:build windows
 
-// 系统托盘（第 64 轮，B4）—— 纯 Win32 syscall，不引入任何新依赖。
+// 系统托盘—— 纯 Win32 syscall，不引入任何新依赖。
 // ====================================================================
 //
 // 为什么不用 systray 库：构建是离线的（GOPROXY=off，依赖全在本地 module
@@ -9,12 +9,12 @@
 // 只有 ~200 行，不值得为它破坏离线构建。
 //
 // 行为对照原面板（SystemTrayLClick/RClick.cml）：
-//   - 左键托盘图标：显示 / 隐藏主窗口（原面板是音量弹窗；第 67 轮曾还原
-//     为音量滑杆弹窗，2026-10-20 连静音一起精简后整个移除，回到开关主窗）
+//   - 左键托盘图标：显示 / 隐藏主窗口（原面板是音量弹窗；曾短暂还原
+//     为音量滑杆弹窗，后连静音一起精简移除，回到开关主窗）
 //   - 右键托盘图标：菜单 = 显示主界面 / 静音切换 / 修复开机入口 / 退出
-//     （2026-10-20 精简：录音机与产品定位无关，菜单项移除；exe 仍捆绑在
+//      精简：录音机与产品定位无关，菜单项移除；exe 仍捆绑在
 //     便携包 SoundRecorder\，需要时可从目录手动打开。静音保留在右键，
-//     左键音量弹窗里的静音勾选框与它重复，一并移除——弹窗纯做音量滑杆。）
+//     左键音量弹窗里的静音勾选框与它重复，一并移除——弹窗纯做音量滑杆）
 //   - 点窗口 ✕：不退出，隐藏进托盘（main.go 的 OnBeforeClose 拦截）；
 //     「退出」菜单项才真退出（置 quitRequested 后调 runtime.Quit）
 //
@@ -42,10 +42,10 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// ★ 托盘图标（第 65 轮定稿）：直接用**官方原面板的托盘图标**
+// 托盘图标：直接用**官方原面板的托盘图标**
 //
 //	`Skin\FaceLift\Main\SystemTray.ico`（单帧 16×16/32bpp，原面板托盘
-//	显示的就是它，用户要求沿用）。已拷入 build/windows/tray.ico；
+//	显示的就是它，直接沿用）。已拷入 build/windows/tray.ico；
 //	加载时按 SM_CXSMICON 精确命中 16×16 帧（多帧大图会发糊的坑见
 //	loadTrayIcon 注释）。窗口标题栏/任务栏/安装包仍用 icon.ico。
 //
@@ -92,7 +92,7 @@ const (
 	cmdEntryDel = 6
 )
 
-// ---- 音量弹窗（第 67 轮，还原原面板左键行为：音量滑杆；2026-10-20 起
+// ---- 音量弹窗（还原原面板左键行为：音量滑杆；起
 //      纯做音量——静音勾选框与右键菜单「静音」重复，已移除）----
 //
 // 本弹窗走与主界面「音量」拨盘同一个参数（VolumeScalarControl 0..1，
@@ -220,7 +220,7 @@ func loadTrayIcon() uintptr {
 	}
 	// ★ 显式按「小图标」系统尺寸加载：icon.ico 有 256→16 六帧，
 	//   cxDesired=0 时 LoadImage 会挑最大帧（256px），托盘再硬缩到
-	//   16px 就发糊发白（第 64 轮实测）。SM_CXSMICON/CYSMICON 随 DPI
+	//   16px 就发糊发白（实测）。SM_CXSMICON/CYSMICON 随 DPI
 	//   缩放（高 DPI 下自动取 20/24 等），托盘处无需再缩。
 	cx, _, _ := getMetrics.Call(smCxSmIcon)
 	cy, _, _ := getMetrics.Call(smCySmIcon)
@@ -281,12 +281,12 @@ func toggleWindow() {
 	}
 }
 
-// startParamWatch 外部参数轮询（2026-10-20 用户报障：按系统音量键调音量，
+// startParamWatch 外部参数轮询 按系统音量键调音量，
 // 主界面拨盘不动）。系统音量/静音可以被 Windows 随时改（音量键、系统
 // 混音器、其它应用），应用内任何写入路径都收不到通知 —— 与托盘同理，
 // 只能靠轮询。每 1s 读一次 VolumeScalarControl / MuteControl，与上次
 // 不同才发 tray:sync（前端防抖 300ms 后整体重拉，与场景应用同路）。
-// ★ 首轮只记基线不触发；驱动读失败（设备不在）记空串视为基线。
+// 首轮只记基线不触发；驱动读失败（设备不在）记空串视为基线。
 // ReadEp 跨线程调用与 --serve 的 HTTP 路径相同，线程安全已由 serve 验证。
 // 检测到变化打一行日志（--serve 排障可见；窗口模式日志同理）。
 func startParamWatch() {
@@ -315,11 +315,10 @@ func startParamWatch() {
 	}
 }
 
-// notifyFrontend 托盘侧改了驱动参数后通知主界面重同步（2026-10-20 用户报障：
-// 托盘静音变了主界面纹丝不动）。根因：托盘走 drv.WriteEp 直写驱动，绕过了
-// 前端 post() 通道，主界面无从得知。修复 = Wails 事件推送 tray:sync，前端
+// notifyFrontend 托盘侧改了驱动参数后通知主界面重同步 // 托盘静音变了主界面纹丝不动）。根因：托盘走 drv.WriteEp 直写驱动，绕过了
+// 前端 post 通道，主界面无从得知。修复 = Wails 事件推送 tray:sync，前端
 // （build_center.py 桥接层）监听后整体重拉 /api/params（与 __resync 同路）。
-// ★ 音量滑杆已于同日移除（左键改为开关主窗），目前唯一触发点是静音切换。
+// 音量滑杆已于同日移除（左键改为开关主窗），目前唯一触发点是静音切换。
 // --serve 诊断模式没有 appCtx/主界面，静默跳过。
 func notifyFrontend() {
 	if appCtx == nil {
@@ -384,7 +383,7 @@ func showTrayMenu() {
 	item(mfString, cmdMute, "静音 / 取消静音")
 	item(mfSeparator, 0, "")
 	// 入口状态（P5-1'）：便携包被移动后，「修复开机入口」把自启与面板项
-	// 拉回当前目录；入口已存在时（2026-10-20 用户要求「可写也要可删」）
+	// 拉回当前目录；入口已存在时也要求「可写也要可删」）
 	// 提供删除 —— Run 值与 CLSID 命令值一并删掉，不再开机自启。
 	// 隐藏启动（/h /d）时不弹提示框，增删都靠这里兜底。
 	if st := readEntryStatus(); st.OK() {
@@ -442,7 +441,7 @@ func trayWndProc(hWnd, msgID, wParam, lParam uintptr) uintptr {
 		// 旧版 NOTIFYICON 行为：wParam=图标 ID，lParam=鼠标事件
 		switch lParam & 0xFFFF {
 		case wmLButtonUp:
-			toggleWindow() // 2026-10-20：音量弹窗移除，左键 = 显示/隐藏主窗
+			toggleWindow() // 音量弹窗已移除，左键 = 显示/隐藏主窗
 		case wmRButtonUp:
 			showTrayMenu()
 		}

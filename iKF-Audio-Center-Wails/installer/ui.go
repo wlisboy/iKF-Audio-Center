@@ -82,7 +82,7 @@ const (
 	wsExDlgFrame = 0x00000001 // WS_EX_DLGMODALFRAME：细边框、无最大化
 	csVRedraw    = 0x0001     // ★类级重画标记：尺寸一变就整体失效客户区。
 	csHRedraw    = 0x0002     //   不加的话缩小窗口时系统 blit 保留旧位图，
-	//   切进度态后残留选择态画面（2026-10-23 用户截图实锤）。
+	//   切进度态后残留选择态画面 用户截图实锤）。
 	swShow   = 5
 	pmRemove = 1
 
@@ -152,11 +152,11 @@ const (
 	fCount
 )
 
-// 逻辑像素（96 dpi）下的版面，实际坐标一律过 px()
-// 2026-10-19 精简：抛弃官方兼容思路，清单 5 行 → 4 行（去掉「撤销接管」，
+// 逻辑像素（96 dpi）下的版面，实际坐标一律过 px
+// 精简：抛弃官方兼容思路，清单 5 行 → 4 行（去掉「撤销接管」，
 // 接管语义简化为「开机自启」一行），窗口 288 → 252。
 const (
-	lgW   = 360.0 // 2026-10-20：320 → 360，行距与状态区一起放大（用户反馈「显示乱」）
+	lgW   = 360.0 // 320 → 360，行距与状态区一起放大
 	lgPad = 16.0
 
 	rowTop = 54.0 // 第一行清单的顶边
@@ -164,7 +164,7 @@ const (
 
 	// 进度态高度固定（paintProgress 的版面按这个高度排）。
 	// 选择态高度随可见行数走 —— 见 choiceH/statusY/btnYOf。
-	// 2026-10-23：内容块垂直居中重排（原 title=76/sub=104/bar=160/foot=176
+	// 内容块垂直居中重排（原 title=76/sub=104/bar=160/foot=176
 	// 上方留白 76、下方只有 38，看起来像版面错位 —— 用户报「安装时界面问题」）。
 	lgProgressH = 258.0
 	lgBarY      = 138.0
@@ -175,7 +175,7 @@ const (
 )
 
 // visibleRows 当前可见的清单行（optRows 下标）。
-// 2026-10-20（用户反馈「卸载时灰行多余」）：卸载模式下「重启音频设备」
+// 卸载模式下「重启音频设备」
 // 与「开机自启」两行**不再变灰挂着**，直接隐藏 —— 卸载语境里它们没有
 // 意义，清单只剩「音频驱动组件（必需）」+「卸载驱动」两行。
 func visibleRows(uninst bool) []int {
@@ -396,7 +396,7 @@ func btnAt(x, y int32, uninst bool) int {
 // 「驱动组件」是必需项，常态下点不动；只有在卸载模式下点它才有意义（= 退出卸载）。
 // 「重启设备」「开机自启」只在安装模式有意义。
 func rowLive(i int) bool {
-	// 2026-10-20：行隐藏后，能被 rowAt 命中的行全部可交互
+	// 行隐藏后，能被 rowAt 命中的行全部可交互
 	// （必需行点了 = 退出卸载模式，语义仍在 toggleRow 里）。
 	return i >= 0 && i < len(optRows)
 }
@@ -441,7 +441,7 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		}
 		return 0
 	case wmTimer:
-		// ★ 界面闪烁修复（2026-10-19）：
+		// ★ 界面闪烁修复 ：
 		//   1. 选择态是**完全静态**的 —— 不失效任何区域，一颗像素都不重画
 		//      （原实现选择态也 40 次/秒整窗重画，这就是闪烁）。
 		//   2. 进度态只失效进度条那一小条：marquee 亮条在这里滚，其余文字
@@ -629,7 +629,7 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 		}
 	}
 
-	// 状态区：两行 label:value（2026-10-20 从单行长句拆开，不再挤一行）
+	// 状态区：两行 label:value 从单行长句拆开，不再挤一行）
 	stY := statusY(uninst)
 	hr(hdc, stY-10, colTrack)
 	lib, dev := "检测中…", "检测中…"
@@ -703,7 +703,7 @@ func paintProgress(hdc uintptr, title, sub, foot string, pos, trackW float64) {
 	put(hdc, foot, 24, 156, lgW-48, 44, 11, 400, colHint, uiFonts[fHint], dtLeft|dtWordBreak)
 }
 
-// statusLine 是选择态底部那行现状。2026-10-19 用户定稿：极简 + 官方语气，
+// statusLine 是选择态底部那行现状。风格：极简 + 官方语气，
 // 不显示发布名（oemNN.inf），连接状态统一「耳机已连接 / 耳机未连接」句式。
 func statusLine(s *drvState) string {
 	if s == nil {
@@ -775,7 +775,7 @@ func put(hdc uintptr, s string, x, y, w, h, size float64, weight int32, col uint
 // 建不出窗口时不弹窗也不放弃 —— 退回一个 Yes/No 消息框把活干完，
 // 不能因为画不出来就不装驱动。
 func uiRun(cfg uiRunCfg) uiOut {
-	// ★「未响应」根因修复（2026-10-19）：Win32 窗口的消息队列绑在**创建它的
+	// ★「未响应」根因修复 ：Win32 窗口的消息队列绑在**创建它的
 	//   OS 线程**上，而 Go 调度器会随意迁移 goroutine —— 这个 goroutine 一旦
 	//   被挪去别的线程，PeekMessage 就永远读不到窗口队列，窗口进入 ghost
 	//   「未响应」态。装驱动期间 pnputil 在后台跑、GC 一活跃，迁移概率陡增，
@@ -849,7 +849,7 @@ func uiRun(cfg uiRunCfg) uiOut {
 	darkenTitleBar(hwnd)
 	pSetTimer.Call(hwnd, 1, 25, 0)
 
-	// 稳定性修复（2026-10-19）：探测放后台，窗口先弹 —— 开窗前那两三轮
+	// 稳定性修复 ：探测放后台，窗口先弹 —— 开窗前那两三轮
 	// pnputil 枚举（UAC 确认后黑窗干等好几秒）是「双击没反应」体感的
 	// 主要来源。结果稍后填进底部状态行；用户在探测完成前就点确认也没
 	// 关系，work 闭包会重新拿新鲜状态（见 main.go）。

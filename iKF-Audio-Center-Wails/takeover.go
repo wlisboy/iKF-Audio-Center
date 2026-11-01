@@ -93,7 +93,7 @@ func runTakeoverUndoAdmin() int {
 	return 0
 }
 
-// runEntryDelete 是 `--entry-delete` 的落点（2026-10-20：托盘「删除开机
+// runEntryDelete 是 `--entry-delete` 的落点 托盘「删除开机
 // 入口」）：先试直删，失败提权重跑。删除 = Run 值与 CLSID 命令值一并删掉，
 // 随时可用「修复开机入口」恢复。
 func runEntryDelete() int {

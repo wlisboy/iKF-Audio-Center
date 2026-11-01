@@ -23,7 +23,7 @@ import (
 //
 // 契约（务必与 Python 版保持一致，前端 BRIDGE_JS 依赖它）：
 //
-//	GET  /api/status          → status() 字典，直接返回，不包壳
+//	GET  /api/status          → status 字典，直接返回，不包壳
 //	GET  /api/params[?ep=]    → {name: {r,v,w,t}} 映射，**直接返回，不包壳**
 //	GET  /api/meter[?ep=]     → {ok, peak, ep, channels}
 //	GET  /api/ping            → {ok, app, ver}
@@ -38,7 +38,7 @@ import (
 //	POST /api/driver/setup    → {action:'install'|'uninstall'|''} → 提权拉起同目录的
 //	                            iKF-驱动管理.exe 并等它结束，再重连驱动。
 //	                            **会阻塞数十秒**，前端要转圈等
-//	POST /api/set             → {name, value[, ep][, kind]} → write() 结果
+//	POST /api/set             → {name, value[, ep][, kind]} → write 结果
 //	                            kind ∈ bool|int|float，只对白名单外属性生效
 //	POST /api/test            → {action:'play'|'stop'|'close', mask} → 声道测试
 //	POST /api/listen          → {on: bool} → 麦克风监听
@@ -111,20 +111,20 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.json(w, http.StatusOK, drv.Profiles())
 	case r.Method == http.MethodGet && r.URL.Path == "/api/driver":
 		a.json(w, http.StatusOK, drv.DriverInfo())
-	// ★ 2026-10-21：界面上「重新检测」的后端入口（与 Python 线同契约）。
+	// 界面上「重新检测」的后端入口（与 Python 线同契约）。
 	//   松开旧上下文 → 重新枚举端点，返回的就是 DriverInfo，ready 即结果。
 	case r.Method == http.MethodPost && r.URL.Path == "/api/driver/reopen":
 		a.json(w, http.StatusOK, drv.ReopenInfo())
 	case r.Method == http.MethodPost && r.URL.Path == "/api/driver/setup":
 		a.driverSetup(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/openurl":
-		// 2026-10-20（用户要求）：品牌区作者名点击 → 打开抖音主页。
+		// 品牌区作者名点击 → 打开抖音主页。
 		// 自定义协议（snssdk1128://）不能让 WebView2 自己导航（会把整个
 		// 应用导航走/白屏），必须走系统 ShellExecute —— OS 自动拉起抖音，
 		// 未安装时弹系统的「选择应用」。★ 安全：只放行 snssdk1128:// 前缀，
 		// 不做通用 openurl（否则等于给前端开了任意命令执行口子）。
 		raw := r.URL.Query().Get("url")
-		// 白名单（2026-10-20 用户改定）：抖音网页版主页 https 链接为主
+		// 白名单 用户改定）：抖音网页版主页 https 链接为主
 		// （默认浏览器打开，不依赖装没装抖音客户端），snssdk1128:// 协议
 		// 链接保留兼容。其余一律拒绝。
 		if !strings.HasPrefix(raw, "https://www.douyin.com/user/") &&
@@ -143,11 +143,11 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			resp["error"] = "无法打开（可能未安装抖音）"
 		}
 		a.json(w, http.StatusOK, resp)
-	// ★ 2026-10-20 内嵌录音机（recorder.go）：官方捆绑 Recorder.exe 是
+	// 内嵌录音机（recorder.go）：官方捆绑 Recorder.exe 是
 	//   依附官方面板 COM 环境的死件（脱离面板拉起必退 241，取证见
 	//   工具/录音机取证-Recorder.exe死件.md），旧 POST /api/recorder
 	//   「拉起官方 exe」语义废弃，改为 start/stop/status 三端点。
-	//   晚间用户拍板迁移：声音页「耳机录音」=渲染端点 loopback，
+	//   声音页「耳机录音」=渲染端点 loopback，
 	//   WAV 落「音乐\iKF Audio Center\」（原麦克风录音废弃）。
 	case r.Method == http.MethodPost && r.URL.Path == "/api/recorder/start":
 		a.json(w, http.StatusOK, rec.Start())
@@ -155,7 +155,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.json(w, http.StatusOK, rec.Stop())
 	case r.Method == http.MethodGet && r.URL.Path == "/api/recorder/status":
 		a.json(w, http.StatusOK, rec.Status())
-	// ★ 2026-10-20 晚：录音灵动岛「打开文件夹」—— 资源管理器打开录音
+	// 录音灵动岛「打开文件夹」—— 资源管理器打开录音
 	//   所在目录并选中该 WAV（explorer /select,）。与 Python 线逐字段
 	//   一致；ShellExecute 走系统 shell，路径不落任何解释器。
 	case r.Method == http.MethodPost && r.URL.Path == "/api/recorder/open":
@@ -228,7 +228,7 @@ func (a *API) recOpen(w http.ResponseWriter, r *http.Request) {
 //
 // 会把同目录的驱动管理程序提权拉起来并**等它结束**，所以这是一个慢接口：
 // 装驱动正常要 10–30 秒，卸载几秒，用户还可能对着 UAC 想一会儿。
-// 返回的就是 DriverInfo()，只是多带了 action / exit_code，
+// 返回的就是 DriverInfo，只是多带了 action / exit_code，
 // 前端可以直接拿 ready 判断「装完能不能用了」。
 func (a *API) driverSetup(w http.ResponseWriter, r *http.Request) {
 	action := ""
@@ -343,7 +343,7 @@ func (a *API) listen(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// 2026-10-20：官方 RunListen2Device 依赖的 COM 服务器在驱动包里
+	// 官方 RunListen2Device 依赖的 COM 服务器在驱动包里
 	// 不存在（见 工具/监听取证-监听COM组件缺失.md），改内嵌 WASAPI
 	// 监听（listen.go）。响应保留 {ok, on, error} 形状，前端零改动。
 	if req.Gain != nil {
@@ -387,6 +387,6 @@ func (a *API) profileOp(w http.ResponseWriter, r *http.Request, op string) {
 	}
 }
 
-// ★ 2026-10-20：recorderPath / launchRecorder 已删除 —— 官方捆绑
+// recorderPath / launchRecorder 已删除 —— 官方捆绑
 // Recorder.exe 是死件（见 工具/录音机取证-Recorder.exe死件.md），
 // 录音机改为内嵌实现（recorder.go 的 rec 实例，三端点见上方路由）。

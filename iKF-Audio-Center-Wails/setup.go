@@ -5,7 +5,7 @@ package main
 // 拉起驱动管理程序
 // ================
 //
-// 主程序恒定 asInvoker —— 一次 UAC 都不弹。只有用户明确点了「安装/卸载驱动组件」，
+// 主程序恒定 asInvoker —— 一次 UAC 都不弹。只有明确点了「安装/卸载驱动组件」，
 // 才用 ShellExecuteEx(runas) 把同目录的 iKF-驱动管理.exe 拉起来，并且等它结束。
 //
 // 为什么非要等：装/卸驱动会让 PnP 重建设备实例，本进程手里那份 osConfLib 的
@@ -13,7 +13,7 @@ package main
 // 等它退出、重新 Open 一次，交到界面上的才是干净状态。
 //
 // 用 ShellExecuteEx 而不是 ShellExecute：只有前者给子进程句柄，能 Wait；
-// 也只有前者能分辨「用户取消了 UAC」和「安装器自己失败」。
+// 也只有前者能分辨「取消了 UAC」和「安装器自己失败」。
 // 提权走 runas 动词，所以驱动管理程序不需要 requireAdministrator 清单。
 
 import (
@@ -81,7 +81,7 @@ func (d *Driver) DriverInfo() map[string]interface{} {
 		"setup":    setup,
 		"setup_ok": setup != "",
 	}
-	/* ★ 2026-10-22：把「安装指纹」挂出来（initfp.go）—— 这是「初始化该
+	/* 把「安装指纹」挂出来（initfp.go）—— 这是「初始化该
 	   全量写还是只补空缺」的判据本体现状，排障时一眼能看到「这次重装会不会
 	   被认出来」，不用等界面表现。只在 /api/driver 这类按需接口上取，
 	   不进 /api/status 的轮询路径。 */
@@ -95,14 +95,14 @@ func (d *Driver) DriverInfo() map[string]interface{} {
 // 额外带 reopened 表示这次重连是否成功（ready 已经够了，但前端若只看
 // 一个字段，ok=false 的语义比 ready 更直白）。
 //
-// ★ 2026-10-21：契约与 Python 线 driver_info + reopened 逐字段一致。
+// 契约与 Python 线 driver_info + reopened 逐字段一致。
 func (d *Driver) ReopenInfo() map[string]interface{} {
 	ok := d.Reopen()
 	info := d.DriverInfo()
 	info["ok"] = ok
 	info["reopened"] = ok
-	/* ★ 2026-10-22：连上之后必须补跑初始化链（恢复默认 / 自愈 / 播种）。
-	   以前这里只重连 —— 而装完驱动点「重新检测」是最常见的路径，启动那次
+	/* 连上之后必须补跑初始化链（恢复默认 / 自愈 / 播种）。
+	   若这里只重连 —— 而装完驱动点「重新检测」是最常见的路径，启动那次
 	   恢复因为驱动当时没就绪被跳过了，于是设备停在「全 ret=2」，用户必须
 	   自己去场景页点「默认」才把参数写回来。见 initstate.go 的说明。
 	   失败时（ok=false）不跑：半就绪下指纹算不准。 */
@@ -116,7 +116,7 @@ func (d *Driver) ReopenInfo() map[string]interface{} {
 
 // RunSetup 拉起驱动管理程序并等它结束，然后重新连一次驱动。
 //
-// action 取 "install" / "uninstall"；空串 = 不带参数，由用户在那边自己选。
+// action 取 "install" / "uninstall"；空串 = 不带参数，由在那边自己选。
 // 会阻塞几秒到几十秒 —— 前端要转圈等，别把它当秒回的接口。
 func (d *Driver) RunSetup(action string) map[string]interface{} {
 	setup := SetupPath()
@@ -130,15 +130,15 @@ func (d *Driver) RunSetup(action string) map[string]interface{} {
 	params := ""
 	switch action {
 	case "install":
-		// 2026-10-23：顺带 --takeover —— 安装器此刻已提权，把入口（Run 自启 +
-		// 控制面板项）改到本程序是零成本动作。以前不带它，装完入口仍指向旧
+		// 顺带 --takeover —— 安装器此刻已提权，把入口（Run 自启 +
+		// 控制面板项）改到本程序是零成本动作。不带它的话，装完入口仍指向旧
 		// 面板/旧拷贝，下次启动主程序还会问「是否改指向」并再弹一次 UAC
-		//（用户报障：装完驱动弹出「替代官方面板」的 UAC 弹窗）。
+		//（装完驱动弹出「替代官方面板」的 UAC 弹窗）。
 		params = "--install --takeover"
 	case "uninstall":
 		params = "--uninstall"
 	case "":
-		// 让用户在安装器界面里选
+		// 让在安装器界面里选
 	default:
 		return map[string]interface{}{
 			"ok": false, "error": "action 只能是 install 或 uninstall",
@@ -148,11 +148,11 @@ func (d *Driver) RunSetup(action string) map[string]interface{} {
 	// 先松手：装驱动会重启设备实例，握着旧上下文等它回来只会读出错值
 	d.Close()
 	code, err := runElevated(setup, params)
-	// ★ 2026-10-22：装完立刻重连要走 Reopen（带退避重试）。安装器尾部
+	// 装完立刻重连要走 Reopen（带退避重试）。安装器尾部
 	// 会 pnputil /restart-device，端点重建期间采集端点常比渲染端点晚到，
 	// 单次 Open 会留下「有些功能能用、有些不能用」的半残状态。
 	ok := d.Reopen()
-	/* ★ 2026-10-22：装完是**最该**跑初始化链的时刻 —— 安装器清空了
+	/* 装完是**最该**跑初始化链的时刻 —— 安装器清空了
 	   FxProperties，设备所有参数回到 ret=2（存在但从未写过）。不在这里
 	   补跑，用户面对的就是「全未设置」，必须自己去场景页点「默认」。
 	   与 ReopenInfo 同一套，见 initstate.go。 */

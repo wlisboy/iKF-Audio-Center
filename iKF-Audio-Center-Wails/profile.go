@@ -54,7 +54,7 @@ var profileEndpoints = []string{EpRender, EpCapture}
 // profileGroups 属性 → 官方 ApoEffect 分组名（写进 .profile 的 <ApoEffect Name>，
 // 便于与官方面板的导出文件互相阅读）。
 //
-// ★★ 第 51 轮（G 档）：整表归一为**页面 Canvas 名**。依据 = 官方随驱动发的组态
+// 整表归一为**页面 Canvas 名**。依据 = 官方随驱动发的组态
 // 模板 CPL/FactoryDefault.xml（全机唯一一份官方格式样本）：
 //
 //	<ApoEffect Name="SpeakerSetting">  ← apoSpeakerSetting.cml Canvas Name
@@ -66,14 +66,14 @@ var profileEndpoints = []string{EpRender, EpCapture}
 // 官方面板读不出归属 —— 用旧名导出的场景在官方面板里点了没反应。
 // profileGroups 属性名 → 官方 ApoEffect 分组名（= 页面 Canvas 名）。
 //
-// ★ S4 起真源 = model/device-model.toml [profile_groups]（53 条含 EQ_Slider
+// S4 起真源 = model/device-model.toml [profile_groups]（53 条含 EQ_Slider
 // 前缀键，装载时自校验）。组名出处与「EQ_Slider 前缀键、SS_* 前缀规则」
 // 见 groupOf 与 TOML 注释。已存旧档由 groupAlias 兜底。
 var profileGroups = modelData.ProfileGroups
 
 // groupAlias 旧版工具写出过的分组名 → 归一到现在的 Canvas 名。
 // **只用于读**：用户已存下来的场景不该因这次改名而显示成「其他」。
-// ★ S1 起真源 = model/device-model.toml [group_alias]（10 条，装载时自校验）。
+// S1 起真源 = model/device-model.toml [group_alias]（10 条，装载时自校验）。
 var groupAlias = modelData.GroupAlias
 
 // profileEndpoint 端点 → 官方 Endpoint 名 / DataFlow（S4 起真源 = TOML）。
@@ -138,11 +138,11 @@ func profileDirs(d *Driver) [][2]interface{} {
 // builtinScenes 内置场景名单：源包自带（UserDefine*/HiFi）+
 // EnsureSeedScenes 播种（默认/游戏/音乐/电影）。
 //
-// ★ builtin 判定按名字、不按目录：便携包下用户自建场景与内置档同住
+// builtin 判定按名字、不按目录：便携包下用户自建场景与内置档同住
 // CPL\profile（profileWriteDir 就返回这里），按目录一刀切会把用户场景
 // 也标成内置 —— 前端场景墙 filter(!builtin) 直接被滤空，表现为
-// 「自定义场景不见了、官方场景也没了应用入口」（2026-10-19 真机确认）。
-// ★ S1 起名单真源 = model/device-model.toml [scene].builtin（7 项，含 HiFi）。
+// 「自定义场景不见了、官方场景也没了应用入口」 实测确认）。
+// S1 起名单真源 = model/device-model.toml [scene].builtin（7 项，含 HiFi）。
 var builtinScenes = strSet(modelData.Scene.Builtin)
 
 // builtinMark 目录自带标记 × 内置名单 —— 两者同时成立才算内置档。
@@ -150,43 +150,42 @@ func builtinMark(dirBuiltin bool, stem string) bool {
 	return dirBuiltin && builtinScenes[stem]
 }
 
-// sceneExclude 不进场景的参数（2026-10-19，回应「应用场景后部分开关不同步」）：
+// sceneExclude 不进场景的参数 ，回应「应用场景后部分开关不同步」）：
 //   - 音量 / 静音：个人听音状态，不是场景属性。写进场景后，应用时写 -10dB
 //     会被系统音量通路立刻回滚，读回值与档不一致 → 界面滑杆/读数「不同步」。
 //   - DevSampleRateControl：设备级采样率，写它触发 USB 重协商 → 端点重建 →
 //     采集端会话值全清（实测 6 项退回 ret=2、2 项暂时消失 ret=-1）。
 //     播种/自建场景混进这一项，是「应用场景后麦克风页整体不同步」的根因。
-//   - Speaker_Channel_Setting（2026-10-19 深夜补充）：设备级声道拓扑，用户在
+//   - Speaker_Channel_Setting）：设备级声道拓扑，用户在
 //     设备页自己选（2=立体声/4/6=5.1/8=7.1），不属于音效场景。播种时设备
 //     正好是 5.1，实读值 6 被存进四张官方卡 → 应用任何场景都把设备页切回
-//     5.1（用户实测报障）。与音量/采样率同类：设备级状态，场景不动它。
+//     5.1（实测报障）。与音量/采样率同类：设备级状态，场景不动它。
 //
 // 三个收口：ProfileSave（用户自建）、fullSnapshot（播种补齐）、
 // ProfileApply（兜底旧档里已有的这类项，跳过不写）。
-// ★ S1 起真源 = model/device-model.toml [scene].exclude（6 项）。
+// S1 起真源 = model/device-model.toml [scene].exclude（6 项）。
 var sceneExclude = strSet(modelData.Scene.Exclude)
 
 // excludedFromScene 场景排除判定（统一入口）。
 // 除两张名单（sceneExclude 设备级 + sceneUnproven APO 未实现）外，还要挡
 // 带通道后缀的多通道项（如 VolumeScalarControl#0/#1）—— 档里存的是带 #
-// 的名字，只按裸名精确匹配会漏（2026-10-19 实测：电影档 63 项里混着
+// 的名字，只按裸名精确匹配会漏 实测：电影档 63 项里混着
 // VolumeScalarControl#0/#1，apply 照写、播种判据也查不出来）。
 func excludedFromScene(name string) bool {
 	return strings.Contains(name, "#") || sceneExclude[name] || sceneUnproven[name]
 }
 
-// sceneUnproven APO 未实现的效果家族，不进场景（2026-10-19 用户拍板：
-// 「自定义场景按照那些生效去调整就好，不需要把 APO 未实现的加进去」）。
+// sceneUnproven APO 未实现的效果家族，不进场景// 「自定义场景按照那些生效去调整就好，不需要把 APO 未实现的加进去」）。
 //
 // 判据链（工具/K档取证-LFX与采集侧位表.md + 回环 A/B 实测 + REA-OUT 字符串
-// 取证。★ 2026-10-19 深夜按反编译产物复核修正：此前「bit2/13/14 是空壳」
+// 按反编译产物复核：「bit2/13/14 是空壳」
 // 是前端注释笔误 —— K 档 §2.2 原文：GFX 只有 bit3/4/20 是空桩，bit1/2/13/14
 // 四个都是真模块）：
 //
 //	真实现 —— 留在场景：CReverbLib 环境音效（bit1）、CEQ15BandLib EQ（bit2）、
 //	          CKeyShifterLib 升降调（bit13）、CVocalCancellationLib 人声消除
 //	          （bit14）—— 四个 GFX 位都有真实 vftable 与构造体（非空桩）；
-//	          CONLAB 耳机环绕（第 44 轮真·应用流 A/B 测到 19.9，噪声底两倍）；
+//	          CONLAB 耳机环绕（实测应用流 A/B：约 19.9，噪声底两倍）；
 //	          采集侧 CBeamFormingLib 指向性麦克风 / CMagicVoiceLib 魔音
 //	          及降噪/AGC/AEC/ENC/回音全部；
 //	空桩/字符串零命中 —— 排除：SS 虚拟环绕家族（RTTI 无类名、A/B 四次噪声底）、
@@ -203,11 +202,11 @@ func excludedFromScene(name string) bool {
 // 界面上这些控件照常显示可交互（UNPROVEN 口径：不置灰、写驱动、如实标注），
 // 只是场景不再管理它们；驱动收写入的（ret=0）手动拨动仍即时生效。
 //
-// ★ 2026-10-22 修正拼写：语音降噪的真名是 `VOICECLARITY_NOISESUPP_LEVEL`
+// 修正拼写：语音降噪的真名是 `VOICECLARITY_NOISESUPP_LEVEL`
 // （driver.go 白名单里就是它）。旧写法 `VOICECLARITY_NOISESUPPRESSION` 在
 // 208 项里根本不存在 ⟹ 死条目，「语音降噪强度」实际从未被排除，
 // 会跟着场景一起存、一起写。
-// ★ S1 起真源 = model/device-model.toml [scene].unproven（35 项，装载时自校验）。
+// S1 起真源 = model/device-model.toml [scene].unproven（35 项，装载时自校验）。
 var sceneUnproven = strSet(modelData.Scene.Unproven)
 
 // hasExcludedItem 档里是否混有排除项 —— 是就说明这份档是排除名单出现
@@ -319,7 +318,7 @@ func kindOfValueType(vtype, name string) string {
 }
 
 // coerce 组态文件里的文本值 → 数值。不合法返回 (nil, false)。
-// ★ 健壮性审计 #9：原来用 Sscanf("%f")，"1abc" 会被当 1 收下 —— 场景档里
+// 健壮性审计 #9：原来用 Sscanf("%f")，"1abc" 会被当 1 收下 —— 场景档里
 // 手滑的脏值静默变形。换 strconv.ParseFloat，整串必须合法。
 func coerce(val, kind string) (interface{}, bool) {
 	f, err := strconv.ParseFloat(strings.TrimSpace(val), 64)
@@ -345,7 +344,7 @@ func xmlEscape(s string) string {
 }
 
 func groupOf(ep, name string) string {
-	// ★ 第 52 轮：先剥掉 "#<声道索引>" 后缀再查表 —— 逐声道音量与主音量
+	// 先剥掉 "#<声道索引>" 后缀再查表 —— 逐声道音量与主音量
 	// 归属同一张官方页（SpeakerVolume / apoSpeakerVol.cml）。
 	if base, _ := splitChannel(name); base != name {
 		name = base
@@ -358,7 +357,7 @@ func groupOf(ep, name string) string {
 	if strings.HasPrefix(name, "EQ_Slider") {
 		return "SpeakerEQ"
 	}
-	// 7.1 虚拟音箱摆位的 8 组 SS_*_ANGLE / SS_*_DIST（第 49 轮，D 档）在
+	// 7.1 虚拟音箱摆位的 8 组 SS_*_ANGLE / SS_*_DIST在
 	// writable 里是循环登记的，逐个铺进 profileGroups 会重复 16 行且以后加
 	// 音箱还会漏。用前缀兜住，等价于映射到 apoSpeakerVirtual.cml。
 	if strings.HasPrefix(name, "SS_") &&
@@ -508,7 +507,7 @@ func buildCML(name, desc string) string {
 // langMap CPL/lang/zh-CN/*.xaml → {ml_键: 中文}。
 // .cml 里 Tooltip 常直接写资源键（例如内置组态 HiFi 的 Tooltip 是
 // ml_PanelProfile_HiFi），官方 UI 靠 XAML 资源字典解析。
-// ★ 健壮性审计 #4：langCache 原是裸全局，Profiles/ProfileRename 两个
+// 健壮性审计 #4：langCache 原是裸全局，Profiles/ProfileRename 两个
 //   HTTP goroutine 并发首建会数据竞争 —— 收进 sync.Once（首个调用方的
 //   d.cpl 生效，与原「先到先缓存」语义一致）。
 var (
@@ -611,7 +610,7 @@ func (d *Driver) Profiles() map[string]interface{} {
 			})
 		}
 	}
-	// 排序（2026-10-20 用户拍板：「默认」放第一位）：
+	// 排序 「默认」放第一位）：
 	//   0 = 「默认」（一键还原基线，永远第一张卡）
 	//   1 = 其余内置档（游戏/音乐/电影，按名字）
 	//   2 = 用户自建档（通话/直播…，按名字）
@@ -625,7 +624,7 @@ func (d *Driver) Profiles() map[string]interface{} {
 		}
 		return 2
 	}
-	// builtin 内的出厂顺序（2026-10-24 用户拍板：移除「游戏」后重排——
+	// builtin 内的出厂顺序 移除「游戏」后重排——
 	// 默认 → 音乐 → 电影；自建场景仍按字母序排其后）。
 	seedRank := map[string]int{"音乐": 0, "电影": 1}
 	sort.SliceStable(list, func(i, j int) bool {
@@ -650,7 +649,7 @@ func (d *Driver) Profiles() map[string]interface{} {
 			factory = fp
 		}
 	}
-	// ★ 「预设」（FactoryDefault.xml）不再作为场景卡列出（2026-10-19 用户拍板）：
+	// ★ 「预设」（FactoryDefault.xml）不再作为场景卡列出）：
 	//   它整档只有一条 DefaultDeviceControl=1 一键出厂指令（本机驱动未实现，
 	//   应用必然无效），语义与 EnsureSeedScenes 播种的「原厂默认」卡重复 ——
 	//   两张恢复出厂卡同墙只会让用户疑惑哪张才是真的。factory 路径仍随
@@ -664,7 +663,7 @@ func (d *Driver) Profiles() map[string]interface{} {
 	}
 	// active：设备真值识别 —— 当前设备参数与哪个场景快照完全一致就显示
 	// 哪个；都不一致为 ""（自定义状态）。取代前端 localStorage 残留记忆
-	// （2026-10-20 用户拍板：「使用中 · X」必须跟设备真实状态走）。
+	//  「使用中 · X」必须跟设备真实状态走）。
 	return map[string]interface{}{
 		"ok": true, "dir": wdir, "writable": writable,
 		"factory": factory, "list": list, "active": identifyActiveScene(d),
@@ -686,10 +685,10 @@ func (d *Driver) profilePath(name string) (string, string, bool) {
 
 var reBadName = regexp.MustCompile(`[\\/:*?"<>|]`)
 
-// reservedSceneName 系统保留的场景名（健壮性审计 #2，2026-10-31）：
+// reservedSceneName 系统保留的场景名（健壮性审计 #2， ：
 // 「预设」= FactoryDefault.xml 保留字（既有口径）；「默认」= 一键还原基线，
 // 被覆盖后 EnsureSeedScenes 的幂等检查（项数够就不重建）不会自愈 ——
-// 一次 API 调用就能把它静默毁掉。前端 profFactory() 只挡 UI，这里后端收口。
+// 一次 API 调用就能把它静默毁掉。前端 profFactory 只挡 UI，这里后端收口。
 // 注意「音乐/电影」**不在**名单里：列表里它们是普通可编辑卡（覆盖/改名/
 // 删除均可，删除由播种自愈），收严反而改变既有设计行为。
 func reservedSceneName(name string) bool {
@@ -735,7 +734,7 @@ func (d *Driver) ProfileSave(name, desc string) map[string]interface{} {
 		}
 		sort.Strings(pnames)
 		for _, pname := range pnames {
-			// ★ 第 52 轮：`VolumeScalarControl#0/#1` 这类带声道后缀的虚拟参数
+			// `VolumeScalarControl#0/#1` 这类带声道后缀的虚拟参数
 			// 不是驱动属性名，写进 .profile 官方面板读不懂、我们自己 apply
 			// 也会失败 ⟹ 场景里一律不收（官方 FactoryDefault.xml 也没有逐声道音量）。
 			// 口径统一走 excludedFromScene（sceneExclude 裸名 + # 后缀）。
@@ -816,7 +815,7 @@ func (d *Driver) ProfileApply(name string) map[string]interface{} {
 	detail := []map[string]interface{}{}
 	done := map[string]bool{}
 	// DefaultDeviceControl（恢复出厂命令）被驱动拒绝的标记。
-	// 本机 OEM 驱动未实现该命令（--serve 实测 0x10003，2026-10-15）；
+	// 本机 OEM 驱动未实现该命令（--serve 实测 0x10003， ；
 	// 预设档整档就是这条指令，不含参数快照，原版面板同样无法恢复出厂。
 	factoryCmdFailed := false
 	for _, it := range items {
@@ -866,7 +865,7 @@ func (d *Driver) ProfileApply(name string) map[string]interface{} {
 			kind: kind, unknown: unknown, isSwitch: known && sp.kind == TBool})
 	}
 
-	// ★ 两轮写入（2026-10-19，回应「应用场景后级别参数写不进」）：
+	// ★ 两轮写入 ，回应「应用场景后级别参数写不进」）：
 	// 驱动语义是**效果开关先开，级别/滑杆参数才收写入**（真机探针证实：
 	// AUDIOBRILLIANT_LEVEL 等 5 组在 Enable_ 关闭时写一律失败，开关打开
 	// 后立即成功）。所以第一轮先写全部布尔开关，第二轮写其余参数。
@@ -991,7 +990,7 @@ func (d *Driver) ProfileItems(name string) map[string]interface{} {
 		Label string `json:"label"`
 		Ep    string `json:"ep"`
 		N     int    `json:"n"`
-		On    int    `json:"on"` // 2026-10-20：该组「开启」的开关数（值=1 的 Enable_*/AGCControl）
+		On    int    `json:"on"` // 该组「开启」的开关数（值=1 的 Enable_*/AGCControl）
 	}
 	pairs := map[string]string{}
 	seen := map[string]bool{}
@@ -999,7 +998,7 @@ func (d *Driver) ProfileItems(name string) map[string]interface{} {
 	var order []string
 	onTotal := 0
 
-	// isSwitchOn 「开启」口径（2026-10-20 用户拍板：详情卡显示实际应用参数）：
+	// isSwitchOn 「开启」口径 详情卡显示实际应用参数）：
 	// 只有开关型参数（Enable_* / AGCControl）值为 1 才算「开启」；
 	// 档位/滑杆（EQ_Slider*、*_LEVEL、RFX_ENVIRONMENT、CONLAB_HPSPK_*…）
 	// 跟随所属开关，不重复计数——否则一份「全 36 项」的档会显得全开。
@@ -1162,7 +1161,7 @@ func (d *Driver) ProfileRename(oldName, newName string) map[string]interface{} {
 
 // ---------------------------------------------------------------- 预置场景
 
-// profileFactoryScene 自建「默认」场景名（2026-10-20 用户拍板：原名「原厂默认」
+// profileFactoryScene 自建「默认」场景名 原名「原厂默认」
 // 改短）：官方 FactoryDefault.xml 只是一条本机驱动拒收的恢复出厂指令
 // （见 ProfileApply），对用户毫无用处；改为把当前驱动状态整档快照，
 // 成为可一键还原的基线。
@@ -1176,7 +1175,7 @@ type seedItem struct {
 }
 
 // seedScenes 预置场景（游戏/音乐/电影）。参数只取本机驱动实测可写的
-// 项（2026-10-15 --dump：render 66 项 / capture 38 项），VirtualBass、
+// 项 --dump：render 66 项 / capture 38 项），VirtualBass、
 // VoiceClarity、AudioBrilliant 等本机 APO 未实现的效果一概不放，
 // 避免应用时被驱动拒收、整档标「不可用」。
 //
@@ -1192,7 +1191,7 @@ var seedScenes = []struct {
 }{
 	{
 		Name: "游戏",
-		// ★ 2026-10-24：移出 builtin 名单 —— 作为**普通场景**播种重建
+		// 移出 builtin 名单 —— 作为**普通场景**播种重建
 		//   （用户可改可删，列在自定义场景区；出厂默认区只剩默认/音乐/电影）。
 		// 竞技取向：削弱低频遮蔽，2–16 kHz 适度提升；只用已验证的耳机环绕，
 		// 不叠加 RFX 混响或未验证的 SS 家族。麦克风只保留单路轻度降噪。
@@ -1272,7 +1271,7 @@ var seedScenes = []struct {
 
 // factoryDefaults 出厂默认值表 —— 设备侧自愈（HealMissingParams）的依据。
 //
-// ★ S2 起真源 = model/device-model.toml [[factory]]（42 项 = 渲染 36 + 采集 6，
+// S2 起真源 = model/device-model.toml [[factory]]（42 项 = 渲染 36 + 采集 6，
 // 装载时自校验）。历史真值注释随数据走（EQ 全 0 = 官方预设索引 11、
 // RFX_ENVIRONMENT=0 = 官方预设口径等，见 TOML 与当日日志）。
 var factoryDefaults = func() []seedItem {
@@ -1283,7 +1282,7 @@ var factoryDefaults = func() []seedItem {
 	return out
 }()
 
-// fullSnapshot 把场景快照补成全量（2026-10-19，回应「恢复后场景缺参数」）：
+// fullSnapshot 把场景快照补成全量 ，回应「恢复后场景缺参数」）：
 // 特征项之外，先按 factoryDefaults 补默认值，再用设备实读补齐剩余可写项
 // （调用前必须已跑过 HealMissingParams，否则 ret=2 的项读不到值会缺参数）。
 // 优先级：特征项 > 默认表 > 实读；同名键去重保序。
@@ -1349,8 +1348,8 @@ func HealMissingParams(d *Driver) int {
 		return 0
 	}
 	/*
-		★ 2026-10-22 第二版：补的范围从「出厂表 42 项」扩到**初始化清单**
-		（55 项 = 出厂表 ∪ 「默认」档 ∪ 设备级）。以前那 12 项采集/新参数
+		补的范围从「出厂表 42 项」扩到**初始化清单**
+		（55 项 = 出厂表 ∪ 「默认」档 ∪ 设备级）（早先范围少 12 项采集/新参数）——
 		只能靠 applySceneExtras 补第二次，两套遍历各写各的；现在同一个执行器，
 		strong=false 就是「只补 ret==2」，有值一个字不动。
 		设备级（拓扑）由 ensureChannelTopology 负责，这里跳过。
@@ -1365,7 +1364,7 @@ func HealMissingParams(d *Driver) int {
 var reApoName = regexp.MustCompile(`(<ApoEffect\s+Name=")([^"]*)(")`)
 
 // MigrateProfileGroups 把存量场景文件里的**旧 ApoEffect 名**就地换成官方
-// Canvas 名（第 51 轮）。
+// Canvas 名。
 //
 // 为什么不能只靠 groupAlias：别名只在**我们读**的时候兜底 —— 文件本身还是
 // 旧名，官方面板照旧读不出，用这些档的场景在官方面板里点了没反应。
@@ -1430,7 +1429,7 @@ func MigrateProfileGroups(d *Driver) (int, int) {
 //     升级重建（播种档 builtin，UI 禁止用户改，升级无害）
 //   - 原厂默认：按 factoryDefaults 生成（存量档项数不足时同样升级重建）
 //
-// ★ 全量播种：特征项之外按「factoryDefaults → 设备实读」补齐其余可写参数
+// 全量播种：特征项之外按「factoryDefaults → 设备实读」补齐其余可写参数
 //
 //	（fullSnapshot），场景档回到旧版 ProfileSave 的全量形态 —— 旧版小档
 //	只有 18-42 项，用户对比「参数变少」。调用前必须已跑过 HealMissingParams。
@@ -1444,7 +1443,7 @@ func EnsureSeedScenes(d *Driver) {
 	if err := os.MkdirAll(wdir, 0o755); err != nil {
 		return
 	}
-	// ★ 2026-10-24（用户拍板修正）：「游戏」移出 builtin 名单（TOML
+	// 「游戏」移出 builtin 名单（TOML
 	//   Scene.Builtin），但**保留**为普通场景 —— 档缺失时由下方 seed 循环
 	//   按原 Items 重建（非 builtin：用户可改可删，列在自定义场景区）。
 	for _, s := range seedScenes {
@@ -1464,7 +1463,7 @@ func EnsureSeedScenes(d *Driver) {
 			snap = append(snap, snapRow{it.Ep, it.Name, kindName(sp.kind), it.Val})
 		}
 		if !okAll || len(snap) == 0 {
-			// ★ 2026-10-24：播种跳过要有痕迹——排查"场景卡没出来"时日志可见
+			// 播种跳过要有痕迹——排查"场景卡没出来"时日志可见
 			log.Printf("[播种] 跳过「%s」（能力面缺失=%v / 快照空=%v）",
 				s.Name, !okAll, len(snap) == 0)
 			continue

@@ -84,18 +84,17 @@ const (
 var assets embed.FS
 
 // drv 是全局唯一的驱动实例。
-// 注意：它必须在包初始化时创建，因为内部要启动一个 runtime.LockOSThread()
+// 注意：它必须在包初始化时创建，因为内部要启动一个 runtime.LockOSThread
 // 钉住的 goroutine —— DLL 的设备上下文带线程局部状态，初始化与后续调用必须同线程。
 var drv = NewDriver()
 
 // ensureChannelTopology 已迁到 initstate.go —— 声道拓扑纠正不再只是
-// 「启动期一次性」的事：装完驱动点「重新检测」连上后同样要补（2026-10-22
-// 用户虚拟机实测：首次启动声道组不是立体声、重启主程序才对，就是因为它
+// 「启动期一次性」的事：装完驱动点「重新检测」连上后同样要补// 用户虚拟机实测：首次启动声道组不是立体声、重启主程序才对，就是因为它
 // 当时只挂在启动路径上，而那次写入落在端点重建窗口里被丢弃了）。
 // 现在由 EnsureInitialState 统一调用，写后回读确认 + 最多重试 3 次。
 
 // seedSceneDefaults 驱动重装/参数存储清空后，把「默认」场景整体应用一次
-// （2026-10-20 用户拍板：重装后所有参数按自定义场景默认来设置）。
+//  重装后所有参数按自定义场景默认来设置）。
 // 判据：3 个哨兵参数（EQ 开关 / 房间大小 / AGC——「默认」场景必写的三处）
 // 全部读不到（ret=2/空）才动手 —— 只要有记忆值就视为已有状态，绝不动用户
 // 当前的调音。场景不含声道参数，拓扑播种由随后的 EnsureInitialState
@@ -118,12 +117,12 @@ func seedSceneDefaults() {
 		int(applied), int(failed))
 }
 
-// openAttempts 返回启动时 drv.Open() 的总尝试次数。
+// openAttempts 返回启动时 drv.Open 的总尝试次数。
 //
-// ★ 2026-10-21（用户拍板）：Open 以前只试一次。iKF-驱动管理装完驱动后
+// Open 只试一次会iKF-驱动管理装完驱动后
 // 会 `pnputil /restart-device` 重建音频端点，用户在「已安装完成」上点
 // 确定就立刻打开主程序，很容易正好撞在重建窗口期里 —— 一次失败界面就
-// 永久停在「未连接驱动」，以前只能彻底关掉重开。
+// 永久停在「未连接驱动」，只能彻底关掉重开。
 //
 // 无界面子命令只给 1 次：失败本身就是它们要观测的结果，多等 7 秒只会
 // 拖慢闸脚本与排障。GUI 启动（含 --serve）才容忍这个窗口期：1+3 次。
@@ -132,7 +131,7 @@ func openAttempts() int {
 		"--self-test", "--selftest", "--roundtrip", "--dump", "--heal", "--init-check", "--init-fp",
 		"--channel-test", "--play", "--loopback-devices", "--loopback-fft",
 		"--loopback-test", "--restore-scene",
-		// ★ 2026-10-22：--serve 也是无界面模式，必须单次。以前漏了它，
+		// --serve 也是无界面模式，必须单次。漏了它的话，
 		//   服务启动要白等 1+2+4=7 秒，闸脚本按 sleep 5 起就撞「页面没就绪」。
 		"--serve",
 	} {
@@ -143,7 +142,7 @@ func openAttempts() int {
 	return 4
 }
 
-// openWithRetry 按 1s / 2s / 4s 退避重试 openAttempts() 次。
+// openWithRetry 按 1s / 2s / 4s 退避重试 openAttempts 次。
 func openWithRetry() bool {
 	n := openAttempts()
 	for i := 0; i < n; i++ {
@@ -164,7 +163,7 @@ func openWithRetry() bool {
 }
 
 // setupFileLog 把标准日志落到 exe 旁的 log/yyyy-mm-dd.txt（追加）。
-// ★ 2026-10-24（用户要求）：GUI 模式没有 stdout，此前 log.Printf 的输出
+// GUI 模式没有 stdout，此前 log.Printf 的输出
 // 全部丢失（破坏性检测报告也点名"panic 无日志"）；现在同时写文件与
 // stderr（serve 模式两者都能看）。按天分文件，多实例追加写安全。
 func setupFileLog() {
@@ -187,7 +186,7 @@ func main() {
 	setupFileLog() // 日志最先挂上：之后任何阶段的输出都有据可查
 
 	// ---- 入口管理族 CLI：必须先于单实例守卫与 drv.Open ----
-	// ★ 2026-10-20 排障发现：--takeover 的提权子进程（--takeover-admin）
+	// 排障发现：--takeover 的提权子进程（--takeover-admin）
 	//   起来时，父进程还活着并握着 singleguard 的 Local\ 互斥锁 —— 子进程
 	//   被当成「第二实例」静默退出 0，父进程误报「接管完成」，注册表其实
 	//   一项都没写（驱动卸载重装后恢复自启时实测，50ms 轮询零命中）。
@@ -342,10 +341,10 @@ func main() {
 	}
 	// --init-check：把「初始化清单」逐项对一遍设备，只读不写。
 	//
-	// 这是「初始化」从口头约定变成可验收的关键一步：以前判断「装完驱动是不是
+	// 这是「初始化」从口头约定变成可验收的关键一步：判断「装完驱动是不是
 	// 真回到默认」只能拿界面肉眼看（一片「未设置」还是不是），现在一条命令
 	// 给出「应有 55 · 达标 a · 未设置 b · 偏离 c」。退出码 1 = 不达标，
-	// 可直接当安装后的验收闸（2026-10-22 用户要求"确保每一项按既定执行"）。
+	// 可直接当安装后的验收闸）。
 	if hasArg("--init-check") {
 		if !drv.ready {
 			fmt.Printf("驱动未就绪，无法核对：%s\n", drv.errMsg)
@@ -369,19 +368,19 @@ func main() {
 		return
 	}
 	// --takeover / --takeover-undo / --entry-delete / --entry-status 这族
-	// 已移到 main() 最前（先于单实例守卫），见文件开头注释 —— 否则提权
-	// 子进程会被守卫挡死、父进程误报成功（2026-10-20 实测回归）。
+	// 已移到 main 最前（先于单实例守卫），见文件开头注释 —— 否则提权
+	// 子进程会被守卫挡死、父进程误报成功 实测回归）。
 
 	// 设备侧自愈：官方靠安装时的 `/h /i` + 每次开机的 `/h /d` 维持默认值，
 	// 这里做等价的事 —— 只补「存在但当前无值」（ret=2）的项。
 	// ★ 必须在场景播种之前：全量播种要实读设备补齐非特征项，
-	//   没自愈的项读回 ret=2，场景档就会缺参数（2026-10-19 用户实测）。
+	//   没自愈的项读回 ret=2，场景档就会缺参数 实测）。
 	// ★ 场景自动恢复必须在自愈**之前**：自愈把 ret=2 项补成默认值后，
-	//   「端点被重置」的指纹就测不出来了（2026-10-20，lastscene.go）。
-	//   恢复目标 = 「默认」场景状态（2026-10-20 用户拍板：重装/重置后
+	//   「端点被重置」的指纹就测不出来了 ，lastscene.go）。
+	//   恢复目标 = 「默认」场景状态 重装/重置后
 	//   自动回到默认，之后自己点场景卡换）。
-	// ★ 2026-10-22：整条链收进 EnsureInitialState —— 「重新检测」和装驱动
-	//   重连也要跑同一套（以前只在这里跑，用户装完驱动点重新检测就错过了）。
+	// 整条链收进 EnsureInitialState —— 「重新检测」和装驱动
+	//   重连也要跑同一套（只在启动时跑，用户装完驱动点重新检测就错过了）。
 	EnsureInitialState(drv, true)
 
 	if i := argIndex("--serve"); i >= 0 && i+1 < len(os.Args) {
@@ -427,7 +426,7 @@ func main() {
 		StartHidden: startHidden,
 		// 单实例：Wails v2.16 的 SingleInstanceLock 有 bug（FindWindowW 搜不到
 		// HWND_MESSAGE 消息窗口，实测双开），改用自研守卫 singleguard.go，
-		// 在 main() 最开头执行（先于 drv.Open / wails.Run）。
+		// 在 main 最开头执行（先于 drv.Open / wails.Run）。
 		// 设计稿深浅两套主题的底色分别是 #0B0B0D / #F2F2F4，
 		// body 底为 #111114。窗口底色取 #111114，让等比缩放产生的
 		// 上下留边与画面融为一体，不出现白边闪屏。
@@ -446,13 +445,13 @@ func main() {
 		// 沙箱助手进程起不来）靠它们能判断断点在哪一段 ——
 		// 窗口对象有没有建、WebView2 环境有没有建、HTML 有没有加载解析完。
 		//
-		// ★ 第 64 轮（B4）：OnStartup 顺带起系统托盘；OnBeforeClose 把
+		// OnStartup 顺带起系统托盘；OnBeforeClose 把
 		//   「点 ✕」拦截成隐藏进托盘，只有托盘菜单「退出」才真退出 ——
 		//   与原面板 SystemTrayLClick/RClick 的常驻行为一致。
 		OnStartup: func(ctx context.Context) {
 			log.Println("[启动] 窗口对象已创建")
 			startTray(ctx)
-			// 2026-10-23（用户定稿）：启动不再做入口询问 —— 那条链要提权，
+			// 启动不再做入口询问 —— 那条链要提权，
 			// 体感是「装完驱动还弹一个替代官方面板的 UAC」。入口改写收口两处：
 			// 装驱动时安装器已提权顺带写好（setup.go --takeover）、
 			// 托盘菜单「修复/删除开机入口」用户主动点才提权（entry.go）。
@@ -482,7 +481,7 @@ func main() {
 func hasArg(a string) bool { return argIndex(a) >= 0 }
 
 // knownFlags 全部已支持的命令行参数（入口族 + 诊断族 + 面板开关）。
-// ★破坏性检测 P1-2：入口族分发结束后逐一比对，未识别的打回 2。
+// 破坏性检测 P1-2：入口族分发结束后逐一比对，未识别的打回 2。
 var knownFlags = map[string]bool{
 	"--serve": true, "--self-test": true, "--selftest": true, "--roundtrip": true,
 	"--dump": true, "--play": true, "--secs": true, "--tone": true, "--wav": true,

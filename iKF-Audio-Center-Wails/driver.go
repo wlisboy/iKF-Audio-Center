@@ -170,11 +170,11 @@ var magicVoices = []string{"怪兽", "卡通", "男人", "女人"}
 // testChannels —— 声道测试：掩码取自原面板 apoSpeakerSetting.cml 的
 // PlayTestSound Tag 全集。四元组：标识 / 掩码 / 中文 / 测试音 wav 文件名。
 //
-// ★ 第 28 轮：第四个字段是**必须**的。反编译 osConfLib.dll
+// 第四个字段是**必须**的。反编译 osConfLib.dll
 // （Ghidra 12.1.4，PlayTestSound@0x1800060E0）后才看清第一个参数是
 // LPWSTR 类型的 wav 路径，直接进 mmioOpenW + CreateFileW ——
 // 也就是 MSDN 那个经典示例 WaveOpenFile；拿不到文件句柄就 return 0x10001。
-// 以前把设备上下文指针塞在这里当路径用，必然打不开文件，
+// 设备上下文指针不能塞在这里当路径用，必然打不开文件，
 // 于是面板上一直显示「声道测试不可用（65537）」。
 // 资源就在驱动安装目录下：<CPL>/sound/*.wav，原面板自带的那 8 个。
 var testChannels = [][4]interface{}{
@@ -339,7 +339,7 @@ func sharedCpls() []string {
 
 // walkMaxDepth 递归兜底的深度上限。见 findDLL 的说明。
 //
-// 取 4：官方铺法最深是 <CPL>/Driver/x64/vista（3 层），但 sharedCpls() 里还有
+// 取 4：官方铺法最深是 <CPL>/Driver/x64/vista（3 层），但 sharedCpls 里还有
 // 一个**父目录级**兜底 `C:\Program Files\iKF headset`，它的 DLL 在第 4 层
 // （CPL\Driver\x64\vista\）。4 既保住那条兜底，又能排掉工程根里便携包那份
 // （dist/iKF-Audio-Center-Portable/CPL/Driver/x64/vista 在第 6 层）。
@@ -360,13 +360,13 @@ func findDLL(cpl string) string {
 	}
 	// 兜底：目录内递归找一次。
 	//
-	// ★★ 第 50 轮的坑：兜底必须**限深**。候选里有 appDir() = 程序所在目录，
+	// ★兜底必须**限深**。候选里有 appDir = 程序所在目录，
 	// 源码/开发态下它就是工程根，而工程根的 dist/ 里躺着便携包，便携包自带
 	// <工程根>/dist/iKF-Audio-Center-Portable/CPL/Driver/x64/vista/osConfLib.dll。
 	// 不限深地 Walk 一遍会把它认下来，于是「工程根就是一个 CPL」，
 	// sound/ profile/ lang/ FactoryDefault.xml 全部失联
 	// （症状：源码运行时声道测试 0/8 资源就位、组态与词条读不到）。
-	// 上面 rels 里官方文档过的铺法最深是 Driver/x64/vista（3 层），但 sharedCpls()
+	// 上面 rels 里官方文档过的铺法最深是 Driver/x64/vista（3 层），但 sharedCpls
 	// 还有个父目录级兜底（DLL 在第 4 层），故上限取 walkMaxDepth = 4；
 	// 便携包那份在 6 层，天然排除。与 Python 侧 _WALK_MAX_DEPTH 保持一致。
 	var found string
@@ -437,7 +437,7 @@ func guessType(v string) string {
 // 实测同一份代码在主 goroutine 里 208 项全部正常，
 // 放到 net/http 的处理 goroutine 里就有 1 项（GetDirectXVer）返回 0x10001。
 //
-// 解决办法：把所有 DLL 调用收敛到一个 runtime.LockOSThread() 钉住的
+// 解决办法：把所有 DLL 调用收敛到一个 runtime.LockOSThread 钉住的
 // 专用 goroutine 上，通过 channel 投递。这样同时也天然实现了串行化，
 // 取代了 Python 版里的互斥锁。
 type Driver struct {
@@ -451,7 +451,7 @@ type Driver struct {
 	propCtrl  *syscall.LazyProc
 	regCb     *syscall.LazyProc
 
-	// 三条附加导出：原面板用它们做声道测试（监听两条 2026-10-20 移除：
+	// 三条附加导出：原面板用它们做声道测试（监听两条 移除：
 	// 官方 RunListen2Device 依赖的 COM 服务器驱动包里没有，见 listen.go）
 	playTest  *syscall.LazyProc
 	stopTest  *syscall.LazyProc
@@ -530,8 +530,8 @@ func (d *Driver) openLocked() bool {
 	cands = append(cands, sharedCpls()...)
 
 	var tried []string
-	// ★ 2026-10-26：循环里有三个不同的失败点（LoadLibrary / ConfLibInit /
-	// 设备枚举为 0），以前统一报"加载失败"。VM 实证（2026-10-26 00:02）：
+	// 循环里有三个不同的失败点（LoadLibrary / ConfLibInit /
+	// 设备枚举为 0），笼统报"加载失败"会掩盖真实失败点。实测：
 	// 插上耳机立刻启动程序时，重试 3 次失败发生在设备还在枚举的窗口里
 	// （设备管理器 00:02:59 才"已启动设备"，应用 00:03:14 自愈）——真实
 	// 原因多半是"设备数为 0"而非加载失败。failWhy 记录最后一次尝试
@@ -587,7 +587,7 @@ func (d *Driver) openLocked() bool {
 		runtime.KeepAlive(&cnt)
 		if cnt <= 0 {
 			failWhy = "设备枚举为 0（耳机未插入或系统还在枚举 USB 设备）"
-			/* ★ 2026-10-22：Init 成功就必须配对撤销。以前这里直接 continue，
+			/* Init 成功就必须配对撤销。若在这里 continue，
 			   驱动没装时启动重试 4 次就留下 4 次未配对的 ConfLibInit，之后
 			   Close 只撤 1 次 —— 净残留 3 次。实测本机（设备在线）重复 Init
 			   无害，但这是明确的资源管理缺口，不能靠"没崩"继续放着。 */
@@ -648,7 +648,7 @@ func (d *Driver) Close() {
 			}()
 		}
 		d.ready = false
-		/* ★ 2026-10-21：指针必须一起清。以前只清 ready，Close→Open 之后
+		/* 指针必须一起清。若只清 ready，Close→Open 之后
 		   若新设备枚举不出采集端点，capReady/capPtr 还留着上一轮的旧值 ——
 		   那是已经作废的设备上下文（Close 已 ConfLibUnInit），再拿去
 		   PropertyControl 就是悬垂指针。reopen 让这条路径变成常规路径，
@@ -657,7 +657,7 @@ func (d *Driver) Close() {
 		d.devKeep, d.capKeep = nil, nil
 		d.capReady = false
 		d.devCnt, d.capCnt = 0, 0
-		/* ★ 2026-10-22：常量缓存一起清。Close 之后设备可能换了/驱动重装了，
+		/* 常量缓存一起清。Close 之后设备可能换了/驱动重装了，
 		   沿用上一轮 slowConst 的读数（如 GetDirectXVer）没有意义。 */
 		d.constMu.Lock()
 		d.constCache = nil
@@ -667,20 +667,20 @@ func (d *Driver) Close() {
 
 // Reopen 松开旧上下文再重新枚举端点。
 //
-// ★ 2026-10-21（用户拍板）：装完驱动立刻打开主程序时，音频端点可能还在
-// pnputil /restart-device 的重建窗口期里，openLocked 会一次失败。以前
+// 装完驱动立刻打开主程序时，音频端点可能还在
+// pnputil /restart-device 的重建窗口期里，openLocked 会一次失败。
 // 界面就此永久停在「未连接驱动」，唯一的出路是彻底关掉重开。Reopen 给
 // 前端一个自恢复入口（POST /api/driver/reopen），与 RunSetup 里装完驱动
 // 那一步 close→open 完全同路。
 //
-// ★ 2026-10-22（虚拟机上暴露，用户实测）：装完驱动再点「重新检测」，出现的
+// （虚拟机上暴露，实测）：装完驱动再点「重新检测」，出现的
 // 是「麦克风 + 自定义场景」不可用、其余正常，而且**退出重开就好**。
 //
 // 原因是端点重建不是原子的：渲染端点先就绪、采集端点（麦克风）后到。
 // openLocked 一次就返回的话渲染侧全通、采集侧全 -9（ptrFor 里 capReady
 // 为 false），界面就是"一半能用"。场景墙同步空掉，因为 CPL 路径跟着一起没落地。
 //
-// ★ 重试判据不能用「上一轮有没有采集端点」：主程序启动时驱动根本没装，
+// 重试判据不能用「上一轮有没有采集端点」：主程序启动时驱动根本没装，
 // 上一轮必然没有，判据恒不成立 —— 第一次修就栽在这里（一次都没重试）。
 // 现在只认「本轮连上了但采集端点缺失」，重试到拿到为止。
 func (d *Driver) Reopen() bool {
@@ -785,7 +785,7 @@ func (d *Driver) pcLocked(ep, name string, isSet bool, payload []byte) (int32, [
 	ppBuf := uintptr(unsafe.Pointer(&pBuf))
 
 	// ---- pValue 约定：按属性所属的表二选一 ----
-	// ★ 第 52 轮：`<属性名>#<声道索引>` 先拆成真名 + 索引（没带 "#" 仍走 -1）。
+	// `<属性名>#<声道索引>` 先拆成真名 + 索引（没带 "#" 仍走 -1）。
 	baseName, chIdx := splitChannel(name)
 	var pVal uintptr
 	var keepGen []byte
@@ -829,7 +829,7 @@ func (d *Driver) Read(name string) (ret int, val string) {
 }
 
 // ReadEp 在指定端点上读。ep = "render" / "capture"
-// ★ 健壮性审计 #4（2026-10-31）：原来的调用侧 ptrFor 预检已删 —— 它在
+// 注意：原来的调用侧 ptrFor 预检已删 —— 它在
 // HTTP goroutine 上裸读 d.ready/capPtr，与工作线程上的 Open/Close 构成
 // 数据竞争。pcLocked 在工作线程上会复检并同样返回 -9，行为不变。
 func (d *Driver) ReadEp(ep, name string) (ret int, val string) {
@@ -880,7 +880,7 @@ func (d *Driver) Write(name string, value interface{}) map[string]interface{} {
 }
 
 // WriteEp 在指定端点上写。
-// ★ 健壮性审计 #4：调用侧 ptrFor 预检已删（理由同 ReadEp）—— 端点缺失
+// 健壮性审计 #4：调用侧 ptrFor 预检已删（理由同 ReadEp）—— 端点缺失
 // 由 pcLocked 复检返回 -9，下方统一转成原样的友好文案。
 func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interface{} {
 	sp, ok := spec(ep, name)
@@ -1029,7 +1029,7 @@ func valueUnchanged(cur, target string, kind int) bool {
 
 // WriteAuto 先走白名单；未命中但属于 208 项时改走 WriteRaw。
 //
-// 口径（用户要求「官方内容零遗漏，功能能不能用交给硬件匹配」）：
+// 口径（官方内容零遗漏，功能能否用交给硬件匹配）：
 // 官方面板里有、但新界面没登记成可写控件的属性（例如音箱方位的
 // SS_LF_ANGLE / SS_RF_ANGLE 一族），也必须真写一次并把驱动的真实返回码
 // 报出来，而不是在前端直接短路成「本机不支持」。本机这些属性返回 2
@@ -1153,13 +1153,13 @@ func (d *Driver) WriteRaw(ep, name string, value interface{}, kind string) map[s
 // PlayTest 声道测试。mask 取自原面板 apoSpeakerSetting.cml 的
 // PlayTestSound Tag 全集：LF=1 RF=2 C=4 W=8 LB=16 RB=32 LS=512 RS=1024。
 //
-// ★ 第 28 轮修正。反汇编确认签名是 PlayTestSound(LPWSTR wavPath, int mode,
+// 反汇编确认签名是 PlayTestSound(LPWSTR wavPath, int mode,
 // void* pInfo)：
 //
 //	wavPath  测试音 WAV 的路径。**不是设备上下文** —— 它直接进
 //	         mmioOpenW + CreateFileW（MSDN 的 WaveOpenFile 示例），
 //	         拿不到文件句柄就 return 0x10001，一个字节都不往下走。
-//	         这正是「声道测试永远不可用」的真正原因：以前这里传的是
+//	         这正是「声道测试永远不可用」的真正原因：若传
 //	         设备上下文指针，被当成宽字符串去开文件，必然失败。
 //	mode     声道掩码。
 //	pInfo    指向 3 个 dword：[+0] 链表内索引 [+8] 链表选择（0=渲染 1=采集）。
@@ -1298,7 +1298,7 @@ func (d *Driver) ParamMapEp(ep string) map[string]map[string]interface{} {
 		}
 		out[n] = map[string]interface{}{"r": ret, "v": val, "w": w, "t": t}
 	}
-	// ★ 第 52 轮：渲染端点额外补上逐声道音量（hNames 里带 "#" 的虚拟参数）。
+	// 渲染端点额外补上逐声道音量（hNames 里带 "#" 的虚拟参数）。
 	// 它们不是 208 项真实属性，所以不进 allNames；但界面滑杆按统一路径取值，
 	// 必须出现在这张表里。与 Python 侧 param_map 逐项一致。
 	if ep == EpRender {
@@ -1403,7 +1403,7 @@ func (d *Driver) Status() map[string]interface{} {
 		return f
 	}
 
-	// micNum 对应 Python 版的 mic_num()：麦克风侧读数必须走采集端点，
+	// micNum 对应 Python 版的 mic_num：麦克风侧读数必须走采集端点，
 	// 走渲染端点一律返回 2（不支持）。
 	micNum := func(n string) interface{} {
 		if !d.capReady {

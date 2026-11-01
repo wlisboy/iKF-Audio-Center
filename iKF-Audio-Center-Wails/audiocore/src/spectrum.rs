@@ -27,7 +27,7 @@ fn hypot_go(x: f64, y: f64) -> f64 {
     x * (1.0 + r * r).sqrt()
 }
 
-/// 表驱动：cos/sin/Blackman 窗，公式与 Go init() 逐字一致。
+/// 表驱动：cos/sin/Blackman 窗，公式与 Go init 逐字一致。
 pub struct Tables {
     pub cos: Vec<f64>,
     pub sin: Vec<f64>,
@@ -208,7 +208,7 @@ pub fn decode_block(raw: &[u8], frames: usize, ch: usize, block_align: usize, ta
     // panic=abort 下就是 0xC0000409 且无日志。校验必须按**实际读宽**算：
     // 只查 frames*block_align 拦不住 block_align < ch×样本字节 的格式漂移
     // （那时最后一帧 base + ch×宽度 仍会出界）。逐帧读的最大偏移出现在
-    // 最后一帧，故校验 (frames-1)*block_align + ch×宽度 ≤ raw.len() 即
+    // 最后一帧，故校验 (frames-1)*block_align + ch×宽度 ≤ raw.len 即
     // 覆盖所有帧。越界按静音处理。
     let width: usize = match (tag, bits) {
         (3, 32) | (1, 32) => 4,
@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn decode_block_format_drift_is_silence() {
         // 声明 float32 8ch（读宽 32B）但 block_align=8、buffer=3×8：旧校验
-        // frames*block_align ≤ raw.len() 放行，逐帧读必越界；现在应整块静音。
+        // frames*block_align ≤ raw.len 放行，逐帧读必越界；现在应整块静音。
         let raw = [0u8; 24];
         let out = decode_block(&raw, 3, 8, 8, 3, 32);
         assert_eq!(out, vec![0.0f32; 3]);

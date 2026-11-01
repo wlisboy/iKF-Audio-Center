@@ -30,7 +30,7 @@
 —— 本程序都不用。`osConfLib.dll` 的导入表只有
 WINMM/ADVAPI32/SETUPAPI/KERNEL32/USER32/ole32/OLEAUT32，不碰 DirectX。
 三个无用 DLL 变体（x86/vista、x64/xp、x86/xp）也不拷：xp 版会让进程 exit 127。
-★ 2026-10-20：`SoundRecorder\\Recorder.exe` **不再捆绑** —— 取证实为
+`SoundRecorder\\Recorder.exe` **不再捆绑** —— 取证实为
 依附官方面板 COM 环境的薄客户端（导入表仅 KERNEL32+ole32，无
 user32/winmm），脱离官方面板拉起必退 241，是死件；录音机已改内嵌实现
 （recorder.go / center_src.py 的 MicRecorder）。取证见
@@ -67,7 +67,7 @@ SETUP_NAME = "iKF-驱动管理.exe"  # 与 driver.go 的 setupExeName 必须一�
 GO_BIN = r"C:\Program Files\Go\bin"
 
 # CPL 里运行期真正要用到的部分（源相对路径 → 目标相对路径，目录则整份递归）
-# ★ 2026-10-20 剔除 profile\default（官方 HiFi 空模板）：.profile 四端点全空、
+# 剔除 profile\default（官方 HiFi 空模板）：.profile 四端点全空、
 #   无参数快照，场景墙侧 profile.go 也明确跳过它（应用等于什么都没做），
 #   新框架已抛弃官方面板 ⟹ 这份文件没有任何消费者，不再拷贝。
 CPL_ITEMS = [
@@ -112,7 +112,7 @@ IKFTOOL_NAME = "iKFTool.exe"  # 日志诊断工具（只读，不占单实例）
 
 
 def build_ikftool(out):
-    """编译 iKFTool 并入包。2026-10-28 起 build_portable 负责——此前它是
+    """编译 iKFTool 并入包。build_portable 负责——此前它是
     10-25 手工放进包里的，一次全量重建就把手工件清掉了（已踩坑）。"""
     dst = os.path.join(out, IKFTOOL_NAME)
     cmd = ["go", "build", "-trimpath", "-ldflags", "-s -w", "-o", dst, "./ikftool"]
@@ -216,7 +216,7 @@ def main():
         shutil.rmtree(args.out)
     os.makedirs(args.out)
 
-    # 主程序放根，driver.go 的 localCpls() 会从这里往上找同目录资源
+    # 主程序放根，driver.go 的 localCpls 会从这里往上找同目录资源
     shutil.copy2(args.exe, os.path.join(args.out, os.path.basename(args.exe)))
 
     # P1：音频热路 Rust DLL（audiocore 产物）。缺失不致命（exe 运行时降级
@@ -232,7 +232,7 @@ def main():
                 if fn.endswith(".rs"):
                     src_newest = max(src_newest, os.path.getmtime(os.path.join(root, fn)))
         if src_newest > os.path.getmtime(audio_dll):
-            # 2026-11-01：从 WARN 升级为硬失败。DLL 旧 = 包里跑旧音频
+            # 从 WARN 升级为硬失败。DLL 旧 = 包里跑旧音频
             # 代码，运行时无告警，静默回潮比缺 DLL（会降级）更危险。
             sys.exit("ikf_audio.dll 比 audiocore/src 旧 —— 先 cargo build --release 再打包"
                      "（确认无妨可删 audiocore/src 下更新的 .rs 的改动时间戳规避，不建议）")
@@ -247,7 +247,7 @@ def main():
         copy_item(src_cpl, rel, os.path.join(args.out, "CPL"))
     for rel in DRV_ITEMS:
         copy_item(src_drv, rel, os.path.join(args.out, "driver"))
-    # ★ 2026-10-20：不再捆绑 SoundRecorder\Recorder.exe —— 死件（见头部
+    # 不再捆绑 SoundRecorder\Recorder.exe —— 死件（见头部
     #   注释）；录音机已内嵌。
     # 内置档（原厂默认/游戏/电影/音乐）由 EnsureSeedScenes 首次启动时生成，
     # 不在这里拷；stash 的场景树必须放回，否则上面那次 rmtree 就是静默删除。
@@ -272,8 +272,8 @@ def main():
 def check_main(out, exe_name):
     """自检一：把 ProgramFiles 掐掉，逼主程序只能读同目录 —— 读不到就说明包是残的。
 
-    ★ 2026-10-22：耳机不在本机时（插到虚拟机里做测试是常规操作），
-    `--dump` 必然报「驱动未连接」，但这不代表包是残的 —— 以前这里直接
+    耳机不在本机时（插到虚拟机里做测试是常规操作），
+    `--dump` 必然报「驱动未连接」，但这不代表包是残的 —— 直接
     sys.exit(1)，整个构建判失败，而实际上文件早就复制完了。
     现在按项目约定给环境前提闸加 SKIP 分支：
       包里找得到 osConfLib.dll → 只做文件级校验，打印 SKIP 继续；

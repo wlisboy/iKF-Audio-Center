@@ -181,7 +181,7 @@ _MODEL = _load_device_model()
 # 一、属性名表（从 osConfLib.dll 的字符串表实测导出）
 # ====================================================================
 
-# ★ S3 起真源 = model/device-model.toml [names]（208 = 112+96，装载时自校验）。
+# S3 起真源 = model/device-model.toml [names]（208 = 112+96，装载时自校验）。
 # 构建注入 __GENERIC__/__OEM__ 与 tools/propnames.json 同步退役。
 GENERIC_NAMES = list(_MODEL["names_generic"])
 OEM_NAMES = list(_MODEL["names_oem"])
@@ -209,7 +209,7 @@ ENDPOINTS = (EP_RENDER, EP_CAPTURE)
 # 按端点分表。VolumeControl / VolumeScalarControl / MuteControl
 # 在**两个端点上都有**，语义分别是扬声器音量与麦克风音量，必须分开登记。
 # --------------------------------------------------------------------
-# ★ S3 起真源 = model/device-model.toml [[writable]]（80 条显式展开，
+# S3 起真源 = model/device-model.toml [[writable]]（80 条显式展开，
 # 含 SS×16 / EQ×10 / 声道×2；kind 值域离散全在数据里，装载时自校验）。
 # 历史逐条证据注释（A-E 档移植、第 48/50/62 轮更正等）随数据走。
 WRITABLE = {ep: {} for ep in ENDPOINTS}
@@ -217,19 +217,19 @@ for _w in _MODEL["writable"]:
     WRITABLE[_w["ep"]][_w["name"]] = _w["t"]
 
 # --------------------------------------------------------------------
-# 场景排除名单（2026-10-22，与 Go 侧 profile.go 的 sceneExclude / sceneUnproven
+# 场景排除名单 ，与 Go 侧 profile.go 的 sceneExclude / sceneUnproven
 # 逐项同值；闸 scene_parity_gate.py 会反查两线的项数是否一致）
 #
 # 口径：「存为新场景」与「应用场景」共用同一份判定 —— 排除项既不写进 .profile，
-#   应用旧档时也跳过不写。Go 侧 2026-10-19 就有这套名单，Python 一直只有
+#   应用旧档时也跳过不写。Go 侧 就有这套名单，Python 一直只有
 #   `"#" in pname` 一层，实测同一个「存为新场景」：Go 37 项 / Python 64 项。
-# ★ DevSampleRateControl 最要命：写它会触发 USB 重协商 → 端点重建 →
+# DevSampleRateControl 最要命：写它会触发 USB 重协商 → 端点重建 →
 #   采集端会话值全清，正是「应用场景后麦克风页整体不同步」的根因。
 #   Go 修了，Python 一直没修。
 # --------------------------------------------------------------------
-# ★ S1 起真源 = iKF-Audio-Center-Wails/model/device-model.toml [scene].exclude
+# S1 起真源 = iKF-Audio-Center-Wails/model/device-model.toml [scene].exclude
 SCENE_EXCLUDE = _MODEL["exclude"]
-# ★ S1 起真源 = 同上 [scene].unproven
+# S1 起真源 = 同上 [scene].unproven
 SCENE_UNPROVEN = _MODEL["unproven"]
 
 
@@ -273,7 +273,7 @@ def _infer_kind(value):
 # 用普通约定调用会触发访问违例（0xC0000005）。
 #
 #   Python 的 ctypes 会把该访问违例转换成可捕获的 OSError，
-#   所以 read() 里 `except OSError: return -2` 能优雅降级。
+#   所以 read 里 `except OSError: return -2` 能优雅降级。
 #
 #   Go 的 syscall 不做这层转换：访问违例会直接终止整个进程，
 #   defer/recover 拦不住（recover 只能捕获 Go 自己的 panic）。
@@ -326,7 +326,7 @@ _SLOW_CONST = frozenset(("GetDirectXVer",))
 #                           的读写接口（osConfLib 反编译确认），故按 0/1 布尔处理
 # 取值范围与端点无关，故仍按属性名统一登记。
 # --------------------------------------------------------------------
-# ★ S3 起真源 = TOML [[writable]] 的 lo/hi（缺省 = 不钳制）。
+# S3 起真源 = TOML [[writable]] 的 lo/hi（缺省 = 不钳制）。
 RANGES = {}
 for _w in _MODEL["writable"]:
     if "lo" in _w:
@@ -337,10 +337,10 @@ for _w in _MODEL["writable"]:
 
 
 # --------------------------------------------------------------------
-# ★★ 第 52 轮（H 档）：**逐声道音量** —— 名字里带 "#<声道索引>" 的虚拟参数
+#**逐声道音量** —— 名字里带 "#<声道索引>" 的虚拟参数
 #
 # 背景：PropertyControl 的 pValue 是二级指针，*pValue → int32 声道索引；
-# 早期实现只按需要写死 -1。第 52 轮用「改索引再读回」验证它是**真参数**：
+# 早期实现只按需要写死 -1。用「改索引再读回」验证它是**真参数**：
 #   VolumeScalarControl idx=0 → 0.500000   idx=1 → 0.500000
 #   idx=2..7                 → ret=0x10004（该声道不存在）
 #   写 idx=0=0.30 / idx=1=0.70 → 互不影响地读回 0.30 / 0.70
@@ -350,13 +350,13 @@ for _w in _MODEL["writable"]:
 # Speaker_Channel_Setting 切到 4/6/8 也不会展开（h_probe3 实测），
 # 所以界面只做左/右两根，不摆 8 根点了没反应的滑杆。
 #
-# ★ 命名约定：`<真实属性名>#<声道索引>`。_pc() 在调用前拆开，因此
+# 命名约定：`<真实属性名>#<声道索引>`。_pc 在调用前拆开，因此
 #   读 / 写 / 置灰 / 滑杆同步全部复用既有路径，没有第二套机制。
-# ★ 但它们**不是驱动属性**：`#0`/`#1` 不能进 .profile（官方面板读不懂），
+# 但它们**不是驱动属性**：`#0`/`#1` 不能进 .profile（官方面板读不懂），
 #   所以 profile_save 显式跳过含 "#" 的名字；_group_of 先剥后缀再查分组表。
-# ★ 也**不进 `ALL_NAMES`**（那是 208 项真实属性的名单），只在 param_map()
+# 也**不进 `ALL_NAMES`**（那是 208 项真实属性的名单），只在 param_map
 #   里额外补出来，于是「参数」页不会多出两个假参数行。
-# ★ S3 起真源 = TOML [[writable]] 里带 # 的虚拟参数（名字内 #<声道索引>）。
+# S3 起真源 = TOML [[writable]] 里带 # 的虚拟参数（名字内 #<声道索引>）。
 CHANNEL_PARAMS = {}
 for _w in _MODEL["writable"]:
     if "#" in _w["name"]:
@@ -379,10 +379,10 @@ def _split_channel(name):
 # 离散取值白名单：驱动对非法值一律返回 0x10003，先在应用层收口。
 # 实测 DevSampleRateControl 只接受 44100 / 48000，
 # 88200 / 96000 / 176400 / 192000 全部被拒（原面板那六档在本机是死的）。
-# ★ 第 50 轮（E 档）Speaker_Channel_Setting：官方 .cml 只给了 4 个 RadioButton，
+#Speaker_Channel_Setting：官方 .cml 只给了 4 个 RadioButton，
 #   Tag 分别是 2 / 4 / 6 / 8（= 声道数本身，不是档位下标）。实测这 4 个值
 #   写→读回全部原样（wret=0 / ret=0），其它值没有官方依据，一律挡在应用层。
-# ★ S3 起真源 = TOML [[writable]] 的 choices（驱动对非法值返回 0x10003，
+# S3 起真源 = TOML [[writable]] 的 choices（驱动对非法值返回 0x10003，
 # 先在应用层收口；同名字跨端点必须同值，装载时断言）。
 CHOICES = {}
 for _w in _MODEL["writable"]:
@@ -398,7 +398,7 @@ MAGIC_VOICES = ["怪兽", "卡通", "男人", "女人"]
 # 声道测试：掩码取自原面板 apoSpeakerSetting.cml 的 PlayTestSound Tag 全集，
 # 第四个字段是**测试音 WAV 的文件名** —— PlayTestSound 的第一个参数就是它。
 #
-# ★ 第 28 轮：以前这里只有三个字段，声音是驱动「自己找」的，于是调用方
+# 若只有三个字段，声音是驱动「自己找」的，于是调用方
 #   只能猜第一个参数传什么，最后传了设备上下文指针 —— 结果是必然失败。
 #   反编译 osConfLib.dll（Ghidra 12.1.4，PlayTestSound@0x1800060E0）看清了：
 #     第一个参数是 **LPWSTR**，直接进 mmioOpenW + CreateFileW，
@@ -529,7 +529,7 @@ def _shared_cpls():
                     out.append(os.path.join(base, name))
         except OSError:
             pass
-    # 环境变量缺失时的硬编码兜底（与 Go 版 sharedCpls() 一致）
+    # 环境变量缺失时的硬编码兜底（与 Go 版 sharedCpls 一致）
     out.append(r"C:\Program Files\iKF headset\CPL")
     here = _app_dir()
     for rel in (
@@ -541,9 +541,9 @@ def _shared_cpls():
     return out
 
 
-# ★★ 第 50 轮的坑：递归兜底必须**限深**。
+# 递归兜底必须**限深**。
 #
-# 候选目录里有一个是 `_app_dir()`（= 程序所在目录）。源码运行时它就是**工程根**，
+# 候选目录里有一个是 `_app_dir`（= 程序所在目录）。源码运行时它就是**工程根**，
 # 而工程根的 dist/ 里躺着上一轮打好的便携包，便携包自带
 # `<工程根>/dist/iKF-Audio-Center-Portable/CPL/Driver/x64/vista/osConfLib.dll`。
 # 原来那两遍 os.walk 没有深度上限，一路钻进去把那份 dll 认了下来 ——
@@ -636,7 +636,7 @@ class Driver(object):
 
     解决办法与 Go 版一致：所有 DLL 调用收敛到一个专用的工作线程上，
     调用方通过队列投递并等待结果。这样同时也天然实现了串行化，
-    取代了原先的互斥锁。
+    取代了此前的互斥锁。
     """
 
     def __init__(self):
@@ -644,7 +644,7 @@ class Driver(object):
         self.ctx = None
         self.cpl = None
         self.dll = None
-        # close() 缓存下来的已加载句柄 —— 重连复用它，绝不 FreeLibrary
+        # close 缓存下来的已加载句柄 —— 重连复用它，绝不 FreeLibrary
         self._lib_cached = None
         self.error = None
         self._keep = None
@@ -697,14 +697,14 @@ class Driver(object):
                     self._call(lambda: self.lib.ConfLibUnInit())
             except Exception:
                 pass
-            # ★ 2026-10-21：**不释放 DLL**。ctypes 的 WinDLL 对象一被回收就
+            # **不释放 DLL**。ctypes 的 WinDLL 对象一被回收就
             # FreeLibrary 真卸载 osConfLib.dll，而驱动内部状态/线程还指着它 ——
             # 实测第一次 reopen 正常、第二次必崩（进程无声退出，HTTP 无响应）。
             # Go 版 LazyDLL 本来就只 ConfLibUnInit、从不卸载，这里缓存句柄
             # 与之逐项对齐，重连时复用同一份映射。
             self._lib_cached = self.lib
             self.lib = None
-        # ★ 2026-10-21：上下文必须一起清。以前只清 lib，close→open 之后
+        # 上下文必须一起清。只清 lib 的话，close→open 之后
         # 若新设备枚举不出采集端点，cap_ctx 还留着上一轮的旧指针 —— 那是
         # 已作废的设备上下文，再拿去 PropertyControl 就是悬垂指针。
         # reopen 让这条路径变成常规路径（与 Go 版 driver.go Close 对齐）。
@@ -714,13 +714,13 @@ class Driver(object):
         self._cap_keep = None
         self.cap_count = 0
         self.device_count = 0
-        # ★ 2026-10-22：常量缓存一起清（与 Go 版 Close 对齐）—— Close 之后
+        # 常量缓存一起清（与 Go 版 Close 对齐）—— Close 之后
         #   设备可能换了/驱动重装了，沿用上一轮 slowConst 读数没有意义。
         self._const_cache = {}
         self._jobs.put(None)
-        # ★ 2026-10-21：必须等线程真的退出再返回。_ensure_worker 用
-        # is_alive() 判断，线程还在处理结束哨兵时它仍是 True —— 于是
-        # open() 不会重建线程，任务投进一个即将没人消费的队列，close→open
+        # 必须等线程真的退出再返回。_ensure_worker 用
+        # is_alive 判断，线程还在处理结束哨兵时它仍是 True —— 于是
+        # open 不会重建线程，任务投进一个即将没人消费的队列，close→open
         # 死死卡在 _call 上（实测 POST /api/driver/reopen 永不返回）。
         w = self._worker
         if w is not None and w.is_alive() and w is not threading.current_thread():
@@ -744,7 +744,7 @@ class Driver(object):
     def reopen(self):
         """松开旧上下文再重新枚举，带退避重试（与 Go 版 Driver.Reopen 对齐）。
 
-        ★ 2026-10-22（用户虚拟机实测）：装完驱动再点「重新检测」，出现的是
+        虚拟机实测：装完驱动再点「重新检测」，出现的是
         「麦克风 + 自定义场景」不可用、其余正常，而且**退出重开就好**。
         端点重建不是原子的 —— 渲染端点先就绪、采集端点（麦克风）后到，
         _open_impl 一次返回的话渲染侧全通、采集侧全 -9，界面就是"一半能用"。
@@ -762,7 +762,7 @@ class Driver(object):
             ok = self.open()
             if not ok:
                 # 完全没连上（驱动没装/端点整个没起来）：只再给一次机会
-                # （400ms）。等满 5 轮 = 4.4 秒，用户点一下「重新检测」
+                # （400ms）。等满 5 轮 = 4.4 秒，点一下「重新检测」
                 # 干等 4 秒才被告知没驱动，这个体验不能要。
                 if i >= 1:
                     return False
@@ -816,7 +816,7 @@ class Driver(object):
             except (OSError, AttributeError):
                 pass
             try:
-                # ★ 2026-10-21：同一份 DLL 走缓存句柄，别重新 WinDLL ——
+                # 同一份 DLL 走缓存句柄，别重新 WinDLL ——
                 # 重复加载再加一次引用计数没意义，而释放又会真卸载（见 close）。
                 if (self._lib_cached is not None and self.dll and
                         os.path.normcase(dll) == os.path.normcase(self.dll)):
@@ -833,7 +833,7 @@ class Driver(object):
                 count = ctypes.c_int(0)
                 lib.GetDeviceCount(0, ctypes.byref(count))
                 if count.value <= 0:
-                    # ★ 2026-10-22：Init 成功就配对撤销（与 Go 版 openLocked 对齐）。
+                    # Init 成功就配对撤销（与 Go 版 openLocked 对齐）。
                     #   启动重试 4 次若都不配对，会留下 4 次净 Init。
                     lib.ConfLibUnInit()
                     continue
@@ -918,14 +918,14 @@ class Driver(object):
         # ---- 函数型导出：原面板用它们做声道测试与麦克风监听，早期实现漏掉了
         # 签名由 osConfLib.dll 反编译还原（见 工具/原面板功能移植对照表.md §四）：
         #   PlayTestSound(wavPath, mode, pInfo)  —— **三个参数**：
-        #     [1] wavPath : LPWSTR，测试音 WAV 的路径（第 28 轮改正，
-        #                   以前按「设备指针」传，导致恒返 0x10001）
+        #     [1] wavPath : LPWSTR，测试音 WAV 的路径改正，
+        #                   （曾按「设备指针」传，导致恒返 0x10001）
         #     [2] mode    : 声道掩码（1/2/4/8/16/32/512/1024，或 3/0x33/0x3F/
         #                   0xFF/0x107/0x60F/0x63F 表示「整组一起响」）
         #     [3] pInfo   : 3 个 dword —— [+0] 链表内索引 [+8] 链表选择
         #                   （0=渲染 1=采集）；早期只传两个参数，第三个寄存器
         #                   R8 是垃圾值，函数读 [R8] 直接触发访问违例
-        #   StopTestSound() / CloseTestSound()   —— 忽略入参，用内部单例
+        #   StopTestSound / CloseTestSound   —— 忽略入参，用内部单例
         #   RunListen2Device(pDevice) / StopListen2Device(pDevice)
         #     —— 读 pDevice 的 +4（设备类型，须 ∈ {2,3,5,0xA}）与 +8（链表号）
         if hasattr(lib, "PlayTestSound"):
@@ -963,7 +963,7 @@ class Driver(object):
             pbuf = ctypes.cast(buf, ctypes.c_void_p)
             pp = ctypes.pointer(pbuf)
 
-            # ★ 第 52 轮：`<属性名>#<声道索引>` → 拆成真名 + 索引。
+            # `<属性名>#<声道索引>` → 拆成真名 + 索引。
             # 没带 "#" 的一律走 -1（历史行为，未改动）。
             base, ch = _split_channel(name)
             if base in GENERIC_SET:
@@ -1077,7 +1077,7 @@ class Driver(object):
     def write_auto(self, name, value, ep=EP_RENDER, kind=None):
         """先走白名单；未命中但属于 208 项时改走 write_raw。
 
-        口径（用户要求「官方内容零遗漏，功能能不能用交给硬件匹配」）：
+        口径（官方内容零遗漏，功能能否用交给硬件匹配）：
         官方面板里有、但新界面没登记成可写控件的属性（例如音箱方位的
         SS_LF_ANGLE / SS_RF_ANGLE 一族），也必须真写一次并把驱动的真实
         返回码报出来，而不是在前端直接短路成「本机不支持」。本机这些属性
@@ -1169,11 +1169,11 @@ class Driver(object):
     def play_test(self, mask):
         """声道测试：在指定声道上播一段测试音。
 
-        ★ 第 28 轮修正。签名是 PlayTestSound(wavPath, mode, pInfo)：
+        修正。签名是 PlayTestSound(wavPath, mode, pInfo)：
           · 第一个参数是**测试音 WAV 的路径**（LPWSTR），不是设备上下文。
             反编译确认它直接进 mmioOpenW + CreateFileW（MSDN 的
             WaveOpenFile 示例），拿不到句柄就 return 0x10001。
-            以前的实现把设备上下文指针塞在这里，被当成宽字符串去开文件，
+            早期实现把设备上下文指针塞在这里，被当成宽字符串去开文件，
             必然失败 —— 面板上就永远显示「声道测试不可用（65537）」。
           · pInfo 仍是 3 个 dword：+0 链表内索引、+8 链表选择（0=渲染）。
             这正是设备上下文前 12 字节的形状。
@@ -1234,11 +1234,11 @@ class Driver(object):
         与 Go 侧 profile.go:Profiles 逐字段对齐（两线的场景墙必须同形）：
           - builtin 判定 = 目录自带 × BUILTIN_SCENES 名单（不按目录一刀切）；
           - 官方空模板（如 default/HiFi，.profile 无参数快照）不进列表；
-          - 排序：「默认」永远第一张卡（2026-10-20 用户拍板），其次内置档，
+          - 排序：「默认」永远第一张卡），其次内置档，
             再次用户自建档，同层按名字；
           - 「预设」（FactoryDefault.xml）不再作为场景卡列出 —— 它整档只有
             一条 DefaultDeviceControl 一键出厂指令（本机驱动未实现，应用
-            必然无效），与「默认」卡语义重复（Go 侧 2026-10-19 拍板同此）。
+            必然无效），与「默认」卡语义重复（Go 侧同此）。
             factory 路径仍随 API 返回，名字「预设」在 save/rename 侧继续
             作为保留字拦截。
         """
@@ -1278,7 +1278,7 @@ class Driver(object):
                     "has_data": os.path.isfile(pfile),
                     "groups": glabels,
                 }
-        # 排序：默认 → 内置 → 用户，同层按名字（Go 侧 rank 同款）
+        # 排序：默认 → 内置 → 同层按名字（Go 侧 rank 同款）
         def _rank(it):
             if it["name"] == PROFILE_FACTORY_SCENE:
                 return 0
@@ -1333,9 +1333,9 @@ class Driver(object):
             if self.ctx_of(ep) is None:
                 continue
             for pname in sorted(WRITABLE.get(ep, {})):
-                # ★ 2026-10-22：口径收敛到 excluded_from_scene —— 不再只是挡
+                # 口径收敛到 excluded_from_scene —— 不再只是挡
                 # 「带声道后缀的虚拟参数」，而是设备级（音量/静音/采样率/声道拓扑）
-                # 与 APO 未实现族一并排除。Go 侧 2026-10-19 起就走这条判定，
+                # 与 APO 未实现族一并排除。Go 侧 起就走这条判定，
                 # Python 此前只剩 `"#" in pname`，实测同一动作 37 vs 64 项。
                 if excluded_from_scene(pname):
                     continue
@@ -1457,7 +1457,7 @@ class Driver(object):
         path, d, builtin = self._profile_path(name)
         if not path:
             return {"ok": False, "ret": -1, "error": "找不到组态「%s」" % name}
-        # 只允许删用户目录里的档；驱动自带目录即使可写也不动
+        # 只允许删目录里的档；驱动自带目录即使可写也不动
         if builtin and os.path.normcase(d) != os.path.normcase(wdir):
             return {"ok": False, "ret": -2,
                     "error": "「%s」是驱动自带组态，不能删除" % name}
@@ -1589,7 +1589,7 @@ class Driver(object):
     def param_map(self, ep=EP_RENDER):
         """该端点全部 208 项 → {name: {r, v, w, t}}
 
-        ★ 第 52 轮：渲染端点额外补上 CHANNEL_PARAMS（逐声道音量）。它们不是
+        渲染端点额外补上 CHANNEL_PARAMS（逐声道音量）。它们不是
         208 项真实属性（名字里带 "#"），所以不进 ALL_NAMES；但界面滑杆要按
         统一路径取值，必须出现在这张表里。
         """
@@ -1757,20 +1757,20 @@ class Driver(object):
 # 所以这套格式可以直接落在我们的 PropertyControl 上，无需额外映射表。
 #
 # CPL 位于 Program Files 下**不可写**（实测 Permission denied），
-# 因此用户自建组态写入 %APPDATA%\iKF Audio Center\profile\；
+# 因此自建组态写入 %APPDATA%\iKF Audio Center\profile\；
 # 读取时两处都扫，驱动自带的内置档照常列出。
 # --------------------------------------------------------------------
 
 PROFILE_FACTORY = _MODEL["factory_profile"]   # 对应 FactoryDefault.xml（S1 起真源=TOML）
-# 自建出厂基线场景名（2026-10-20 用户拍板由「原厂默认」改名「默认」）。
-# ★ S1 起真源 = TOML [scene].factory_scene；与 Go 侧 profileFactoryScene 逐字对应
+# 自建出厂基线场景名 由「原厂默认」改名「默认」）。
+# S1 起真源 = TOML [scene].factory_scene；与 Go 侧 profileFactoryScene 逐字对应
 PROFILE_FACTORY_SCENE = _MODEL["factory_scene"]
 # 内置场景名单：源包自带 + Go 侧 EnsureSeedScenes 播种。
-# ★ builtin 判定按名字、不按目录（与 Go 侧 builtinScenes/builtinMark 逐项
-#   对应）：便携包下用户自建场景与内置档同住 CPL\profile，按目录一刀切
-#   会把用户场景也标成内置 —— 场景墙的可改可删判定、排序分层全部失真
-#   （Go 侧 2026-10-19 真机确认过同样的坑）。
-# ★ S1 起真源 = TOML [scene].builtin（7 项，含 HiFi）。
+# builtin 判定按名字、不按目录（与 Go 侧 builtinScenes/builtinMark 逐项
+#   对应）：便携包下自建场景与内置档同住 CPL\profile，按目录一刀切
+#   会把场景也标成内置 —— 场景墙的可改可删判定、排序分层全部失真
+#   （Go 侧 实测确认过同样的坑）。
+# S1 起真源 = TOML [scene].builtin（7 项，含 HiFi）。
 BUILTIN_SCENES = _MODEL["builtin"]
 PROFILE_TEMPLATE = "UserDefineFormwork.cml"
 PROFILE_CURRENT = "UserDefine.cml"
@@ -1784,7 +1784,7 @@ PROFILE_CURRENT = "UserDefine.cml"
 # `XearAudioCenter /u /q` 会清掉设备侧的值，于是全部退回 ret=2，界面把开关
 # 灰成「本机不支持」—— 看起来像「虚拟环绕 / 升降 Key 丢了」。
 #
-# 值取自官方安装状态的实测快照（2026-10-14 --dump，当时两端点合计 ret=0
+# 值取自官方安装状态的实测快照 --dump，当时两端点合计 ret=0
 # 有 104 项）。它们存在端点的 FxProperties
 # （HKLM\SOFTWARE\...\MMDevices\Audio\Render\{GUID}\）里 —— 每组合一个
 # C-Media 私有的 PROPERTYKEY，共 36 个值。所以「移植官方文件」治不了这个
@@ -1793,16 +1793,16 @@ PROFILE_CURRENT = "UserDefine.cml"
 # 与 Go 侧 iKF-Audio-Center-Wails/profile.go 的 factoryDefaults 逐项对应，
 # 改一边必须同步另一边。
 # --------------------------------------------------------------------
-# ★ S2 起真源 = model/device-model.toml [[factory]]（42 项，装载时自校验）。
+# S2 起真源 = model/device-model.toml [[factory]]（42 项，装载时自校验）。
 # 历史真值注释随数据走：EQ 全 0 = 官方预设索引 11（反编译）、
-# RFX_ENVIRONMENT=0 = 官方预设口径（驱动原始出厂是 7，用户拍板按预设）。
+# RFX_ENVIRONMENT=0 = 官方预设口径（驱动原始出厂是 7，按预设）。
 FACTORY_DEFAULTS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[2])
                     for kv in _MODEL["factory"]]
 
 # 属性 → 官方 ApoEffect 分组名（写进 .profile 的 <ApoEffect Name>，
 # 便于与官方面板的导出文件互相阅读）
 #
-# ★★ 第 51 轮（G 档）：分组名的依据终于拿到，整表归一到**页面 Canvas 名**。
+# 分组名的依据终于拿到，整表归一到**页面 Canvas 名**。
 #
 #   证据 = 官方随驱动发的那份组态模板 `CPL/FactoryDefault.xml`（这是全机唯一一份
 #   官方格式的 .profile 样本）。它写的是：
@@ -1811,7 +1811,7 @@ FACTORY_DEFAULTS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[
 #   两例全部吻合。exe 里 0x186A08~0x1875E0 那张 101 串的表
 #   （`Headset* / HeadPhone* / Speaker* / SpeakerQuarter* / MicIn* / DesktopMic* /
 #     LineIn* / SPDIFOut* / SPDIFIn* / HDMI* / StereoMix*` 全族）也是同一套
-#   「端点族前缀 + 页名」命名，与第 50 轮查实的 `apo%s.cml` 拼名规则一致。
+#   「端点族前缀 + 页名」命名，与查实的 `apo%s.cml` 拼名规则一致。
 #   ⟹ **分组名 = 取值页面的 Canvas 名**，每一项都能独立验证
 #      （文件就在 CPL/Skin/FaceLift/，Canvas 名在本模块注释里逐条标出）。
 #
@@ -1825,19 +1825,19 @@ FACTORY_DEFAULTS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[
 #
 #   两个例外的保留名（都**没有**对应页面，改名无从谈起）：
 #     · `GFSControl` —— 设备控制（HKCU\SOFTWARE\C-Media\Hook\EnableGFS，
-#        第 46 轮取证），任何 .cml 里都没有它；
+#取证），任何 .cml 里都没有它；
 #     · `MicEcho` —— 旧面板 `CDlgMicEcho` 对话框，官方新面板没有这张页。
-# ★ S4 起真源 = TOML [profile_groups]（53 条含 EQ_Slider 前缀键）。
+# S4 起真源 = TOML [profile_groups]（53 条含 EQ_Slider 前缀键）。
 # 组名出处/前缀规则/合并页口径见 TOML 注释；SS_* 前缀规则在 _group_of。
 PROFILE_GROUPS = {ep: dict(tbl) for ep, tbl in _MODEL["profile_groups"].items()}
 
 # 旧版工具写出过的分组名 → 归一到现在的 Canvas 名。
-# **只用于读**：用户已经存下来的场景不该因为这次改名而在详情里显示成「其他」。
-# ★ S1 起真源 = TOML [group_alias]（10 条，装载时自校验）。
+# **只用于读**：已经存下来的场景不该因为这次改名而在详情里显示成「其他」。
+# S1 起真源 = TOML [group_alias]（10 条，装载时自校验）。
 _GROUP_ALIAS = _MODEL["alias"]
 
 # 端点 → 官方 Endpoint 名 / DataFlow
-# ★ S4 起真源 = TOML [profile_endpoint] / [profile_value_type]。
+# S4 起真源 = TOML [profile_endpoint] / [profile_value_type]。
 PROFILE_ENDPOINT = {ep: (v[0], v[1]) for ep, v in _MODEL["profile_endpoint"].items()}
 PROFILE_VALUE_TYPE = dict(_MODEL["profile_value_type"])
 
@@ -1895,8 +1895,8 @@ def heal_missing(drv):
     """
     if drv is None or drv.lib is None:
         return 0
-    # ★ 2026-10-22 第二版：补的范围从「出厂表 42 项」扩到**初始化清单**
-    #   （55 项 = 出厂表 ∪ 「默认」档 ∪ 设备级）。以前那 12 项采集/新参数
+    # 范围：从「出厂表 42 项」扩到**初始化清单**
+    #   （55 项 = 出厂表 ∪ 「默认」档 ∪ 设备级）（早先范围少 12 项采集/新参数）——
     #   只能靠 _apply_scene_extras 补第二次，两套遍历各写各的；现在同一个
     #   执行器，strong=False 就是「只补 ret==2」，有值一个字不动。
     #   设备级（拓扑）由 ensure_channel_topology 负责，这里跳过。
@@ -1905,10 +1905,10 @@ def heal_missing(drv):
     return applied
 
 
-# ---------------- 驱动重置后自动回到「默认」场景（2026-10-20 用户拍板） ----------------
+# ---------------- 驱动重置后自动回到「默认」场景 ） ----------------
 # 与 Go 侧 lastscene.go 逐字段对应。重置指纹命中 → 把出厂默认参数全量写回
 # （=「默认」场景的状态；不依赖场景文件、幂等）。指纹不成立绝不写 —— 保护
-# 用户手动调过但没存场景的参数。恢复跑在自愈之前（自愈补完默认值指纹就没了）。
+# 手动调过但没存场景的参数。恢复跑在自愈之前（自愈补完默认值指纹就没了）。
 
 LAST_APPLIED_RESET_THRESHOLD = 21   # FACTORY_DEFAULTS 过半即判定端点被重置
 
@@ -1935,7 +1935,7 @@ def restore_default_scene(drv, force=False):
     if not force and missing < LAST_APPLIED_RESET_THRESHOLD:
         return False, ("设备参数在位（出厂默认表缺省仅 %d/%d 项），无需恢复"
                        % (missing, len(FACTORY_DEFAULTS)))
-    # ★ 2026-10-22 第二版：执行体不再「遍历出厂表 + 补一次场景档」，
+    # 执行体不再「遍历出厂表 + 补一次场景档」，
     #   而是**按初始化清单**一次写完（见 build_init_manifest）。
     #   清单 = 出厂表 42 ∪ 「默认」档 37 ∪ 设备级 1 = 55 项。
     #   这里只做 param 项，拓扑交给 ensure_channel_topology —— 它才有
@@ -1952,7 +1952,7 @@ def restore_default_scene(drv, force=False):
                   % (applied, failed))
 
 
-# ---------------- 初始化清单：初始化目标的唯一真相（2026-10-22） ----------------
+# ---------------- 初始化清单：初始化目标的唯一真相  ----------------
 # 与 Go 侧 initmanifest.go 逐字段对应。为什么要有它：在这之前「初始化该写
 # 哪些项」散在五处（FACTORY_DEFAULTS 42 / 默认.profile 37 / _apply_scene_extras
 # 补 12 / ensure_channel_topology 1 / seed 三哨兵），每次修一个漏洞就冒一个
@@ -1960,9 +1960,9 @@ def restore_default_scene(drv, force=False):
 #
 #   source  factory / scene / device —— 从哪来（排障时倒查）
 #   scope   param / device           —— 执行策略不同：
-#           param  安装级触发全量写，其它触发只补 ret==2（不覆盖用户调音）
-#           device 任何触发都校正（拓扑是硬件事实，不是用户偏好）
-# ★ S2 起真源 = TOML [[init_device]]（1 项，拓扑；scope=device 规则在解释器）。
+#           param  安装级触发全量写，其它触发只补 ret==2（不覆盖调音）
+#           device 任何触发都校正（拓扑是硬件事实，不是偏好）
+# S2 起真源 = TOML [[init_device]]（1 项，拓扑；scope=device 规则在解释器）。
 INIT_DEVICE_ITEMS = [(EP_RENDER if kv[0] == EP_RENDER else EP_CAPTURE, kv[1], kv[2])
                      for kv in _MODEL["init_device"]]
 
@@ -2082,13 +2082,13 @@ def identify_active_scene(drv):
     """设备真值场景识别：当前设备参数与哪个场景快照完全一致就返回哪个
     名字；都不一致返回 ""（自定义状态）。判据与 Go 侧 identifyActiveScene
     一致：只比快照实际存项；设备侧 ret!=0 视为不匹配；文本精确比对。
-    （取代前端 localStorage 残留记忆 —— 2026-10-20 用户拍板：
+    （取代前端 localStorage 残留记忆 —— 原则：
     「使用中·X」必须跟设备真实状态走。）
     """
     if drv is None or drv.lib is None:
         return ""
-    # ★ 不能走 drv.profiles() —— 那里面会调本函数，互相递归把接口挂死
-    #（2026-10-20 实测）；直接枚举场景文件名。
+    # ★ 不能走 drv.profiles —— 那里面会调本函数，互相递归把接口挂死
+    # 实测）；直接枚举场景文件名。
     seen = set()
     names = []
     from_dir = _profile_dirs(drv)
@@ -2110,11 +2110,11 @@ def identify_active_scene(drv):
             seen.add(stem)
             here.append(stem)
         names.extend(here)
-    # ★ 2026-10-22：多个场景内容相同时，识别必须先判「默认」。
+    # 多个场景内容相同时，识别必须先判「默认」。
     # 当时 `音乐.profile` 与 `默认.profile` 逐项完全相同（默认就是古典乐曲线），
-    # sorted() 按 UTF-8 排「音」在「默」之前，识别一命中就返回「音乐」。
-    # ★ 同日改判：默认档 EQ 换成**官方预设 Default 的平直曲线**，音乐仍是
-    #   古典乐 ⟹ 两档不再同分，这里只是兜底（用户自己把某档调得跟默认一样时
+    # sorted 按 UTF-8 排「音」在「默」之前，识别一命中就返回「音乐」。
+    # 默认档 EQ 换成**官方预设 Default 的平直曲线**，音乐仍是
+    #   古典乐 ⟹ 两档不再同分，这里只是兜底（自己把某档调得跟默认一样时
     #   仍然归到「默认」这个出厂态名字下）。与 Go 侧 profileNamesForIdentify 同口径。
     if PROFILE_FACTORY_SCENE in names:
         names.remove(PROFILE_FACTORY_SCENE)
@@ -2218,11 +2218,11 @@ def migrate_profile_groups(drv):
 # 为什么要有它：前两轮把初始化收成了一份清单（INIT_DEVICE_ITEMS +
 # build_init_manifest）和一条链（ensure_initial_state），但「什么时候该全量写」
 # 一直是**启发式**：出厂表 42 项里缺省 >= 21 项才当成「驱动被重置」
-# （LAST_APPLIED_RESET_THRESHOLD）。启发式测的是「值在不在」，用户说的是
+# （LAST_APPLIED_RESET_THRESHOLD）。启发式测的是「值在不在」，说的是
 # 「**驱动被重装过**」，两者不等价：驱动只装了一半（20/42 缺省）就不写；
 # 驱动升级后把旧值搬回来也不写。
 #
-# 判据（2026-10-22 用户拍板：端点 GUID + 驱动版本）：
+# 判据 端点 GUID + 驱动版本）：
 #   GetExtraInfo      -> {0.0.0.00000000}.{b2446ada-...}  渲染端点 ID
 #   GetExtraInfo(cap) -> {0.0.1.00000000}.{3b3b5ea3-...}  采集端点 ID
 #   GetDriverVer      -> 10.0.1.1
@@ -2233,7 +2233,7 @@ def migrate_profile_groups(drv):
 #
 # 三条安全规则（比判据本身更重要）：
 #   1. 指纹文件不存在 != 重装 —— 首次运行只记基线，绝不因此全量写，
-#      否则老用户升级一次就被清一次调音。全新机器由 21/42 启发式兜底。
+#      否则老升级一次就被清一次调音。全新机器由 21/42 启发式兜底。
 #   2. 只有两边都非空且不同才算「变了」 —— 读抖动/采集端点没起来都表现为
 #      空串，一律判「不知道」，宁可不动。
 #   3. 字段新旧**合并**写，空串不覆盖旧值 —— 否则一次读失败就把基线擦掉。
@@ -2465,7 +2465,7 @@ def ensure_initial_state(drv, full=False):
     """连上驱动后必须跑一次的初始化链。与 Go 侧 initstate.go:EnsureInitialState 对应。
 
     为什么抽成一个函数：**启动路径**和「重新检测」/装驱动重连做的是同一件事
-    （把设备恢复到可用起点 = 「默认」场景状态），以前只有启动路径跑它，于是
+    （把设备恢复到可用起点 = 「默认」场景状态），若只有启动路径跑它，
     用户最常见的那条路径正好错过：
 
         装驱动 → 主程序已在跑（或启动那刻驱动还没装好）→ open 失败/半就绪
@@ -2473,7 +2473,7 @@ def ensure_initial_state(drv, full=False):
         → 用户点「重新检测」→ reopen 成功 → 没人再跑恢复
         → 设备全 ret=2，界面一片「未设置」，必须自己去场景页点「默认」
 
-    2026-10-22 用户实测：「得我去自定义场景点默认然后所有参数才会按照默认去设定」。
+    实测确认：进入自定义场景点「默认」后所有参数才会按默认设定。
 
     幂等性由被调函数各自保证，可反复跑：restore_default_scene 有指纹保护
     （缺省 < 21/42 项一个字都不写）、heal_missing 只补 ret==2。
@@ -2491,7 +2491,7 @@ def ensure_initial_state(drv, full=False):
     if full:
         cleanup_legacy_last_applied(drv)
 
-    # ★ 2026-10-22：声道拓扑排在最前，且放进这条链里 —— 以前只挂在启动
+    # 声道拓扑排在最前，且放进这条链里 —— 若只挂在启动
     #   路径上（Python 线甚至一直没有），装完驱动点「重新检测」连上后
     #   没人补，设备页声道组就不是立体声。放最前还有一个原因：切拓扑可能
     #   触发端点属性重建，必须在写参数**之前**把这件事做完。
@@ -2503,14 +2503,14 @@ def ensure_initial_state(drv, full=False):
     elif topo_msg:
         print("[初始化] 声道拓扑：%s" % topo_msg)   # 没写成功也要留痕
 
-    # ★ 2026-10-22 第三版：先问「驱动换过一茬没有」（init_fp_changed）。
-    #   以前唯一的判据是 21/42 启发式（缺省过半才算被重置），它测的是
-    #   「值在不在」，而用户要的是「驱动被重装过」—— 两者不等价：驱动装
+    # 第三版：先问「驱动换过一茬没有」（init_fp_changed）。
+    #   单靠 21/42 启发式不够（缺省过半才算被重置），它测的是
+    #   「值在不在」，而要的是「驱动被重装过」—— 两者不等价：驱动装
     #   了一半（20/42 缺省）就不写，驱动升级后把旧值搬回来也不写。现在
     #   指纹（端点 GUID + 驱动版本 + 设备实例）变化 ⟹ 直接全量写。
     #
     #   顺序铁律不变：恢复必须在自愈**之前**（自愈把 ret=2 补成默认值后，
-    #   「端点被重置」的启发式就再也测不出来了，2026-10-20）。
+    #   「端点被重置」的启发式就再也测不出来了， 。
     fp_changed, fp_why = init_fp_changed(drv)
     full_write_ok = True
     if fp_changed:
@@ -2548,7 +2548,7 @@ def ensure_initial_state(drv, full=False):
     # ★ 全量写有失败项时**不落指纹** —— 下次启动会再判一次「变了」，重试
     #   那一轮（补空缺紧跟在上一步跑过，能补的都补了）。
     # ★ 首次运行（无基线）也走这里：只记基线、不写设备（安全规则 1），
-    #   所以老用户升级上来调音不会被清。
+    #   所以老升级上来调音不会被清。
     if fp_changed and not full_write_ok:
         print("[初始化] 全量写有失败项，指纹暂不更新（下次启动重试）")
     else:
@@ -2668,7 +2668,7 @@ def _xml_escape(s):
 
 
 def _group_of(ep, name):
-    # ★ 第 52 轮：先剥掉 "#<声道索引>" 后缀再查表 —— 逐声道音量归属与
+    # 先剥掉 "#<声道索引>" 后缀再查表 —— 逐声道音量归属与
     # 主音量同一张官方页（SpeakerVolume / apoSpeakerVol.cml）。
     base, _ch = _split_channel(name)
     if base != name:
@@ -2678,7 +2678,7 @@ def _group_of(ep, name):
         return tbl[name]
     if name.startswith("EQ_Slider"):
         return "SpeakerEQ"
-    # 7.1 虚拟音箱摆位的 8 组 SS_*_ANGLE / SS_*_DIST（第 49 轮，D 档）：
+    # 7.1 虚拟音箱摆位的 8 组 SS_*_ANGLE / SS_*_DIST：
     # 它们在 WRITABLE 里是循环登记的，逐个写进 PROFILE_GROUPS 会重复 16 行，
     # 且以后加音箱还会漏。这里用前缀兜住，等价于映射到 apoSpeakerVirtual.cml。
     if name.startswith("SS_") and (name.endswith("_ANGLE")
@@ -2692,12 +2692,12 @@ def _group_of(ep, name):
 # 一张官方页住着多个模块时（Karaoke 页有人声消除+升降调、Setting 页有
 # 声道配置/互换/复制、MicInVol 页有麦克风音量+模拟功放），标签写成合并描述 ——
 # 官方本来就按「页」归属，拆开反而与官方 .profile 对不上。
-# ★ S4 起真源 = TOML [group_label]（28 项，含只读两组）。
+# S4 起真源 = TOML [group_label]（28 项，含只读两组）。
 _GROUP_LABEL = dict(_MODEL["group_label"])
 
 # 渲染端点的分组展示顺序（照官方面板菜单：音量→EQ→环境→环绕一族→人声→
 # Xear 音效族→设定/采样率；采集端点整体排在后面）。
-# ★ S4 起真源 = TOML [display].group_order（27 项；采集端 rank+1000 在 _group_rank）。
+# S4 起真源 = TOML [display].group_order（27 项；采集端 rank+1000 在 _group_rank）。
 _GROUP_ORDER = tuple(_MODEL["display"]["group_order"])
 
 
@@ -2803,10 +2803,10 @@ def _build_cml(name, desc):
 #   IMMDeviceEnumerator.GetDefaultAudioEndpoint(eRender, eConsole)
 #     或 GetDevice(id) —— 按端点 ID 锁定某个输出设备（仅耳机模式）
 #     → IMMDevice.Activate(IID_IAudioClient)
-#     → IAudioClient.GetMixFormat()          ← 共享模式必须用混音格式
+#     → IAudioClient.GetMixFormat          ← 共享模式必须用混音格式
 #     → IAudioClient.Initialize(SHARED, LOOPBACK, 200ms, 0, mix)
 #     → IAudioClient.GetService(IID_IAudioCaptureClient)
-#     → IAudioClient.Start()
+#     → IAudioClient.Start
 #     → 轮询 GetNextPacketSize / GetBuffer / ReleaseBuffer
 #     → 混成单声道 float32 → 环形缓冲 → 每 20ms 一次 1024 点 FFT → 512 字节
 #
@@ -2815,7 +2815,7 @@ def _build_cml(name, desc):
 # 单文件线不能有第三方依赖（无 numpy / comtypes），所以直接用 ctypes 走
 # 虚表。COM 的虚表布局是稳定 ABI，照头文件抄下标即可。
 #
-# ★ 两个必须记住的坑（Go 那边踩过一遍）
+# 两个必须记住的坑（Go 那边踩过一遍）
 # ------------------------------------
 # ① COM 接口指针指向的是「虚表指针」，不是虚表本身：
 #      fn = (*(void***)p)[idx]
@@ -2880,7 +2880,7 @@ CLSCTX_ALL = 0x17
 AUDCLNT_SHARE_SHARED = 0
 AUDCLNT_LOOPBACK = 0x00020000
 AUDCLNT_SILENT = 0x00000002
-# 2026-10-20 内嵌监听：允许按与端点混音格式不同的格式初始化采集端
+# 内嵌监听：允许按与端点混音格式不同的格式初始化采集端
 # （引擎内部转换），两边得以用「渲染端点混音格式」直通搬运。
 AUDCLNT_AUTO_CONVERT = 0x80000000       # Win8.1+
 AUDCLNT_SRC_DEFAULT_QUALITY = 0x08000000
@@ -2891,7 +2891,7 @@ STGM_READ = 0                           # 属性仓库只读
 VT_LPWSTR = 31                          # PROPVARIANT.vt == VT_LPWSTR
 
 # Web Audio AnalyserNode 的默认参数与归一化，与 loopback.go 完全一致。
-# ★ waMagScale = 1/N 是**实测反解**出来的（Chromium 的 AnalyserNode 用
+# waMagScale = 1/N 是**实测反解**出来的（Chromium 的 AnalyserNode 用
 #   |X[k]|/N，满幅正弦读 −13.56 dB，不是规范正文那句「0 dB」）。
 #   详见 iKF-Audio-Center-Wails/loopback.go 里 waMagScale 的注释。
 WA_MIN_DB = -100.0
@@ -3064,7 +3064,7 @@ class Loopback(object):
         self.rate = 0
         self.ch = 0
         self.fmt = ""
-        # dev_sel 是用户指定的端点 ID（空 = 跟随默认播放设备）；
+        # dev_sel 是指定的端点 ID（空 = 跟随默认播放设备）；
         # dev_name 是实际打开的端点友好名，给前端展示「正在采哪个设备」。
         self.dev_sel = ""
         self.dev_name = ""
@@ -3204,7 +3204,7 @@ class Loopback(object):
                 return {"ok": False, "running": False, "error": "回环未启动"}
             # 原始样本峰值（线性 float32）：bins/level 是 dB 量化+平滑后的
             # 可视化值，底噪级信号（~1e-4）会显示成 0——诊断「端点里到底
-            # 有没有数据」必须看原始峰值（2026-10-20 监听排障教训）。
+            # 有没有数据」必须看原始峰值 监听排障教训）。
             peak = 0.0
             if self._ring_n > 0:
                 cnt = self._ring_n
@@ -3332,7 +3332,7 @@ class Loopback(object):
 
     def _session(self, stop):
         """跑一次完整的「打开 → 采集」，返回 (中断原因, 是否收到停止信号)。"""
-        # 必须用 c_void_p() 而不是 None：None 传给 ctypes.byref 会 TypeError。
+        # 必须用 c_void_p 而不是 None：None 传给 ctypes.byref 会 TypeError。
         # 这几个变量是「由被调方填充」的出参，用 c_void_p 才能拿到地址。
         dev = ctypes.c_void_p()
         client = ctypes.c_void_p()
@@ -3750,7 +3750,7 @@ def _music_dir():
 class MicRecorder(object):
     """一路耳机录音会话（渲染端点 loopback → 16bit 立体声 WAV）。
 
-    2026-10-20 晚（用户拍板）：从「麦克风页录音机（录麦克风）」迁移为
+    从「麦克风页录音机（录麦克风）」迁移为
     声音页「耳机录音」——录渲染端点回环，即耳机里正在播放的声音；
     WAV 落「音乐/iKF Audio Center/」，统一下混立体声。
 
@@ -4120,7 +4120,7 @@ REC = MicRecorder()
 
 
 class MicListen(object):
-    """一路麦克风监听会话（内嵌自研，2026-10-20）。
+    """一路麦克风监听会话（内嵌自研）。
 
     为什么不走官方路径（Driver.listen → osConfLib.RunListen2Device）：
     反编译实锤（工具/监听取证-监听COM组件缺失.md），RunListen2Device
@@ -4147,7 +4147,7 @@ class MicListen(object):
         self.rate = 0
         self.ch = 0
         self.sent = 0
-        # 排障诊断（2026-10-20 静音 bug）：采集包计数、SILENT 旗标包数、
+        # 排障诊断 静音 bug）：采集包计数、SILENT 旗标包数、
         # 采集数据峰值（float32 绝对值最大，正常底噪 ~3e-4，全零=0）
         self.pkts = 0
         self.silent_pkts = 0
@@ -4264,7 +4264,7 @@ class MicListen(object):
                 self._fail("无法创建音频设备枚举器")
                 return
             try:
-                # ★★ 2026-10-20 排障实录（三次实测才定位，两线同病）：
+                # 排障实录（三次实测才定位，两线同病）：
                 #   v1 采集侧 AUTOCONVERTPCM（采集按渲染混音格式 8ch 开）
                 #   → 静音；v2 渲染侧 AUTOCONVERTPCM（渲染按采集格式请求）
                 #   → 依旧静音。判据：监听开着时用输出端点回环采 30 万帧
@@ -4322,7 +4322,7 @@ class MicListen(object):
                     self._fail("无法获取 IAudioCaptureClient")
                     return
 
-                # ★★ 2026-10-20 排障实录（三次实测才定位，两线同病）：
+                # 排障实录（三次实测才定位，两线同病）：
                 #   v1 采集侧 AUTOCONVERTPCM → 静音；v2 渲染侧
                 #   AUTOCONVERTPCM（渲染按采集格式请求）→ 依旧静音。
                 #   判据：监听开着时用输出端点回环采 30 万帧**原始浮点**
@@ -4728,7 +4728,7 @@ def _loopback_test(secs, drv, wav=None, tone=False, dev_arg=""):
         print("           ↑ 位深读成 0，多半是 WAVEFORMATEXTENSIBLE 布局算错了")
 
     if tone:
-        # 掩码 1 = 左前（TEST_CHANNELS 里的一档）。★ 第 28 轮之前这里写的是
+        # 掩码 1 = 左前（TEST_CHANNELS 里的一档）。之前这里写的是
         # 0x6BF —— 那串位既不是单个声道也不是驱动的「整组」白名单，
         # 加上第一个参数传错，无论传什么都是 0x10001，看不出来是参数问题。
         #
@@ -4817,7 +4817,7 @@ def _loopback_test(secs, drv, wav=None, tone=False, dev_arg=""):
     if global_max:
         print("结论     : 链路健康，频谱有内容")
     else:
-        # ★ 这里以前只写「FFT 或归一化有问题」，把人往错的方向引。
+        # 这里不能只写「FFT 或归一化有问题」——会把人往错的方向引。
         #   实测（本机装 FxSound）：跟随默认端点时帧数照涨、频谱恒 0，
         #   锁到耳机端点后同一个测试音立刻有内容 —— 端点对不上是第一嫌疑。
         print("结论     : 链路健康，频谱全 0 —— 先查端点，再查 FFT")
@@ -4913,7 +4913,7 @@ def driver_info(drv):
         "setup": setup,
         "setup_ok": setup != "",
     }
-    # ★ 2026-10-22：把「安装指纹」挂出来（见 init_fp_summary）—— 这是
+    # 把「安装指纹」挂出来（见 init_fp_summary）—— 这是
     #   「初始化该全量写还是只补空缺」的判据本体现状，与 Go 侧 DriverInfo
     #   逐字段一致。只在 /api/driver 这类按需接口上取，不进 /api/status 轮询。
     if info["ready"]:
@@ -4991,11 +4991,11 @@ def run_setup(drv, action):
     # 先松手：装驱动会重启设备实例，握着旧上下文等它回来只会读出错值
     drv.close()
     code, err = _run_elevated(setup, params)
-    # ★ 2026-10-22：装完立刻重连走 reopen()（带退避重试），与 Go 版
+    # 装完立刻重连走 reopen（带退避重试），与 Go 版
     #   RunSetup 对齐 —— 端点重建期间采集端点常比渲染端点晚到。
     ok = drv.reopen()
-    # ★ 2026-10-22：装完是**最该**跑初始化链的时刻 —— 安装器清空了
-    #   FxProperties，设备参数全回 ret=2。不补跑就是「全未设置」，用户得
+    # 装完是**最该**跑初始化链的时刻 —— 安装器清空了
+    #   FxProperties，设备参数全回 ret=2。不补跑就是「全未设置」，得
     #   自己去场景页点「默认」。与 Go 侧 RunSetup 同一套。
     init = ensure_initial_state(drv) if ok else {}
 
@@ -5073,7 +5073,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(LOOPBACK.status())
         if path == "/api/spectrum":
             return self._json(LOOPBACK.spectrum())
-        # ★ 2026-10-20 内嵌录音机（MicRecorder）。契约与 Wails 线逐字段一致。
+        # 内嵌录音机（MicRecorder）。契约与 Wails 线逐字段一致。
         #   旧 POST /api/recorder「拉起官方 Recorder.exe」已废弃 —— 那个 exe
         #   是依附官方面板 COM 环境的死件（取证见工具档），Python 线过去
         #   连路由都没有（前端调了必 404），本就是两线不同步的旧账。
@@ -5105,8 +5105,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(REC.start())
         if path == "/api/recorder/stop":
             return self._json(REC.stop())
-        # ★ 2026-10-20 晚：录音灵动岛「打开文件夹」—— 资源管理器打开
-        #   录音所在目录并**选中**该 WAV（explorer /select,）。路径由
+        # 录音灵动岛「打开文件夹」—— 资源管理器打开
+        #   录音所在目录并**选中**该 WAV（explorer /select）。路径由
         #   前端透传（来自 stop 响应的 file），只作为 shell 参数、
         #   不落任何解释器，无注入面。
         if path == "/api/recorder/open":
@@ -5135,19 +5135,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "请求体解析失败"}, 400)
 
         if path == "/api/driver/reopen":
-            # ★ 2026-10-21：界面上「重新检测」的后端入口，与 Go 版
+            # 界面上「重新检测」的后端入口，与 Go 版
             #   Driver.ReopenInfo 同契约（driver_info + reopened）。
             #   装完驱动 / 端点重建窗口期里启动失败时用来自恢复。
-            #   ★ 2026-10-22：改走 reopen()（带退避重试），不再手写
+            #   改走 reopen（带退避重试），不再手写
             #   close + open —— 装完驱动那一刻采集端点常比渲染端点晚到。
             ok = self.driver.reopen()
             info = driver_info(self.driver)
             info["ok"] = bool(ok)
             info["reopened"] = bool(ok)
-            # ★ 2026-10-22：连上之后必须补跑初始化链（恢复默认 / 自愈）。
-            #   以前这里只重连 —— 而装完驱动点「重新检测」是最常见的路径，
+            # 连上之后必须补跑初始化链（恢复默认 / 自愈）。
+            #   若只重连 —— 而装完驱动点「重新检测」是最常见的路径，
             #   启动那次恢复因驱动没就绪被跳过，设备停在「全 ret=2」，
-            #   用户必须自己去场景页点「默认」。见 ensure_initial_state。
+            #   必须自己去场景页点「默认」。见 ensure_initial_state。
             if ok:
                 init = ensure_initial_state(self.driver)
                 if init:
@@ -5196,7 +5196,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(self.driver.play_test(mask))
 
         if path == "/api/listen":
-            # 2026-10-20 内嵌监听：官方 RunListen2Device 依赖的 COM
+            # 内嵌监听：官方 RunListen2Device 依赖的 COM
             # 服务器驱动包里没有（见 工具/监听取证-监听COM组件缺失.md），
             # 改走 MicListen（listen.go 对应实现）。响应保留 {ok, on}
             # 形状，前端零改动。
@@ -5302,7 +5302,7 @@ def _self_test(drv):
     print("属性总数 : %d（通用 %d + OEM %d）"
           % (len(ALL_NAMES), len(GENERIC_NAMES), len(OEM_NAMES)))
     print("可读     : %d" % ok)
-    # 2026-10-22：原写「本机不支持」。ret=2 的实测含义是「存在但从未写过」
+    # ret=2 的实测含义是「存在但从未写过」
     # （卸载/重装驱动清空 FxProperties 后全变 2，写一次就回 0），不是本机不支持。
     print("未写入   : %d" % unsup)
     print("未找到   : %d" % notfound)
@@ -5382,12 +5382,12 @@ _OPEN_ONCE_ARGS = ("--self-test", "--selftest", "--roundtrip", "--dump",
                    "--heal", "--channel-test", "--play",
                    "--loopback-devices", "--loopback-fft",
                    "--loopback-test", "--restore-scene",
-                   # ★ 2026-10-22：--init-check / --init-fp 都是核对类命令，
+                   # --init-check / --init-fp 都是核对类命令，
                    #   失败本身就是它们要报的结果；Go 线早就在表里，这边漏了
                    #   ⟹ 驱动没装时白等 1+2+4=7 秒才报「未就绪」。
                    "--init-check", "--init-fp",
-                   # ★ 2026-10-22：--no-browser 是无界面模式，必须单次。
-                   #   以前漏了它，服务启动要白等 1+2+4=7 秒，闸脚本按
+                   # --no-browser 是无界面模式，必须单次。
+                   #   漏了它的话，服务启动要白等 1+2+4=7 秒，闸脚本按
                    #   sleep 5 起就撞「页面没就绪」。
                    "--no-browser")
 
@@ -5395,10 +5395,10 @@ _OPEN_ONCE_ARGS = ("--self-test", "--selftest", "--roundtrip", "--dump",
 def open_with_retry(drv, argv):
     """启动时按 1s / 2s / 4s 退避重连（与 Go 版 openWithRetry 行为一致）。
 
-    ★ 2026-10-21（用户拍板）：Open 以前只试一次。iKF-驱动管理装完驱动后
+    Open 若只试一次：iKF-驱动管理装完驱动后
     会 `pnputil /restart-device` 重建音频端点，用户点完「已安装完成」就
     立刻打开主程序，很容易撞在重建窗口期里 —— 一次失败界面就永久停在
-    「未连接驱动」，以前只能彻底关掉重开。GUI 重试，CLI 单次。
+    「未连接驱动」，只能彻底关掉重开。GUI 重试，CLI 单次。
     """
     attempts = 1 if any(a in argv for a in _OPEN_ONCE_ARGS) else 4
     for i in range(attempts):
@@ -5514,7 +5514,7 @@ def main(argv):
         return 0
 
     # --heal：只跑一遍设备侧自愈，不进界面 —— 给「开关被灰掉、但不想
-    # 连带改其他设置」的用户一个手动入口。核对效果看 --dump。
+    # 连带改其他设置」的一个手动入口。核对效果看 --dump。
     if "--heal" in argv:
         if drv.lib is None:
             print("驱动未就绪，无法自愈：%s" % drv.error)
@@ -5535,7 +5535,7 @@ def main(argv):
         return 0
 
     # --init-check：把「初始化清单」逐项对一遍设备，只读不写。
-    # 这是「初始化」从口头约定变成可验收的关键一步：以前判断「装完驱动是不是
+    # 这是「初始化」从口头约定变成可验收的关键一步：判断「装完驱动是不是
     # 真回到默认」只能拿界面肉眼看，现在一条命令给出「应有 55 · 达标 a ·
     # 未设置 b · 偏离 c」。退出码 1 = 不达标，可直接当安装后的验收闸。
     if "--init-check" in argv:
@@ -5557,8 +5557,8 @@ def main(argv):
         print("结论：达标 —— 设备已是初始化定义的默认状态")
         return 0
 
-    # ★ 2026-10-22：整条链收进 ensure_initial_state —— 「重新检测」和装驱动
-    #   重连也要跑同一套（以前只在这里跑，用户装完驱动点重新检测就错过了）。
+    # 整条链收进 ensure_initial_state —— 「重新检测」和装驱动
+    #   重连也要跑同一套（只在启动时跑，装完驱动点重新检测就错过了）。
     #   内部顺序：恢复默认（带指纹保护）→ 设备侧自愈 → 场景分组名升级。
     #   恢复默认必须在自愈**之前**：自愈补完默认值后指纹就测不出来了。
     ensure_initial_state(drv, full=True)

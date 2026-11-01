@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""生成托盘专用图标 tray.ico（第 65 轮）。
+"""生成托盘专用图标 tray.ico。
 
 背景：build/windows/icon.ico 是黑底白字的 iKF 字标 —— 16px 时是一块
 看不清的黑疙瘩，托盘上「显示不正常」。

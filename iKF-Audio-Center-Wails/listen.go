@@ -9,8 +9,8 @@ package main
 //   反编译实锤（工具/监听取证-监听COM组件缺失.md）：RunListen2Device
 //   内部 CoCreateInstance(CLSID {E642D042-…})，该 COM 服务器在整套 WHQL
 //   驱动包、System32、注册表里都不存在——官方原版面板同样开不了。
-// ★ 转换必须自己做：WASAPI 引擎的 AUTOCONVERTPCM 无论放采集侧还是渲染
-//   侧都会产出静音（2026-10-20 排障实测，教训已继承进 Rust 实现）。
+// 转换必须自己做：WASAPI 引擎的 AUTOCONVERTPCM 无论放采集侧还是渲染
+//   侧都会产出静音 排障实测，教训已继承进 Rust 实现）。
 //
 // 与 Python 线 center_src.py 的 MicListen 逐字段对齐。
 
@@ -33,7 +33,7 @@ type MicListen struct {
 	ch      int
 
 	// sent/pkts/silentPkts/capPeak：statusRust 从 DLL 实时拉取覆盖；
-	// 这里保留字段只为 Status() 的键集合在句柄为 0 时也完整。
+	// 这里保留字段只为 Status 的键集合在句柄为 0 时也完整。
 	sent       uint64
 	pkts       uint64
 	silentPkts uint64
@@ -76,7 +76,7 @@ func (l *MicListen) SetGain(g float64) map[string]interface{} {
 		return map[string]interface{}{"ok": false, "error": "监听未开启"}
 	}
 	// ★f32 必须按位传：uintptr(float32) 是值截断（3.0→3），Rust 端
-	// from_bits(3)=次正规数≈0 → 增益归零、监听无声（2026-10-24 真机踩坑）。
+	// from_bits(3)=次正规数≈0 → 增益归零、监听无声 真机踩坑）。
 	bits := math.Float32bits(float32(g))
 	r, _, _ := audioDLL.NewProc("ikf_listen_set_gain").Call(h, uintptr(bits))
 	return map[string]interface{}{"ok": r == 0, "gain": g}

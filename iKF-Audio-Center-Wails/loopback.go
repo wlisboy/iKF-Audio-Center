@@ -120,7 +120,7 @@ func NewLoopback() *Loopback {
 	}
 }
 
-// Start 打开一路回环。device 是端点 ID（Devices() 列出来的那种），
+// Start 打开一路回环。device 是端点 ID（Devices 列出来的那种），
 // 空 = 跟随系统默认。
 func (l *Loopback) Start(device string) map[string]interface{} {
 	return l.startRust(device)
@@ -307,7 +307,7 @@ func (l *Loopback) startRustInner(device string) map[string]interface{} {
 	}
 	l.mu.Lock()
 	if l.rustH != 0 {
-		// ★ 健壮性审计 #3（2026-10-31）：等端点友好名期间另一个 Start 抢先
+		// ★ 健壮性审计 #3 ：等端点友好名期间另一个 Start 抢先
 		// 占位 —— 自己这路会话是多余的。不覆盖对方的句柄（否则那路就此
 		// 遗弃：采集线程跑到进程退出，端点一直被占用），立即收掉自己这路
 		//（句柄注册表保证 close 安全），按「已在跑」返回占位方的状态。
