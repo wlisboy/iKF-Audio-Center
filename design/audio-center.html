@@ -5151,7 +5151,7 @@ var VIS = (function(){
            回到本页即无缝接上。真想停就点「停止」。 */
       }
     },
-    theme: function{ /* 配色在帧循环里按 paletteMode 解析，无需额外处理 */ },
+    theme: function(){ /* 配色在帧循环里按 paletteMode 解析，无需额外处理 */ },
     stats: function(){ return state; },
     /* 给无头回归用的只读快照（配色状态没法从 DOM 反推）。
        命名刻意避开业务语义 —— 它不是对外 API，只是测量的抓手。 */

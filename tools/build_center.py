@@ -1745,7 +1745,7 @@ BRIDGE_JS = r"""
      现在由后端 /api/profiles 的 active 字段按设备真值识别（设备参数与
      哪个场景快照完全一致就是哪个，都不一致 = 自定义状态）；
      apply 成功后本地即时更新，下次拉列表时以真值识别为准。 */
-  function profSaveActive{ /* 兼容占位：active 已改为设备真值识别 */ }
+  function profSaveActive(){ /* 兼容占位：active 已改为设备真值识别 */ }
   try { localStorage.removeItem('iKF.activeProfile'); } catch(_){}
 
   function profSelected(){
