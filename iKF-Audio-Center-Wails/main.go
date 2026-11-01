@@ -259,7 +259,13 @@ func main() {
 		dumpParams(ep)
 		return
 	}
-	if i := argIndex("--play"); i >= 0 && i+1 < len(os.Args) {
+	if i := argIndex("--play"); i >= 0 {
+		// --play 必须带 wav 路径：缺值时静默落 GUI 会让自动化把
+		// 参数错误看成「进程挂起」。这里直接报错退出。
+		if i+1 >= len(os.Args) || strings.HasPrefix(os.Args[i+1], "--") {
+			fmt.Fprintln(os.Stderr, "--play 缺少 wav 路径（用法：--play <wav> [--secs N] [--loop]）")
+			os.Exit(2)
+		}
 		secs := 10.0
 		if j := argIndex("--secs"); j >= 0 && j+1 < len(os.Args) {
 			if v, err := strconv.ParseFloat(os.Args[j+1], 64); err == nil && v > 0 {
@@ -283,6 +289,11 @@ func main() {
 			if v, err := strconv.ParseFloat(os.Args[i+1], 64); err == nil && v > 0 {
 				secs = v
 			}
+		}
+		// 时长上界 600s：1e300 这类输入会把「期望帧数」打印成百位数字
+		// 并让测试实际跑满时长才报失败，没有意义。
+		if secs > 600 {
+			secs = 600
 		}
 		wav := ""
 		if j := argIndex("--wav"); j >= 0 && j+1 < len(os.Args) {
@@ -380,7 +391,13 @@ func main() {
 	//   重连也要跑同一套（只在启动时跑，用户装完驱动点重新检测就错过了）。
 	EnsureInitialState(drv, true)
 
-	if i := argIndex("--serve"); i >= 0 && i+1 < len(os.Args) {
+	if i := argIndex("--serve"); i >= 0 {
+		// --serve 必须带地址：缺值时静默落 GUI 会让自动化把参数错误
+		// 看成「进程挂起」，还会抢走单实例锁。
+		if i+1 >= len(os.Args) || strings.HasPrefix(os.Args[i+1], "--") {
+			fmt.Fprintln(os.Stderr, "--serve 缺少地址（用法：--serve <addr>，如 127.0.0.1:18500）")
+			os.Exit(2)
+		}
 		serveHTTP(os.Args[i+1])
 		return
 	}
