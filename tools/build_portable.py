@@ -232,7 +232,10 @@ def main():
                 if fn.endswith(".rs"):
                     src_newest = max(src_newest, os.path.getmtime(os.path.join(root, fn)))
         if src_newest > os.path.getmtime(audio_dll):
-            print("WARN ikf_audio.dll 比 audiocore/src 旧 —— 请先 cargo build --release 再打包")
+            # 2026-11-01：从 WARN 升级为硬失败。DLL 旧 = 包里跑旧音频
+            # 代码，运行时无告警，静默回潮比缺 DLL（会降级）更危险。
+            sys.exit("ikf_audio.dll 比 audiocore/src 旧 —— 先 cargo build --release 再打包"
+                     "（确认无妨可删 audiocore/src 下更新的 .rs 的改动时间戳规避，不建议）")
         with open(audio_dll, "rb") as f:
             dll_sha = hashlib.sha256(f.read()).hexdigest()
         shutil.copy2(audio_dll, os.path.join(args.out, "ikf_audio.dll"))

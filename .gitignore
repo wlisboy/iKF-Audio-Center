@@ -8,6 +8,7 @@ __pycache__/
 *.sys
 *.DO-NOT-SHIP
 *.log
+*.log.prev
 *.zip
 log/
 
