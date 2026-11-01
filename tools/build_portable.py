@@ -92,7 +92,7 @@ DRV_ITEMS = [
 def go_env():
     env = dict(os.environ)
     env["PATH"] = GO_BIN + os.pathsep + env.get("PATH", "")
-    env["GOPROXY"] = "off"   # 依赖都在本地 module cache，完全离线
+    env["GOPROXY"] = "off"
     env["GOSUMDB"] = "off"
     return env
 
@@ -108,7 +108,7 @@ def build_setup(out):
     return dst
 
 
-IKFTOOL_NAME = "iKFTool.exe"  # 日志诊断工具（只读，不占单实例）
+IKFTOOL_NAME = "iKFTool.exe"
 
 
 def build_ikftool(out):
@@ -216,15 +216,12 @@ def main():
         shutil.rmtree(args.out)
     os.makedirs(args.out)
 
-    # 主程序放根，driver.go 的 localCpls 会从这里往上找同目录资源
     shutil.copy2(args.exe, os.path.join(args.out, os.path.basename(args.exe)))
 
     # P1：音频热路 Rust DLL（audiocore 产物）。缺失不致命（exe 运行时降级
     # 到 Go 路径），但一键构建的包里必须带上，否则 Rust 化永不生效。
     audio_dll = os.path.join(APP, "audiocore", "target", "release", "ikf_audio.dll")
     if os.path.isfile(audio_dll):
-        # 防旧 DLL 静默回潮：源码比 DLL 新 = 忘了 cargo build（崩溃修复
-        # 只改 Rust 侧时尤其危险 —— 包看着新，崩溃面还是旧的）。
         import hashlib
         src_newest = 0
         for root, _dirs, files in os.walk(os.path.join(APP, "audiocore", "src")):

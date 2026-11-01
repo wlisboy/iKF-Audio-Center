@@ -37,8 +37,6 @@ import (
 )
 
 const (
-	// RunPath / RunName 开机自启项。值名保持 Cm108BSound（不新增条目，
-	// 卸载旧版时好清理 —— 与官方安装器同一落点）。
 	RunPath = `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
 	RunName = "Cm108BSound"
 
@@ -47,8 +45,6 @@ const (
 	// CLSID 与 CmiSetupConfig.dll [ADDREG_64] 写入的逐字一致。
 	ClsidCmd = `CLSID\{125C480D-543D-49C8-8840-4D28400ED72A}\Shell\Open\Command`
 
-	// RunArgs 旧面板的开机参数原样保留 —— 主程序把 /h /d 解释为
-	// 「隐藏进托盘启动」。
 	RunArgs = ` /h /d`
 
 	// OldExe 旧面板 exe（官方安装器默认 INSTALLDIR）。撤销接管把两处
@@ -134,7 +130,6 @@ func ensureControlPanelMeta(icon string) error {
 			return err
 		}
 	}
-	// NameSpace 登记
 	kn, _, err := registry.CreateKey(registry.LOCAL_MACHINE, nsPath, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
 		return fmt.Errorf("重建 NameSpace 登记失败：%w", err)
@@ -270,7 +265,7 @@ func DeleteEntry() (int, error) {
 
 // Status 是一次入口体检的结果。
 type Status struct {
-	Self string // 本程序绝对路径
+	Self string
 
 	RunValue  string
 	RunExe    string
@@ -283,10 +278,8 @@ type Status struct {
 	ClsOK     bool
 }
 
-// OK 两处都指向本程序。
 func (e Status) OK() bool { return e.RunOK && e.ClsOK }
 
-// Stale 至少一处指向不存在的文件（入口已坏）。
 func (e Status) Stale() bool {
 	if e.RunExe != "" && !e.RunExists {
 		return true
@@ -294,7 +287,6 @@ func (e Status) Stale() bool {
 	return e.ClsExe != "" && !e.ClsExists
 }
 
-// Describe 给提示框与托盘菜单用的一句话状态。
 func (e Status) Describe() string {
 	switch {
 	case e.OK():
@@ -355,7 +347,6 @@ func ExeFromCmd(s string) string {
 	return s
 }
 
-// SameExe 比较两个路径是否指同一个可执行文件（忽略大小写与多余分隔符）。
 func SameExe(a, b string) bool {
 	if a == "" || b == "" {
 		return false
@@ -363,7 +354,6 @@ func SameExe(a, b string) bool {
 	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
 }
 
-// Read 读两处入口并逐项判定。读操作不需要管理员。
 func Read() Status {
 	st := Status{}
 	if p, err := ExePath(); err == nil {

@@ -88,7 +88,6 @@ var profileEndpoint = func() map[string][2]string {
 // profileValueType 数值类型 → ValueType 文本（官方用 .NET 类型名；S4 真源 = TOML）。
 var profileValueType = modelData.ProfileValueType
 
-// ProfileEntry 列表里的一项
 type ProfileEntry struct {
 	Name    string `json:"name"`
 	Desc    string `json:"desc"`
@@ -145,7 +144,6 @@ func profileDirs(d *Driver) [][2]interface{} {
 // S1 起名单真源 = model/device-model.toml [scene].builtin（7 项，含 HiFi）。
 var builtinScenes = strSet(modelData.Scene.Builtin)
 
-// builtinMark 目录自带标记 × 内置名单 —— 两者同时成立才算内置档。
 func builtinMark(dirBuiltin bool, stem string) bool {
 	return dirBuiltin && builtinScenes[stem]
 }
@@ -209,8 +207,6 @@ func excludedFromScene(name string) bool {
 // S1 起真源 = model/device-model.toml [scene].unproven（35 项，装载时自校验）。
 var sceneUnproven = strSet(modelData.Scene.Unproven)
 
-// hasExcludedItem 档里是否混有排除项 —— 是就说明这份档是排除名单出现
-// 之前生成的，播种升级时整档重建。
 func hasExcludedItem(items []ProfileItem) bool {
 	for _, it := range items {
 		if excludedFromScene(it.Name) {
@@ -260,7 +256,6 @@ func cmlAttr(text, attr string) string {
 	return ""
 }
 
-// ProfileItem 一条 Property
 type ProfileItem struct {
 	Endpoint  string
 	Flow      string
@@ -304,14 +299,12 @@ func profileItems(text string) []ProfileItem {
 	return items
 }
 
-// kindOfValueType 官方 ValueType（.NET 类型名）→ 我们的 kind 字符串
 func kindOfValueType(vtype, name string) string {
 	v := strings.TrimSpace(vtype)
 	if strings.HasSuffix(v, "Single") || strings.HasSuffix(v, "Double") {
 		return "float"
 	}
 	if genericSet[name] && strings.HasSuffix(v, "UInt32") {
-		// 通用表里的 UInt32 基本就是 0/1 开关
 		return "bool"
 	}
 	return "int"
@@ -385,7 +378,7 @@ func groupRank(ep, key string) int {
 			return base + i
 		}
 	}
-	return base + 500 // 表外的自定义分组排在已知分组之后
+	return base + 500
 }
 
 // profileGroupLabels 一份场景用到了哪些模块：按展示顺序去重，最多 4 个。
@@ -410,7 +403,7 @@ func profileGroupLabels(items []ProfileItem) []string {
 		if g == "" {
 			g = groupOf(ep, it.Name)
 		}
-		if a, ok := groupAlias[g]; ok { // 旧版工具写过的名字 → Canvas 名
+		if a, ok := groupAlias[g]; ok {
 			g = a
 		}
 		if seen[g] {
@@ -446,7 +439,6 @@ type snapRow struct {
 	Val  string
 }
 
-// buildProfileXML snapshot → 官方 schema 文本
 func buildProfileXML(name string, snap []snapRow) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "<Profile Name=\"%s\">\n", xmlEscape(name))
@@ -489,7 +481,6 @@ func buildProfileXML(name string, snap []snapRow) string {
 	return b.String()
 }
 
-// buildCML 新增组态时写出的 RadioButton（结构照抄官方的 UserDefineFormwork.cml）
 func buildCML(name, desc string) string {
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 		<RadioButton Name="%s" GroupName="ProFileMenu" Left="0" Top="0" `+
@@ -542,7 +533,6 @@ func langMap(d *Driver) map[string]string {
 	return langCache
 }
 
-// langText 把 ml_* 资源键还原成官方中文；不是键就原样返回
 func langText(d *Driver, s string) string {
 	if s == "" {
 		return s
@@ -555,9 +545,7 @@ func langText(d *Driver, s string) string {
 	return s
 }
 
-// ---------------------------------------------------------------- 四个动作
 
-// Profiles 列出全部组态
 func (d *Driver) Profiles() map[string]interface{} {
 	seen := map[string]bool{}
 	list := []ProfileEntry{}
@@ -582,7 +570,7 @@ func (d *Driver) Profiles() map[string]interface{} {
 			}
 			stem := fn[:len(fn)-4]
 			if seen[stem] {
-				continue // 用户目录优先
+				continue
 			}
 			seen[stem] = true
 			cml := readText(filepath.Join(dir, fn))
@@ -670,7 +658,6 @@ func (d *Driver) Profiles() map[string]interface{} {
 	}
 }
 
-// profilePath 按名字找到 .profile 文件
 func (d *Driver) profilePath(name string) (string, string, bool) {
 	for _, pair := range profileDirs(d) {
 		dir, _ := pair[0].(string)
@@ -706,7 +693,6 @@ func writeAtomic(path string, data []byte) error {
 	return os.Rename(tmp, path)
 }
 
-// ProfileSave 把当前全部可写参数快照成组态，写出 .profile + .cml（官方格式）
 func (d *Driver) ProfileSave(name, desc string) map[string]interface{} {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -804,7 +790,6 @@ func (d *Driver) ProfileApply(name string) map[string]interface{} {
 			"note": "该场景为空（等同恢复驱动默认设置）"}
 	}
 
-	// writeOp 一条待写参数；isSwitch=true 的（布尔效果开关）第一轮先写。
 	type writeOp struct {
 		ep, name, kind    string
 		v                 interface{}
@@ -1029,13 +1014,11 @@ func (d *Driver) ProfileItems(name string) map[string]interface{} {
 			onTotal++
 		}
 
-		// 文件里写的 <ApoEffect Name> 才是真正的分组归属；
-		// 缺了（手工编辑过的档）再退回属性名反查。
 		g := it.Effect
 		if g == "" {
 			g = groupOf(ep, it.Name)
 		}
-		if a, ok := groupAlias[g]; ok { // 旧版工具写过的名字 → Canvas 名
+		if a, ok := groupAlias[g]; ok {
 			g = a
 		}
 		gk := ep + "|" + g
@@ -1072,7 +1055,6 @@ func (d *Driver) ProfileItems(name string) map[string]interface{} {
 	}
 }
 
-// reProfileNameAttr 匹配 .profile 根节点上的 Name 属性（连同它前面的引号）
 var reProfileNameAttr = regexp.MustCompile(`(<Profile\b[^>]*?\bName=")[^"]*(")`)
 
 // ProfileRename 重命名用户自建场景：内容原样搬到新名字下。
@@ -1125,7 +1107,6 @@ func (d *Driver) ProfileRename(oldName, newName string) map[string]interface{} {
 			"error": fmt.Sprintf("无法创建场景目录：%s", err)}
 	}
 
-	// 描述留在 .cml 的 Tooltip 里；列表项读的就是它，改名时一并搬走。
 	desc := langText(d, cmlAttr(readText(filepath.Join(dir, oldName+".cml")), "Tooltip"))
 
 	body := readText(path)
@@ -1133,7 +1114,6 @@ func (d *Driver) ProfileRename(oldName, newName string) map[string]interface{} {
 		return map[string]interface{}{"ok": false, "ret": -5,
 			"error": "场景文件结构异常，未找到 <Profile Name> 节点"}
 	}
-	// ReplaceAllString 的替换串里 $ 有特殊含义，名字里带 $ 会串味
 	safe := strings.ReplaceAll(xmlEscape(newName), "$", "$$")
 	body = reProfileNameAttr.ReplaceAllString(body, "${1}"+safe+"${2}")
 
@@ -1167,7 +1147,6 @@ func (d *Driver) ProfileRename(oldName, newName string) map[string]interface{} {
 // 成为可一键还原的基线。
 const profileFactoryScene = "默认"
 
-// seedItem 一条预置参数
 type seedItem struct {
 	Ep   string
 	Name string
@@ -1296,7 +1275,7 @@ func fullSnapshot(d *Driver, base []snapRow) []snapRow {
 		}
 		seen[k] = true
 		if excludedFromScene(r.Name) {
-			continue // base 直通项也要过排除名单（seed 表里可能带 # 通道项）
+			continue
 		}
 		out = append(out, r)
 	}
@@ -1360,7 +1339,6 @@ func HealMissingParams(d *Driver) int {
 	}()
 }
 
-// reApoName 匹配 <ApoEffect Name="…"> 的“前缀 + 值 + 收尾引号”三段。
 var reApoName = regexp.MustCompile(`(<ApoEffect\s+Name=")([^"]*)(")`)
 
 // MigrateProfileGroups 把存量场景文件里的**旧 ApoEffect 名**就地换成官方
@@ -1456,7 +1434,6 @@ func EnsureSeedScenes(d *Driver) {
 			}
 			sp, known := spec(it.Ep, it.Name)
 			if !known {
-				// 能力面与预期不符：宁可缺档也不写一份应用会失败的
 				okAll = false
 				break
 			}
@@ -1500,7 +1477,7 @@ func EnsureSeedScenes(d *Driver) {
 	for _, it := range factoryDefaults {
 		sp, known := spec(it.Ep, it.Name)
 		if !known {
-			continue // 本机能力面没这一项 —— 宁可缺也不写真会失败的
+			continue
 		}
 		fsnap = append(fsnap, snapRow{it.Ep, it.Name, kindName(sp.kind), it.Val})
 	}

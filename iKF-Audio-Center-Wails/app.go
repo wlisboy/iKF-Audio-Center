@@ -359,8 +359,6 @@ func (a *API) listen(w http.ResponseWriter, r *http.Request) {
 	a.json(w, http.StatusOK, out)
 }
 
-// profileOp 处理 /api/profile/{save,apply,delete,rename}。
-// 四个动作共用一套请求体解析，避免四份重复的 400 分支。
 func (a *API) profileOp(w http.ResponseWriter, r *http.Request, op string) {
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 8192))
 	var req struct {

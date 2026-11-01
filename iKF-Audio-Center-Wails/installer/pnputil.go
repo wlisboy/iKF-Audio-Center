@@ -76,7 +76,6 @@ func writeLog() string {
 	return ""
 }
 
-// rebootNote 把「成功但建议重启」翻成人话，并说明为什么。
 func rebootNote(code int) string {
 	if code == errRebootRequired || code == errRebootInitiated {
 		return "\n（系统提示需要重启后才能完全生效。如果界面读不到参数，请重启一次。）"
@@ -89,14 +88,13 @@ var (
 	reAnyInf = regexp.MustCompile(`(?i)\b[a-z0-9_.\-]+\.inf\b`)
 )
 
-// drvState 是「系统里现在是什么情况」，全部来自只读查询。
 type drvState struct {
-	infPath   string   // 要装的 INF 绝对路径
+	infPath   string
 	catPath   string   // 同目录的 .cat，pnputil 会按 INF 的 CatalogFile 去找
-	published []string // DriverStore 里已发布的 oemNN.inf；空 = 没装
-	hwid      string   // INF 声明的硬件 ID
-	deviceID  string   // 设备实例 ID；空 = 设备当前不在
-	oldPanel  string   // 旧版官方面板 exe 路径；空 = 未检测到（P3 顺序保护）
+	published []string
+	hwid      string
+	deviceID  string
+	oldPanel  string
 }
 
 func exeDir() string {
@@ -271,7 +269,6 @@ func fileExists(p string) bool {
 	return err == nil && !st.IsDir()
 }
 
-// install 把 driver/ 加进 DriverStore 并立即装到已连接的设备上。
 func (s *drvState) install() (string, bool) {
 	if e := s.packErr(); e != "" {
 		return e, false
@@ -320,7 +317,6 @@ func (s *drvState) uninstall() (string, bool) {
 		lines = append(lines, "驱动库里仍有残留："+strings.Join(left, "、"))
 	}
 	if !ok {
-		// 失败才逐项带细节；成功弹窗只说结果
 		return strings.Join(lines, "\n") + rebootNote(reboot), false
 	}
 	// 卸载完成固定建议重启电脑（不再依赖 pnputil
@@ -341,7 +337,6 @@ func (s *drvState) restartDevice() string {
 	return s.deviceID
 }
 
-// dryRunText 只把将要执行的东西念出来，一个字都不落地。
 func dryRunText(s *drvState, action string) string {
 	var b strings.Builder
 	b.WriteString("— 预演，未执行任何系统改动 —\n\n")
@@ -388,7 +383,6 @@ func itoa(n int) string {
 	return string(buf[i:])
 }
 
-// tail 取输出的末尾若干字节，失败时给用户看的原话就在最后几行。
 func tail(s string, n int) string {
 	s = strings.TrimSpace(s)
 	if len(s) <= n {

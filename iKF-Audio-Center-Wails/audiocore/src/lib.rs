@@ -616,7 +616,7 @@ mod lbdiag_tests {
         );
         std::thread::sleep(Duration::from_secs(2));
         let frames = st.frames.load(Ordering::SeqCst);
-        let sp = s.spectrum(&mut [0u8; crate::spectrum::BINS]); // 占位：拿锁看 level
+        let sp = s.spectrum(&mut [0u8; crate::spectrum::BINS]);
         let level = s.level();
         s.close();
         eprintln!("frames={frames} spectrum_ok={sp} level={level}");

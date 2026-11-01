@@ -35,12 +35,11 @@ const (
 	siClass    = `iKF-Audio-Center-sic`
 	siWindow   = `iKF-Audio-Center-siw`
 	wmCOPYDATA = 0x004A
-	siMagic    = 0x494B4653 // "IKFS" —— 自定义 COPYDATA 标识
+	siMagic    = 0x494B4653
 )
 
 var siHwnd uintptr
 
-// guardSingleInstance 返回 true = 已有实例在运行，本进程应立即退出。
 func guardSingleInstance() bool {
 	mu, err := windows.CreateMutex(nil, true, windows.StringToUTF16Ptr(siMutex))
 	if err == nil {
@@ -50,11 +49,9 @@ func guardSingleInstance() bool {
 		return false
 	}
 	if err != windows.ERROR_ALREADY_EXISTS {
-		// 拿不到锁也不是「已存在」（罕见），如实放行，别把应用锁死
 		log.Println("[单实例] 互斥锁异常（放行）：", err)
 		return false
 	}
-	// 已有实例：定位其消息窗口并转交
 	hwnd := siFindReceiver()
 	if hwnd == 0 {
 		// 上一实例正在退出（锁残留但窗口已销毁）：当作可启动处理，
@@ -66,19 +63,16 @@ func guardSingleInstance() bool {
 	return true
 }
 
-// siFindReceiver 用 FindWindowExW 找消息专用窗口 —— 关键差异：
-// FindWindowW 不搜 HWND_MESSAGE 窗口（Wails v2.16 的 bug 根源）。
 func siFindReceiver() uintptr {
 	user32 := syscall.NewLazyDLL("user32.dll")
 	find := user32.NewProc("FindWindowExW")
-	hwndMessage := ^uintptr(2) // HWND_MESSAGE = (HWND)-3
+	hwndMessage := ^uintptr(2)
 	hwnd, _, _ := find.Call(hwndMessage, 0,
 		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(siClass))),
 		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(siWindow))))
 	return hwnd
 }
 
-// siNotify 给第一实例发 WM_COPYDATA（无 payload，纯通知）。
 func siNotify(hwnd uintptr) {
 	type copyDataStruct struct {
 		dwData uintptr
@@ -91,8 +85,6 @@ func siNotify(hwnd uintptr) {
 	send.Call(hwnd, wmCOPYDATA, 0, uintptr(unsafe.Pointer(&cd)))
 }
 
-// siStartReceiver 注册消息窗口类、建隐藏窗口，并在独立 OS 线程上泵消息。
-// （GetMessageW 有线程亲和性——与托盘消息循环同一条铁律）
 func siStartReceiver() {
 	go func() {
 		runtime.LockOSThread()
@@ -100,17 +92,16 @@ func siStartReceiver() {
 		register := user32.NewProc("RegisterClassExW")
 		create := user32.NewProc("CreateWindowExW")
 
-		// wndClassExW / msg 结构复用 tray.go 的定义（同包）
 		wcex := wndClassExW{
 			CbSize:        uint32(unsafe.Sizeof(wndClassExW{})),
 			LpfnWndProc:   syscall.NewCallback(siWndProc),
 			HInstance:     hInstOf(),
-			HbrBackground: 6, // COLOR_WINDOW+1
+			HbrBackground: 6,
 			LpszClassName: uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(siClass))),
 		}
 		register.Call(uintptr(unsafe.Pointer(&wcex)))
 
-		const hwndMessage = ^uintptr(2) // HWND_MESSAGE = (HWND)-3
+		const hwndMessage = ^uintptr(2)
 		hwnd, _, err := create.Call(0,
 			uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(siClass))),
 			uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(siWindow))),
@@ -131,14 +122,13 @@ func siStartReceiver() {
 		for {
 			r, _, _ := getMessage.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
 			if r == 0 {
-				return // WM_QUIT
+				return
 			}
 			dispatch.Call(uintptr(unsafe.Pointer(&m)))
 		}
 	}()
 }
 
-// siWndProc 接收窗口过程：收到转交通知就唤出主界面。
 func siWndProc(hWnd, msgID, wParam, lParam uintptr) uintptr {
 	if msgID == wmCOPYDATA {
 		siShowMainWindow()
@@ -147,11 +137,9 @@ func siWndProc(hWnd, msgID, wParam, lParam uintptr) uintptr {
 	return defWindowProc(hWnd, msgID, wParam, lParam)
 }
 
-// siShowMainWindow 唤出主界面。appCtx 未就绪（OnStartup 未跑）时挂起标志，
-// 由 startTray 之后的 OnStartup 收尾 —— 不丢唤出请求。
 func siShowMainWindow() {
 	if appCtx == nil {
-		winShown = true // OnStartup 后 StartHidden 之外都会显示，天然补上
+		winShown = true
 		return
 	}
 	wruntime.WindowUnminimise(appCtx)

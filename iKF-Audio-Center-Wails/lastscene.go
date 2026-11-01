@@ -137,7 +137,6 @@ func profileNamesForIdentify(d *Driver) []string {
 				continue
 			}
 			stem := n[:len(n)-len(".profile")]
-			// 模板/当前标记（UserDefine*.cml 的同名档）与重复档跳过
 			if stem == "" || stem+".cml" == profileTemplate ||
 				stem+".cml" == profileCurrent || seen[stem] {
 				continue
@@ -163,7 +162,6 @@ func profileNamesForIdentify(d *Driver) []string {
 	return factoryFirst(names)
 }
 
-// factoryFirst 把「默认」提到识别候选的第一位（其余保持原序）。
 func factoryFirst(names []string) []string {
 	for i, n := range names {
 		if n != profileFactoryScene {

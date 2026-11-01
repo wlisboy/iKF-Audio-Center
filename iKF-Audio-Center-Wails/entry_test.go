@@ -20,7 +20,6 @@ func TestExeFromCmd(t *testing.T) {
 		{`"C:\dir\a.exe"`, `C:\dir\a.exe`},
 		{``, ``},
 		{`   `, ``},
-		// 无引号且带参数：截到第一个空格
 		{`C:\dir\a.exe /h`, `C:\dir\a.exe`},
 	}
 	for _, c := range cases {

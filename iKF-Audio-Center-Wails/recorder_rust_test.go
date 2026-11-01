@@ -65,7 +65,6 @@ func TestRecorderRustRealDevice(t *testing.T) {
 		t.Fatalf("stop 失败: %v", stop)
 	}
 
-	// 产物校验：44 字节头 + 数据
 	raw, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatalf("读产物失败: %v", err)

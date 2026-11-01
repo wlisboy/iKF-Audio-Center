@@ -109,8 +109,6 @@ var expectFactory = []string{"默认", "音乐", "电影"}
 // expectNormal 应存在的普通场景（缺失会在报告里警告）。
 var expectNormal = []string{"游戏"}
 
-// sceneExclude / sceneUnproven 的名字级子集：报告里对混入参数打 ⚠。
-// （完整判据在主程序 profile.go；这里列最常见的。）
 func isSuspiciousParam(name string) bool {
 	if strings.Contains(name, "#") {
 		return true
@@ -125,8 +123,8 @@ func isSuspiciousParam(name string) bool {
 
 type sceneFile struct {
 	name string    // 场景名（去扩展名）
-	path string    // 完整路径
-	dir  string    // 来源目录
+	path string
+	dir  string
 	bdir bool      // 目录是否驱动自带（CPL）
 	item []profileItem
 	err  string
@@ -220,7 +218,6 @@ func secRuntime(w func(string, ...interface{})) {
 	}
 }
 
-// integrityFiles 包完整性要查的文件（相对 exe 目录）。
 var integrityFiles = []string{
 	"iKF-Audio-Center.exe",
 	"ikf_audio.dll",
@@ -229,8 +226,6 @@ var integrityFiles = []string{
 	`CPL\Driver\x64\vista\osConfLib.dll`,
 }
 
-// secIntegrity 包完整性：大小 + mtime + SHA256。直接回答「传输有没有截断、
-// exe 与 dll 是不是一对」（10-23 远端排障时靠对方手动 certutil 对哈希）。
 func secIntegrity(w func(string, ...interface{}), exe string) {
 	w("")
 	w("──────── 包完整性（SHA256）────────")
@@ -266,7 +261,6 @@ var avProcs = []struct{ proc, name string }{
 	{"msmpeng.exe", "Windows Defender"},
 }
 
-// secProcsLogs 进程与日志现状。
 func secProcsLogs(w func(string, ...interface{}), exe string) {
 	w("")
 	w("──────── 进程与日志现状 ────────")
@@ -498,8 +492,6 @@ func armDumps(off bool) int {
 	return 0
 }
 
-// broadcastEnvChange 通知 Explorer 刷新环境变量，双击启动的新进程即可拿到
-// GOTRACEBACK（否则要重新登录）。
 func broadcastEnvChange() {
 	user32 := windows.NewLazySystemDLL("user32.dll")
 	p := user32.NewProc("SendMessageTimeoutW")
@@ -623,7 +615,6 @@ func main() {
 	if appdata := os.Getenv("APPDATA"); appdata != "" {
 		add(filepath.Join(appdata, "iKF Audio Center", "profile"), false)
 	}
-	// 命令行显式追加目录（flag.Parse 之后的全部位置参数）
 	for _, a := range flag.Args() {
 		if st, err := os.Stat(a); err == nil && st.IsDir() {
 			add(a, false)
@@ -633,7 +624,7 @@ func main() {
 	// ---- 扫描全部场景（.profile=参数快照，.cml=列表元数据；两两成对。
 	//      主列表以 .cml 为准，参数从同名 .profile 读 —— 与主程序一致） ----
 	var scenes []sceneFile
-	seenScene := map[string]bool{} // name+dir 去重（用户目录优先）
+	seenScene := map[string]bool{}
 	for _, c := range cands {
 		entries, err := os.ReadDir(c.dir)
 		if err != nil {
@@ -665,7 +656,6 @@ func main() {
 			} else if fi, err := os.Stat(filepath.Join(c.dir, stem+".cml")); err == nil {
 				sf.fi = fi
 			}
-			// 参数快照在 .profile；没有就退读 .cml（老档形态）
 			raw, err := os.ReadFile(sf.path)
 			if err != nil {
 				if raw2, err2 := os.ReadFile(filepath.Join(c.dir, stem+".cml")); err2 == nil {

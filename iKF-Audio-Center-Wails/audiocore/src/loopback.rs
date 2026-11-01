@@ -51,8 +51,8 @@ pub const ERR_SERVICE: &str = "无法获取 IAudioCaptureClient";
 pub const ERR_START: &str = "启动耳机音频通道失败，请重新插拔耳机后重试";
 pub const ERR_BROKEN: &str = "回环流已中断";
 
-const E_RENDER: i32 = 0; // eDataFlow eRender
-const E_CONSOLE: i32 = 0; // eRole eConsole
+const E_RENDER: i32 = 0;
+const E_CONSOLE: i32 = 0;
 const AUDCLNT_SILENT: u32 = 0x00000002;
 const WAVE_FORMAT_EXT_TAG: u16 = 0xFFFE;
 
@@ -81,7 +81,7 @@ pub struct LoopbackState {
     pub chan_mask: AtomicU32,
     pub block_align: AtomicI32,
     pub frames: AtomicU64,
-    pub err_code: AtomicI32, // 0=无 1=错误
+    pub err_code: AtomicI32,
     pub kind: Mutex<String>,
     pub dev: Mutex<String>,
     pub err: Mutex<String>,
@@ -132,7 +132,6 @@ impl LoopbackSession {
     /// 同步完成打开（几毫秒量级）；失败返回中文错误串（与 Go 同文案）。
     pub fn open(endpoint: Option<&str>) -> Result<Self, String> {
         unsafe {
-            // MTA；已初始化（S_FALSE）也继续用
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
             let en: IMMDeviceEnumerator =
@@ -185,7 +184,7 @@ impl LoopbackSession {
                 frames: AtomicU64::new(0),
                 err_code: AtomicI32::new(0),
                 kind: Mutex::new(info.kind),
-                dev: Mutex::new(String::new()), // 线程里填（拿 dev 友好名）
+                dev: Mutex::new(String::new()),
                 err: Mutex::new(String::new()),
             });
 
@@ -291,7 +290,6 @@ unsafe fn parse_mix_format(mix: *mut WAVEFORMATEX) -> (SessionInfo, u16, i32) {
         //（避免 GUID::to_u128 的字节序歧义，与 Go uint16(SubFormat.Data1) 等价）
         let d1 = std::ptr::read_unaligned((mix as *const u8).add(24) as *const u32);
         sub_tag = d1 as u16;
-        // dwChannelMask 在偏移 20
         mask = std::ptr::read_unaligned((mix as *const u8).add(20) as *const u32);
         tag = sub_tag;
     }
@@ -416,7 +414,6 @@ unsafe fn capture_loop(
         state.err_code.store(1, Ordering::SeqCst);
     }
     state.running.store(false, Ordering::SeqCst);
-    // rate 等字段保留（Go 版 Status 在流断后仍读得到最后格式），Stop 才清零。
 }
 
 /// 端点枚举：(id, name, is_default)（Go Devices 的数据同源）。
@@ -489,7 +486,6 @@ const PKEY_DEVICE_FRIENDLYNAME: PROPERTYKEY = PROPERTYKEY {
 };
 
 unsafe fn propvariant_lpstr(pv: &PROPVARIANT) -> String {
-    // VT_LPWSTR = 31；值在偏移 8（x64 PROPVARIANT 布局，与 Go 版同一注记）
     if pv.Anonymous.Anonymous.vt.0 != 31 {
         return String::new();
     }

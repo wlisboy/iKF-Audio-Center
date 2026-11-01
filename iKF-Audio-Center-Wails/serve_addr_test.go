@@ -17,7 +17,7 @@ func TestServeAddrLoopback(t *testing.T) {
 		{"127.0.0.1:18500", "127.0.0.1:18500"},
 		{"localhost:8899", "localhost:8899"},
 		{"[::1]:8899", "[::1]:8899"},
-		{"192.168.1.5:18500", "192.168.1.5:18500"}, // 显式指定 = 明知故犯，放行
+		{"192.168.1.5:18500", "192.168.1.5:18500"},
 	}
 	for _, c := range cases {
 		if got := serveAddrLoopback(c.in); got != c.want {

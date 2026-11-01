@@ -138,7 +138,6 @@ func (d *Driver) RunSetup(action string) map[string]interface{} {
 	case "uninstall":
 		params = "--uninstall"
 	case "":
-		// 让在安装器界面里选
 	default:
 		return map[string]interface{}{
 			"ok": false, "error": "action 只能是 install 或 uninstall",
@@ -211,7 +210,7 @@ func runElevated(exe, params string) (int, error) {
 		return 0, e
 	}
 	if sei.hProcess == 0 {
-		return 0, nil // 理论上不会发生（带了 NOCLOSEPROCESS），保守当成功
+		return 0, nil
 	}
 	defer windows.CloseHandle(sei.hProcess)
 	windows.WaitForSingleObject(sei.hProcess, windows.INFINITE)

@@ -136,7 +136,6 @@ eprintln!("[ls] 4 mixfmt");
                 return Err(ERR_MIX_CAP_BAD.to_string());
             }
             if tag != 3 {
-                // 共享模式混合格式必为 float32；别的情况直接拒绝（不猜格式）
                 return Err(format!("{}（tag={} bits）", ERR_MIX_CAP_UNSUP, tag));
             }
             cli_c
@@ -304,7 +303,6 @@ unsafe fn listen_loop(h: LsHandles, state: &Arc<ListenState>, stop: &Arc<AtomicB
     'outer: while !stop.load(Ordering::SeqCst) {
         std::thread::sleep(Duration::from_millis(5));
 
-        // 1) 排干采集包（静音包补零，保证渲染时钟一直有料）
         for _ in 0..64 {
             let packet = match capture.GetNextPacketSize() {
                 Ok(n) => n,
@@ -336,7 +334,6 @@ unsafe fn listen_loop(h: LsHandles, state: &Arc<ListenState>, stop: &Arc<AtomicB
                     pending.extend(std::iter::repeat(0u8).take(f * block_align));
                 } else {
                     let raw = std::slice::from_raw_parts(data, f * block_align);
-                    // 采集数据峰值（float32 绝对值最大）：诊断「采集侧就是静音」
                     let mut peak = f32::from_bits(state.cap_peak_bits.load(Ordering::SeqCst));
                     for chunk in raw.chunks_exact(4) {
                         let v = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]).abs();
@@ -424,6 +421,5 @@ fn set_err(state: &Arc<ListenState>, msg: &str) {
     }
 }
 
-// WAIT_OBJECT_0 未用（占位避免误 import）
 #[allow(dead_code)]
 const _: u32 = WAIT_OBJECT_0.0;

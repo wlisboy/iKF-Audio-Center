@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-// 依赖关系探针：先开 Enable_ 开关，再看级别/滑杆参数是否变得可写。
 func TestDepProbe(t *testing.T) {
 	d := NewDriver()
 	if !d.Open() {
@@ -34,7 +33,6 @@ func TestDepProbe(t *testing.T) {
 		r2, v2 := d.ReadEp(EpRender, c.sw)
 		t.Logf("%-28s [开关 %s pre=%d ok=%v] 级别 pre=%d write=%v post=%d,%q",
 			c.sw, c.dep, r0, ok0, r1, okr, r2, v2)
-		// 还原开关为关，避免污染用户状态
 		d.WriteEp(EpRender, c.dep, "0")
 	}
 }

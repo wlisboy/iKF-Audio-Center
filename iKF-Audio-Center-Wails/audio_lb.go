@@ -46,9 +46,6 @@ func cstr(b []byte) string {
 	return string(b)
 }
 
-// audioRustWanted P1 翻默认后：Rust 路径**默认启用**（S2/S3/S4 已真机逐项
-// 验收），IKF_AUDIO_RUST=0 可显式关回 Go 路径（排障用）。DLL 缺失时
-// audioReady() 为 false，自然落回 Go 路径。
 func audioRustWanted() bool { return os.Getenv("IKF_AUDIO_RUST") != "0" }
 
 // lbDevicesViaRust 端点枚举。行格式 "id\tname\tdef\n"（def ∈ {0,1}）。
@@ -57,7 +54,6 @@ func lbDevicesViaRust() (map[string]interface{}, bool) {
 		return nil, false
 	}
 	pr := audioDLL.NewProc("ikf_loopback_devices")
-	// 两遍拉：先要长度
 	n, _, _ := pr.Call(0, 0)
 	if n == 0 {
 		return map[string]interface{}{"ok": false, "error": "无法枚举播放设备"}, false
@@ -83,7 +79,6 @@ func lbDevicesViaRust() (map[string]interface{}, bool) {
 	return map[string]interface{}{"ok": true, "default": defID, "list": list}, true
 }
 
-// lbSpectrumViaRust 拉最新 512 字节。
 func lbSpectrumViaRust(h uintptr) ([]byte, bool) {
 	if !audioProbe() || h == 0 {
 		return nil, false
@@ -94,7 +89,6 @@ func lbSpectrumViaRust(h uintptr) ([]byte, bool) {
 	return out, r == 0
 }
 
-// lbStatusViaRust 拉状态快照。
 func lbStatusViaRust(h uintptr) (lbStatusC, bool) {
 	if !audioProbe() || h == 0 {
 		return lbStatusC{}, false
@@ -105,7 +99,6 @@ func lbStatusViaRust(h uintptr) (lbStatusC, bool) {
 	return st, r == 0
 }
 
-// splitLines / splitTabs 定长辅助（避免 strings import 翻倍）。
 func splitLines(b []byte) [][]byte {
 	var out [][]byte
 	start := 0

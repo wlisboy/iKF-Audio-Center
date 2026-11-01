@@ -129,7 +129,6 @@ def _load_device_model():
             "alias": dict(m.get("group_alias", {})),
             "factory_profile": scene["factory_profile"],
             "factory_scene": scene["factory_scene"],
-            # S2：出厂表 42 + 初始化设备级 1（保序）
             "factory": [(kv["ep"], kv["name"], kv["val"]) for kv in m.get("factory", [])],
             "init_device": [(kv["ep"], kv["name"], kv["val"]) for kv in m.get("init_device", [])],
         }
@@ -392,7 +391,6 @@ for _w in _MODEL["writable"]:
             assert CHOICES[_w["name"]] == ch, "离散取值跨端点不一致: " + _w["name"]
         CHOICES[_w["name"]] = ch
 
-# 魔音类型：取自原面板 apoMicInXearMagicVoice.cml 的 RadioButton 文案
 MAGIC_VOICES = ["怪兽", "卡通", "男人", "女人"]
 
 # 声道测试：掩码取自原面板 apoSpeakerSetting.cml 的 PlayTestSound Tag 全集，
@@ -435,7 +433,6 @@ ROOM_SIZES = ["小房间", "中房间", "大房间"]
 # 相对量属性：写入是「增量」而非「绝对值」，不能做「值相同即跳过」的判断
 NOOP_SKIP = frozenset(["VolumeControl"])
 
-# 只读展示项（顺序即界面「设备」页的展示顺序）
 INFO_KEYS = [
     "GetDeviceFriendlyName", "GetAudioCodecName", "GetDriverVer",
     "GetFirmwareVer", "GetDeviceID", "GetDirectXVer",
@@ -661,7 +658,6 @@ class Driver(object):
         self.dev_list = 0
         self.cap_idx = 0
         self.cap_list = 1
-        # 专用工作线程
         self._jobs = queue.Queue()
         self._worker = threading.Thread(target=self._loop, daemon=True)
         self._worker.start()
@@ -675,7 +671,7 @@ class Driver(object):
             fn, box = item
             try:
                 box["v"] = fn()
-            except BaseException as exc:      # 含 OSError（访问违例）
+            except BaseException as exc:
                 box["e"] = exc
             finally:
                 box["done"].set()
@@ -862,7 +858,7 @@ class Driver(object):
             self.cpl = cpl
             self.dll = dll
             self.device_count = count.value
-            self.error = None  # 重连成功要把上一轮的失败原因擦掉
+            self.error = None
             self._warm_up()
             return True
 
@@ -967,7 +963,6 @@ class Driver(object):
             # 没带 "#" 的一律走 -1（历史行为，未改动）。
             base, ch = _split_channel(name)
             if base in GENERIC_SET:
-                # 通用属性：pValue 只需是非空有效指针（函数不读它）
                 keep = ctypes.create_string_buffer(1024)
                 pval = ctypes.cast(keep, ctypes.c_void_p)
             else:
@@ -1257,7 +1252,7 @@ class Driver(object):
                     continue
                 stem = fn[:-4]
                 if stem in seen:
-                    continue          # 用户目录优先
+                    continue
                 cml = _read_text(os.path.join(d, fn))
                 pfile = os.path.join(d, stem + ".profile")
                 desc = _lang_text(self, _cml_attr(cml, "Tooltip"))
@@ -1266,7 +1261,6 @@ class Driver(object):
                     its = _profile_items(_read_text(pfile))
                     cnt = len(its)
                     glabels = _profile_group_labels(its)
-                # 官方空模板不进列表（Go 侧 Profiles 同款过滤）
                 if builtin and cnt == 0:
                     continue
                 seen[stem] = {
@@ -1278,7 +1272,6 @@ class Driver(object):
                     "has_data": os.path.isfile(pfile),
                     "groups": glabels,
                 }
-        # 排序：默认 → 内置 → 同层按名字（Go 侧 rank 同款）
         def _rank(it):
             if it["name"] == PROFILE_FACTORY_SCENE:
                 return 0
@@ -1385,7 +1378,7 @@ class Driver(object):
         applied = failed = skipped = 0
         detail = []
         done = set()
-        ops = []          # (ep, pname, v, kind, unknown, is_switch)
+        ops = []
         factory_cmd_failed = False
         for ep_name, flow, _fx, pname, val, vtype in items:
             ep = EP_CAPTURE if flow.lower() == "in" else EP_RENDER
@@ -1553,11 +1546,9 @@ class Driver(object):
         except OSError as e:
             return {"ok": False, "ret": -4, "error": "无法创建场景目录：%s" % e}
 
-        # 描述留在 .cml 的 Tooltip 里，列表项读的就是它，改名时一并搬走
         desc = _lang_text(self, _cml_attr(
             _read_text(os.path.join(d, old_name + ".cml")), "Tooltip"))
         body = _read_text(path)
-        # 用 lambda 而不是替换模板：名字里带 \ 或 $ 时模板会被解释
         new_body, n = re.subn(
             r'(<Profile\b[^>]*?\bName=")[^"]*(")',
             lambda m: m.group(1) + _xml_escape(new_name) + m.group(2),
@@ -1841,8 +1832,6 @@ _GROUP_ALIAS = _MODEL["alias"]
 PROFILE_ENDPOINT = {ep: (v[0], v[1]) for ep, v in _MODEL["profile_endpoint"].items()}
 PROFILE_VALUE_TYPE = dict(_MODEL["profile_value_type"])
 
-
-
 def _appdata_profile_dir():
     base = os.environ.get("APPDATA") or os.path.expanduser("~")
     return os.path.join(base, "iKF Audio Center", "profile")
@@ -1997,13 +1986,13 @@ def build_init_manifest(drv):
             try:
                 items = _profile_items(_read_text(path))
             except Exception:
-                items = []          # 只读目录 / 半就绪：清单退化成出厂表
+                items = []
         for _e, flow, _fx, name, val, _vt in items:
             if not name or "#" in name:
                 continue            # 逐声道项不进场景档（与 profile_save 口径一致）
             ep = EP_CAPTURE if str(flow).lower() == "in" else EP_RENDER
             if WRITABLE.get(ep, {}).get(name) is None:
-                continue            # 本机能力面没这项，写了也是白写
+                continue
             add(ep, name, val, "scene", "param")
 
     for ep, name, val in INIT_DEVICE_ITEMS:
@@ -2033,7 +2022,7 @@ def apply_init_manifest(drv, items=None, strong=False):
             ret, _cur = drv.read(name, ep)
             if ret != 2:
                 skipped += 1
-                continue        # 有值（0）或不存在（-1/-2）：都不是本次该改的
+                continue
         kind = WRITABLE.get(ep, {}).get(name)
         try:
             res = drv.write_auto(name, val, ep, kind)
@@ -2060,7 +2049,7 @@ def check_init_manifest(drv):
         ep, name, want = it["ep"], it["name"], it["val"]
         ret, cur = drv.read(name, ep)
         if ret == 0 and cur == "":
-            ret, cur = drv.read(name, ep)      # 已知读抖动，重读一次
+            ret, cur = drv.read(name, ep)
         if ret == 0 and str(cur) == want:
             r["ok"] += 1
             lines.append("  达标   %-7s %-32s %-8s %s" % (ep, name, want, it["source"]))
@@ -2132,7 +2121,6 @@ def identify_active_scene(drv):
                 continue
             ep = EP_CAPTURE if flow.lower() == "in" else EP_RENDER
             ret, cur = drv.read(pname, ep)
-            # ★ ret=0 但值列读空 = 已知读抖动：重读一次再判
             if ret == 0 and cur == "":
                 ret, cur = drv.read(pname, ep)
             if ret != 0 or cur != val:
@@ -2206,7 +2194,7 @@ def migrate_profile_groups(drv):
                 with io.open(p, "w", encoding="utf-8") as f:
                     f.write(new)
             except OSError:
-                continue          # 只读目录（如装到 Program Files）直接跳过
+                continue
             files += 1
             tags += hit[0]
     return files, tags
@@ -2315,7 +2303,7 @@ def init_fp_changed(drv):
         return False, ""
     cur = _init_fp_now(drv)
     if not _fp_known(cur):
-        return False, ""          # 三个字段全读不到：判不了，宁可不动用户参数
+        return False, ""
     old, ok = _read_init_fp()
     if not ok:
         return False, ""          # 安全规则 1：没有指纹 != 重装
@@ -2440,7 +2428,7 @@ def ensure_channel_topology(drv):
 
     ret, v = drv.read("Speaker_Channel_Setting", EP_RENDER)
     if ret == 0 and v == "":
-        ret, v = drv.read("Speaker_Channel_Setting", EP_RENDER)   # 已知读抖动，重读一次
+        ret, v = drv.read("Speaker_Channel_Setting", EP_RENDER)
     if ret == 0 and _stereo(v):
         return False, ""
     if ret != 0:
@@ -2644,7 +2632,6 @@ def _kind_of_value_type(vtype, name):
     if v.endswith("Single") or v.endswith("Double"):
         return "float"
     if name in GENERIC_SET and v.endswith("UInt32"):
-        # 通用表里的 UInt32 基本就是 0/1 开关
         return "bool"
     return "int"
 
@@ -2731,7 +2718,7 @@ def _profile_groups(items):
             continue
         seen.add(nk)
         g = fx or _group_of(ep, pname)
-        g = _GROUP_ALIAS.get(g, g)      # 旧版工具写出的分组名 → Canvas 名
+        g = _GROUP_ALIAS.get(g, g)
         key = (ep, g)
         if key in idx:
             idx[key]["n"] += 1
@@ -2851,7 +2838,6 @@ IID_IAUDIO_RENDER_CLIENT = _GUID(       # 内嵌监听（listen.py 对应 listen
     0xF294ACFC, 0x3146, 0x4483,
     (ctypes.c_ubyte * 8)(0xA7, 0xBF, 0xAD, 0xDC, 0xA7, 0xC2, 0x60, 0xE2))
 
-# 虚表下标（0/1/2 是 IUnknown 的 QueryInterface/AddRef/Release）
 VTBL_IMMDEVICE_GET_DEFAULT_ENDPOINT = 4
 VTBL_IMMDEVICE_ENUM_ENDPOINTS = 3       # IMMDeviceEnumerator：列出全部活动端点
 VTBL_IMMDEVICE_GET_DEVICE = 5           # IMMDeviceEnumerator：按端点 ID 取设备
@@ -2882,12 +2868,12 @@ AUDCLNT_LOOPBACK = 0x00020000
 AUDCLNT_SILENT = 0x00000002
 # 内嵌监听：允许按与端点混音格式不同的格式初始化采集端
 # （引擎内部转换），两边得以用「渲染端点混音格式」直通搬运。
-AUDCLNT_AUTO_CONVERT = 0x80000000       # Win8.1+
+AUDCLNT_AUTO_CONVERT = 0x80000000
 AUDCLNT_SRC_DEFAULT_QUALITY = 0x08000000
 E_RENDER = 0
 E_CONSOLE = 0
 DEVICE_STATE_ACTIVE = 1                 # 只列「在」的端点
-STGM_READ = 0                           # 属性仓库只读
+STGM_READ = 0
 VT_LPWSTR = 31                          # PROPVARIANT.vt == VT_LPWSTR
 
 # Web Audio AnalyserNode 的默认参数与归一化，与 loopback.go 完全一致。
@@ -2959,7 +2945,6 @@ class _PROPERTYKEY(ctypes.Structure):
 
 
 class _PROPVARIANT(ctypes.Structure):
-    # x64 上值联合体固定在偏移 8（vt 2 字节 + 保留 6 字节），拿 pwszVal 就够
     _fields_ = [("vt", ctypes.c_uint16),
                 ("_pad", ctypes.c_ubyte * 6),
                 ("val", ctypes.c_void_p)]
@@ -3022,16 +3007,16 @@ class _WAVEFORMATEX(ctypes.Structure):
 
 class _WAVEFORMATEXTENSIBLE(ctypes.Structure):
     # 平铺写全，不嵌入 _WAVEFORMATEX —— 见本节头部的坑 ②
-    _fields_ = [("wFormatTag", ctypes.c_uint16),        # 0
-                ("nChannels", ctypes.c_uint16),         # 2
-                ("nSamplesPerSec", ctypes.c_uint32),    # 4
-                ("nAvgBytesPerSec", ctypes.c_uint32),   # 8
-                ("nBlockAlign", ctypes.c_uint16),       # 12
-                ("wBitsPerSample", ctypes.c_uint16),    # 14
-                ("cbSize", ctypes.c_uint16),            # 16
-                ("wValidBitsPerSample", ctypes.c_uint16),  # 18
-                ("dwChannelMask", ctypes.c_uint32),     # 20
-                ("SubFormat", _GUID)]                   # 24
+    _fields_ = [("wFormatTag", ctypes.c_uint16),
+                ("nChannels", ctypes.c_uint16),
+                ("nSamplesPerSec", ctypes.c_uint32),
+                ("nAvgBytesPerSec", ctypes.c_uint32),
+                ("nBlockAlign", ctypes.c_uint16),
+                ("wBitsPerSample", ctypes.c_uint16),
+                ("cbSize", ctypes.c_uint16),
+                ("wValidBitsPerSample", ctypes.c_uint16),
+                ("dwChannelMask", ctypes.c_uint32),
+                ("SubFormat", _GUID)]
 
 
 def _lb_downmix(ch):
@@ -3238,7 +3223,7 @@ class Loopback(object):
         Hands-Free/HFP），选哪个由前端引导，后端不掺和。
         """
         hr = _ole32.CoInitializeEx(None, COINIT_MULTITHREADED)
-        uninit = (hr == 0)  # S_OK 才该 CoUninitialize
+        uninit = (hr == 0)
         try:
             enumerator = ctypes.c_void_p()
             hr = _ole32.CoCreateInstance(
@@ -3299,7 +3284,7 @@ class Loopback(object):
         """
         stop = self._stop
         hr = _ole32.CoInitializeEx(None, COINIT_MULTITHREADED)
-        uninit = (hr == 0)  # S_OK 才该 CoUninitialize
+        uninit = (hr == 0)
         try:
             attempt = 0
             while True:
@@ -3471,7 +3456,7 @@ class Loopback(object):
                 hr = _com_call(capture, VTBL_CAPTURE_GET_NEXT_PACKET_SIZE,
                                ctypes.byref(packet))
                 if _hres_bad(hr):
-                    broken = True  # 通常意味着流已失效（设备被拔了）
+                    broken = True
                     break
                 if packet.value == 0:
                     break
@@ -3519,7 +3504,6 @@ class Loopback(object):
             w = self._ring_w
             cnt = len(mixed)
             if cnt >= LB_RING_LEN:
-                # 一次推入的样本比整个环还多：只保留最后 LB_RING_LEN 个
                 ring[:] = mixed[-LB_RING_LEN:]
                 self._ring_w = 0
                 self._ring_n += cnt
@@ -3562,7 +3546,6 @@ class Loopback(object):
             vals = struct.unpack_from("<%di" % n, buf)
             scale = 1.0 / 2147483648.0
         elif tag == 1 and bits == 24:
-            # 24 位没有 struct 格式码，只能手解（罕见格式，慢点无所谓）
             vals = []
             ap = vals.append
             for i in range(frames):
@@ -3570,7 +3553,7 @@ class Loopback(object):
                 for _c in range(ch):
                     v = buf[o] | (buf[o + 1] << 8) | (buf[o + 2] << 16)
                     if v & 0x800000:
-                        v -= 0x1000000  # 24 位符号扩展
+                        v -= 0x1000000
                     ap(v)
                     o += 3
             scale = 1.0 / 8388608.0
@@ -3620,7 +3603,6 @@ class Loopback(object):
                 r = re[k]
                 i2 = im[k]
                 mag = math.sqrt(r * r + i2 * i2) * norm
-                # 平滑按规范做在幅度上
                 s = WA_SMOOTHING * prev[k] + (1.0 - WA_SMOOTHING) * mag
                 prev[k] = s
                 if s > level:
@@ -3640,7 +3622,6 @@ def _fft_radix2(re, im, cos_tab, sin_tab):
     n = len(re)
     if n < 2 or (n & (n - 1)):
         return
-    # 位反转置换
     j = 0
     for i in range(1, n):
         bit = n >> 1
@@ -3651,7 +3632,6 @@ def _fft_radix2(re, im, cos_tab, sin_tab):
         if i < j:
             re[i], re[j] = re[j], re[i]
             im[i], im[j] = im[j], im[i]
-    # 蝶形。twiddle 用长度 n 的整表索引：索引 k*(n/length) 一定落在 [0, n/2)。
     length = 2
     while length <= n:
         half = length >> 1
@@ -3855,7 +3835,6 @@ class MicRecorder(object):
             # ★ 不重试：见类型注释。一次会话到头。
             self._session(stop)
         except Exception as exc:
-            # 采集线程漏出的异常直接把线程打死会停在 running=True。
             with self._lock:
                 self.err = "录音线程异常：%r" % (exc,)
                 self.running = False
@@ -4005,7 +3984,6 @@ class MicRecorder(object):
                     self._fail("输出端数据流已中断（设备被拔出？），已保存已录部分")
                     return
 
-            # stop 信号正常收尾
             self._close_wav(wout)
             wout = None
         finally:
@@ -4020,7 +3998,6 @@ class MicRecorder(object):
             if mix_ptr.value:
                 _ole32.CoTaskMemFree(mix_ptr)
             if wout is not None:
-                # 异常路径：也要把头补上，文件至少能播
                 self._close_wav(wout)
             with self._lock:
                 self.running = False
@@ -4059,7 +4036,7 @@ class MicRecorder(object):
             out[i] = v & 0xFF
             out[i + 1] = (v >> 8) & 0xFF
 
-        if tag == 3 and bits == 32:            # IEEE float32
+        if tag == 3 and bits == 32:
             vals = struct.unpack_from("<%df" % (n_frames * src_ch), buf)
             for f in range(n_frames):
                 base = f * src_ch
@@ -4146,8 +4123,6 @@ class MicListen(object):
         self.rate = 0
         self.ch = 0
         self.sent = 0
-        # 排障诊断 静音 bug）：采集包计数、SILENT 旗标包数、
-        # 采集数据峰值（float32 绝对值最大，正常底噪 ~3e-4，全零=0）
         self.pkts = 0
         self.silent_pkts = 0
         self.cap_peak = 0.0
@@ -4303,7 +4278,7 @@ class MicListen(object):
                 if rate <= 0 or ch <= 0 or block_align <= 0:
                     self._fail("麦克风混音格式异常")
                     return
-                if tag != 3:  # 混合格式必为 float32；别的情况拒绝（不猜格式）
+                if tag != 3:
                     self._fail("麦克风混音格式不受支持（tag=%d bits=%d）"
                                % (tag, bits))
                     return
@@ -4417,7 +4392,6 @@ class MicListen(object):
                 if stop.wait(0.005):
                     break
                 broken = False
-                # 1) 排干采集包（静音包补零，保证渲染时钟一直有料）
                 for _ in range(64):
                     hr = _com_call(cap_c, VTBL_CAPTURE_GET_NEXT_PACKET_SIZE,
                                    ctypes.byref(packet))
@@ -4482,8 +4456,8 @@ class MicListen(object):
                         "<%df" % n, bytes(pending[:n * block_align]))
                     out = [0.0] * (n * ren_ch)
                     for i, s in enumerate(samples):
-                        out[i * ren_ch] = s       # FL
-                        out[i * ren_ch + 1] = s   # FR
+                        out[i * ren_ch] = s
+                        out[i * ren_ch + 1] = s
                     ctypes.memmove(p_buf.value,
                                    struct.pack("<%df" % (n * ren_ch), *out),
                                    n * ren_block)
@@ -4518,7 +4492,6 @@ class MicListen(object):
 
 LIS = MicListen()
 
-# winmm 只用来在自检里播一段 wav 当信号源
 SND_ASYNC = 0x0001
 SND_NODEFAULT = 0x0002
 SND_LOOP = 0x0008
@@ -4569,7 +4542,7 @@ def _lb_synth(rate, amp):
     lb._ring_n = LB_FFT_SIZE
     for i in range(LB_FFT_SIZE):
         lb._ring[i] = amp * math.sin(2 * math.pi * 937.5 * i / rate)
-    for _ in range(40):  # 让平滑收敛
+    for _ in range(40):
         lb._compute_spectrum()
     return bytes(lb._bins)
 
@@ -4874,7 +4847,7 @@ def _play_only(path, secs, loop=False):
     except KeyboardInterrupt:
         pass
     if _winmm is not None:
-        _winmm.PlaySoundW(None, None, 0)  # 停止
+        _winmm.PlaySoundW(None, None, 0)
     return 0
 
 
@@ -4950,13 +4923,13 @@ def _run_elevated(exe, params):
 
     sei = SHELLEXECUTEINFOW()
     sei.cbSize = ctypes.sizeof(sei)
-    sei.fMask = 0x00000040            # SEE_MASK_NOCLOSEPROCESS
+    sei.fMask = 0x00000040
     sei.lpVerb = "runas"
     sei.lpFile = exe
     sei.lpParameters = params or None
     # 提权后子进程的当前目录会变成 System32，工作目录必须显式给
     sei.lpDirectory = os.path.dirname(exe)
-    sei.nShow = 1                     # SW_SHOWNORMAL
+    sei.nShow = 1
 
     shell32 = ctypes.windll.shell32
     shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(SHELLEXECUTEINFOW)]

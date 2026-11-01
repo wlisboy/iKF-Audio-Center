@@ -37,7 +37,7 @@ import (
 const (
 	lbRingLen = 8192
 	lbFFTSize = 1024
-	lbBins    = lbFFTSize / 2 // 512，与 Web Audio frequencyBinCount 一致
+	lbBins    = lbFFTSize / 2
 )
 
 // Web Audio AnalyserNode 的默认参数，必须与前端 AnalyserNode 一致。
@@ -126,7 +126,6 @@ func (l *Loopback) Start(device string) map[string]interface{} {
 	return l.startRust(device)
 }
 
-// Stop 关掉会话。
 func (l *Loopback) Stop() map[string]interface{} {
 	return l.stopRust()
 }
@@ -177,8 +176,6 @@ func (l *Loopback) computeSpectrum() {
 	l.mu.Lock()
 	for k := 0; k < lbBins; k++ {
 		mag := math.Hypot(re[k], im[k]) * norm
-		// 平滑按规范做在幅度上。prev 存 float32 —— 浏览器的
-		// AnalyserNode 内部也是 float 累加，这里保持一致。
 		s := waSmoothing*float64(l.prev[k]) + (1-waSmoothing)*mag
 		l.prev[k] = float32(s)
 		if s > float64(level) {
@@ -209,7 +206,6 @@ func fftRadix2(re, im []float64) {
 	if n < 2 || n&(n-1) != 0 {
 		return
 	}
-	// 位反转置换
 	for i, j := 1, 0; i < n; i++ {
 		bit := n >> 1
 		for ; j&bit != 0; bit >>= 1 {
@@ -221,7 +217,6 @@ func fftRadix2(re, im []float64) {
 			im[i], im[j] = im[j], im[i]
 		}
 	}
-	// 蝶形。twiddle 用长度 n 的整表索引，直接查表。
 	for length := 2; length <= n; length <<= 1 {
 		half := length >> 1
 		step := n / length
@@ -363,9 +358,6 @@ func (l *Loopback) stopRust() map[string]interface{} {
 }
 
 func (l *Loopback) statusRust() map[string]interface{} {
-	// ★破坏性检测 P0-3：DLL 调用与字段读取全程持锁 —— 原实现拿完 h 就
-	// 解锁，stopRust 可在窗口内 close(h)，status 读到已释放的会话
-	// （假成功比崩溃更难发现）。DLL 调用微秒级，锁内不构成热点。
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	h := l.rustH
@@ -420,6 +412,6 @@ func (l *Loopback) spectrumRust() map[string]interface{} {
 		"bins":   base64.StdEncoding.EncodeToString(bins),
 		"level":  float64(int(st.level*1000)) / 1000,
 		"frames": st.frames,
-		"peak":   0.0, // 原始峰值不维护（level 足够），诊断看 level
+		"peak":   0.0,
 	}
 }

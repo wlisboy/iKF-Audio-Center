@@ -39,7 +39,6 @@ var (
 	audioMu sync.Mutex
 )
 
-// audioDLLCandidates 按优先级返回候选路径。
 func audioDLLCandidates() []string {
 	var out []string
 	if d := appDir(); d != "" {
@@ -48,7 +47,6 @@ func audioDLLCandidates() []string {
 			out = append(out, filepath.Join(wd, "ikf_audio.dll"))
 		}
 	}
-	// go test 的工作目录是包目录（Wails/），appDir 可能拿不到 exe —— 补一个相对路径
 	if wd, err := filepath.Abs(filepath.Join("audiocore", "target", "release")); err == nil {
 		out = append(out, filepath.Join(wd, "ikf_audio.dll"))
 	}
@@ -62,7 +60,7 @@ func audioProbe() bool {
 	}
 	audioMu.Lock()
 	defer audioMu.Unlock()
-	if st := audioState.Load(); st != 0 { // 双检：并发首探只做一次
+	if st := audioState.Load(); st != 0 {
 		return st == 1
 	}
 	for _, p := range audioDLLCandidates() {
@@ -74,11 +72,11 @@ func audioProbe() bool {
 		ver := dll.NewProc("ikf_version")
 		st := dll.NewProc("ikf_selftest")
 		if err := abi.Find(); err != nil || ver.Find() != nil || st.Find() != nil {
-			continue // 导出不齐（半成品 DLL）= 视为不可用
+			continue
 		}
 		got, _, _ := abi.Call()
 		if got != audioABI {
-			continue // 接口纪元错配 = 拒绝使用
+			continue
 		}
 		sentinel, _, _ := st.Call()
 		if sentinel != 0xF00D {
@@ -91,7 +89,7 @@ func audioProbe() bool {
 		}
 		buf := make([]byte, n)
 		ver.Call(uintptr(unsafe.Pointer(&buf[0])), n)
-		s := string(buf[:n-1]) // 去 '\0'
+		s := string(buf[:n-1])
 		audioDLL = dll
 		audioVer.Store(&s)
 		audioState.Store(1)
@@ -101,10 +99,8 @@ func audioProbe() bool {
 	return false
 }
 
-// audioReady 热路径模块开工前的统一闸门。
 func audioReady() bool { return audioProbe() }
 
-// audioVersion 就绪时返回版本串（如 "ikf-audio 0.1.0"），否则空串。
 func audioVersion() string {
 	audioProbe()
 	if v := audioVer.Load(); v != nil {
@@ -113,7 +109,6 @@ func audioVersion() string {
 	return ""
 }
 
-// audioStatus 诊断用：一行说清状态（self-test / status 接口里展示）。
 func audioStatus() string {
 	if audioProbe() {
 		return fmt.Sprintf("rust: %s (abi %d)", audioVersion(), audioABI)

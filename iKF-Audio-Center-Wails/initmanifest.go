@@ -47,14 +47,13 @@ import (
 	"strings"
 )
 
-// initItem 初始化清单的一项。
 type initItem struct {
-	Ep     string // EpRender / EpCapture
+	Ep     string
 	Name   string
 	Val    string
-	Kind   string // "" / "bool" / "int"，由 spec() 反查
-	Source string // factory / scene / device
-	Scope  string // param / device
+	Kind   string
+	Source string
+	Scope  string
 }
 
 // initDeviceItems 设备级项（不在任何参数表里，硬件事实）。
@@ -103,8 +102,6 @@ func BuildInitManifest(d *Driver) []initItem {
 				if strings.EqualFold(it.Flow, "in") {
 					ep = EpCapture
 				}
-				// 本机能力面没有的项写了也是白写 —— 不进清单（与旧
-				// applySceneExtras 的 known 判据一致）。
 				if _, known := spec(ep, it.Name); !known {
 					continue
 				}
@@ -120,7 +117,6 @@ func BuildInitManifest(d *Driver) []initItem {
 	return out
 }
 
-// itemKind 把 spec 的类型翻成 WriteAuto 认识的字符串（未知则空串，交给它自己判）。
 func itemKind(ep, name string) string {
 	if sp, known := spec(ep, name); known {
 		return kindName(sp.kind)
@@ -145,7 +141,7 @@ func applyInitManifest(d *Driver, items []initItem, strong bool) (int, int, int)
 		if !strong {
 			if ret, _ := d.ReadEp(it.Ep, it.Name); ret != 2 {
 				skipped++
-				continue // 有值（0）或不存在（-1/-2）：都不是本次该改的
+				continue
 			}
 		}
 		if res := d.WriteAuto(it.Ep, it.Name, it.Val, it.Kind); res["ok"] == true {
@@ -157,19 +153,10 @@ func applyInitManifest(d *Driver, items []initItem, strong bool) (int, int, int)
 	return applied, failed, skipped
 }
 
-// InitCheckResult 一条核对结果。
 type InitCheckResult struct {
 	Total, OK, Missing, Drift, Unsupported int
 }
 
-// CheckInitManifest 逐项核对设备与清单（只读，绝不写）。
-//
-// 每一项归四类：
-//
-//	OK           ret=0 且值 == 目标
-//	Missing      ret=2（存在但从没写过 —— 界面「未设置」）
-//	Drift        ret=0 但值 != 目标（用户改过，或初始化没跑成）
-//	Unsupported  ret<0（本机没有这项能力，不算失败）
 func CheckInitManifest(d *Driver) (InitCheckResult, []string) {
 	var r InitCheckResult
 	var lines []string
@@ -178,7 +165,7 @@ func CheckInitManifest(d *Driver) (InitCheckResult, []string) {
 	for _, it := range items {
 		ret, val := d.ReadEp(it.Ep, it.Name)
 		if ret == 0 && val == "" {
-			ret, val = d.ReadEp(it.Ep, it.Name) // 已知读抖动，重读一次
+			ret, val = d.ReadEp(it.Ep, it.Name)
 		}
 		switch {
 		case ret == 0 && val == it.Val:

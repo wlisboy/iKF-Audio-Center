@@ -26,7 +26,6 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// ---------------------------------------------------------------- 属性名表
 
 var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 
@@ -111,8 +110,8 @@ var writable = func() map[string]map[string]wspec {
 }()
 
 var channelParams = map[string]int{
-	"VolumeScalarControl#0": 0, // FrontLeft
-	"VolumeScalarControl#1": 1, // FrontRight
+	"VolumeScalarControl#0": 0,
+	"VolumeScalarControl#1": 1,
 }
 
 // splitChannel `VolumeScalarControl#0` → ("VolumeScalarControl", 0)；
@@ -164,7 +163,6 @@ var environments = []string{
 
 var roomSizes = []string{"小房间", "中房间", "大房间"}
 
-// magicVoices —— 魔音类型，取自原面板 apoMicInXearMagicVoice.cml 的 RadioButton 文案
 var magicVoices = []string{"怪兽", "卡通", "男人", "女人"}
 
 // testChannels —— 声道测试：掩码取自原面板 apoSpeakerSetting.cml 的
@@ -298,10 +296,6 @@ func registryCpl() string {
 	return ""
 }
 
-// appDir 返回 exe 所在目录 —— 绿色版（免安装）资源的根。
-//
-// 只能用 exe 自身路径推导：提权后当前目录会变成 System32，
-// 双击与「以管理员身份运行」的进程 cwd 还未必相同，相对路径一律不可信。
 func appDir() string {
 	p, err := os.Executable()
 	if err != nil {
@@ -396,7 +390,6 @@ func findDLL(cpl string) string {
 	return found
 }
 
-// ---------------------------------------------------------------- 解码
 
 func u16(raw []byte) string {
 	u := make([]uint16, 0, 64)
@@ -491,7 +484,7 @@ type Driver struct {
 func NewDriver() *Driver {
 	d := &Driver{reqCh: make(chan func(), 64)}
 	go func() {
-		runtime.LockOSThread() // 关键：整个生命周期不换线程
+		runtime.LockOSThread()
 		for f := range d.reqCh {
 			f()
 		}
@@ -499,7 +492,6 @@ func NewDriver() *Driver {
 	return d
 }
 
-// run 把一次调用投递到工作线程并等待完成
 func (d *Driver) run(fn func()) {
 	done := make(chan struct{})
 	d.reqCh <- func() {
@@ -559,8 +551,6 @@ func (d *Driver) openLocked() bool {
 
 		mod := syscall.NewLazyDLL(dll)
 		if err := mod.Load(); err != nil {
-			// 常见：126 依赖缺失、32 ERROR_SHARING_VIOLATION（杀软扫描占住
-			// 文件）、1115 DLL 初始化失败 —— 数字码比文字好 grep。
 			failWhy = fmt.Sprintf("加载 DLL 失败（%v）", err)
 			continue
 		}
@@ -823,7 +813,6 @@ func (d *Driver) pcLocked(ep, name string, isSet bool, payload []byte) (int32, [
 	return int32(r), out
 }
 
-// Read 返回 (ret, 字符串值)。ret: 0 成功 / 2 不支持 / -1 未找到 / -2 需特殊参数
 func (d *Driver) Read(name string) (ret int, val string) {
 	return d.ReadEp(EpRender, name)
 }
@@ -842,8 +831,6 @@ func (d *Driver) ReadEp(ep, name string) (ret int, val string) {
 	return d.readEpUncached(ep, name)
 }
 
-// readConst 查 slowConst 的缓存；没有就真读一次，读成功才记。
-// 锁只护 map 本身 —— 真读走 pc 的串行化，不会并发。
 func (d *Driver) readConst(ep, name string) (int, string) {
 	key := ep + "\x00" + name
 	d.constMu.Lock()
@@ -913,7 +900,6 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 		case bool:
 			on = v
 		default:
-			// JSON 解出来是 float64；内部调用可能是 int / int32 …
 			f, err := toFloat(value)
 			if err != nil {
 				return map[string]interface{}{"ok": false, "ret": -1,
@@ -937,7 +923,7 @@ func (d *Driver) WriteEp(ep, name string, value interface{}) map[string]interfac
 		}
 		payload = le32(math.Float32bits(float32(f)))
 		target = fmt.Sprintf("%f", f)
-	default: // TInt
+	default:
 		f, err := toFloat(value)
 		if err != nil {
 			return map[string]interface{}{"ok": false, "error": fmt.Sprintf("值不合法：%v", value)}
@@ -1452,9 +1438,6 @@ func (d *Driver) Status() map[string]interface{} {
 		"test_channels": func() [][]interface{} {
 			out := make([][]interface{}, 0, len(testChannels))
 			for _, tc := range testChannels {
-				// 四个字段都给前端：第四项是测试音 wav 文件名，界面把它
-				// 挂在 chip 的 tooltip 上 —— 以后有人发现某档不响，
-				// 至少能在界面上直接看到它在找哪个文件。
 				out = append(out, []interface{}{tc[0], tc[1], tc[2], tc[3]})
 			}
 			return out
@@ -1496,7 +1479,6 @@ func (d *Driver) Meter(ep string) map[string]interface{} {
 	return map[string]interface{}{"ok": r == 0, "peak": peak, "ep": ep, "channels": mc}
 }
 
-// ---------------------------------------------------------------- 小工具
 
 func le32(u uint32) []byte {
 	return []byte{byte(u), byte(u >> 8), byte(u >> 16), byte(u >> 24)}

@@ -22,13 +22,13 @@ func TestExcludedFromScene(t *testing.T) {
 		{"DevSampleRateControl", true},
 		{"Speaker_Channel_Setting", true}, // 设备级声道拓扑，播种实读 5.1 曾把设备页切回 5.1
 		// APO 未实现家族 场景只收确认生效的）
-		{"Enable_SS_LFX", true},          // 虚拟环绕（四次 A/B 均噪声底）
-		{"SS_LB_ANGLE", true},            // SS 家族子参数随总开关一起排除
+		{"Enable_SS_LFX", true},
+		{"SS_LB_ANGLE", true},
 		{"SS_LFE_DIST", true},
-		{"Enable_DHDVS_LFX", true},       // Dolby 家族
+		{"Enable_DHDVS_LFX", true},
 		{"DHDVS_USEDH", true},
-		{"Enable_BM_GFX", true},          // 动态低音（BassManagement 零命中）
-		{"Enable_SURRSENS_LFX", true},    // 环绕增强：模块有实体但 A/B 未确认生效
+		{"Enable_BM_GFX", true},
+		{"Enable_SURRSENS_LFX", true},
 		{"Enable_VOICECLARITY_LFX", true},// 语音清晰度（双证据未实现）
 		// 升降调/人声消除是真模块（CKeyShifterLib/
 		// CVocalCancellationLib 有 vftable+构造体，K 档 GFX bit13/14），
@@ -38,16 +38,16 @@ func TestExcludedFromScene(t *testing.T) {
 		{"Enable_VOCALCANCEL_GFX", false},
 		{"VOCALCANCEL_LEVEL", false},
 		// 真实现 —— 必须留在场景
-		{"Enable_RFX_GFX", false},        // CReverbLib 真建模块
+		{"Enable_RFX_GFX", false},
 		{"RFX_ENVIRONMENT", false},
-		{"Enable_CONLAB_HPSPK_LFX", false}, // A/B 测到 19.9（噪声底两倍）
+		{"Enable_CONLAB_HPSPK_LFX", false},
 		{"CONLAB_HPSPK_MODE", false},
-		{"Enable_EQ_GFX", false},         // EQ 官方核心
-		{"Enable_MAGICVOICE", false},     // CMagicVoiceLib 真建
-		{"Enable_MICARRAY_LFX", false},   // CBeamFormingLib 真建
-		{"Enable_SMART_VOLUME_GFX", false}, // 未测过，按规矩不判死
+		{"Enable_EQ_GFX", false},
+		{"Enable_MAGICVOICE", false},
+		{"Enable_MICARRAY_LFX", false},
+		{"Enable_SMART_VOLUME_GFX", false},
 		{"Enable_SwapLfeCn_LFX", false},
-		{"VolumeScalarControl#0", true}, // 带通道后缀 —— 本次修的就是漏掉它
+		{"VolumeScalarControl#0", true},
 		{"VolumeScalarControl#1", true},
 		{"VolumeControl#3", true},
 		{"MuteControl#1", true},
@@ -70,7 +70,7 @@ func TestBuiltinMark(t *testing.T) {
 		stem       string
 		want       bool
 	}{
-		{true, "默认", true}, // 改名（原「原厂默认」）
+		{true, "默认", true},
 		{true, "游戏", false}, // 移出 builtin 名单（普通场景）
 		{true, "音乐", true},
 		{true, "电影", true},
@@ -78,8 +78,8 @@ func TestBuiltinMark(t *testing.T) {
 		{true, "UserDefineFormwork", true},
 		{true, "HiFi", true},
 		{true, "我的场景", false},   // 便携包 CPL\profile 下的用户自建
-		{true, "UserDefine2", false}, // 名字接近但不在名单
-		{false, "默认", false},  // 用户目录（AppData）里同名 → 用户优先
+		{true, "UserDefine2", false},
+		{false, "默认", false},
 		{false, "我的场景", false},
 	}
 	for _, c := range cases {

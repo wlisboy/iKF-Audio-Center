@@ -38,7 +38,6 @@ func TestWritableFromModel(t *testing.T) {
 	if rc["render"] != 65 || rc["capture"] != 15 {
 		t.Fatalf("白名单端点分布漂移: %v", rc)
 	}
-	// 关键规格抽查：kind / 值域 / 离散 / 不钳制
 	sp, ok := spec("render", "GFSControl")
 	if !ok || sp.kind != TBool {
 		t.Fatalf("GFSControl 登记漂移: %+v ok=%v", sp, ok)
@@ -103,7 +102,6 @@ func TestFactoryDefaultsFromModel(t *testing.T) {
 }
 
 func TestProfileGroupsFromModel(t *testing.T) {
-	// 关键归属抽查：音量族 / EQ 前缀键 / 合并页 / 麦克风专项
 	if g := groupOf("render", "VolumeScalarControl#0"); g != "SpeakerVolume" {
 		t.Fatalf("声道后缀剥除失效: %q", g)
 	}

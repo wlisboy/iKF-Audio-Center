@@ -163,7 +163,7 @@ impl Spectrum {
             } else if v > 255.0 {
                 v = 255.0;
             }
-            self.bins[k] = v as u8; // Go byte() 同为截断
+            self.bins[k] = v as u8;
         }
         if level > 1.0 {
             level = 1.0;
@@ -214,7 +214,7 @@ pub fn decode_block(raw: &[u8], frames: usize, ch: usize, block_align: usize, ta
         (3, 32) | (1, 32) => 4,
         (1, 16) => 2,
         (1, 24) => 3,
-        _ => 0, // 未知格式：逐帧 match 本就写静音
+        _ => 0,
     };
     if frames == 0 || block_align == 0 || ch == 0 || width == 0 {
         return vec![0.0f32; frames];
@@ -248,7 +248,7 @@ pub fn decode_block(raw: &[u8], frames: usize, ch: usize, block_align: usize, ta
                     v as f32 / 8388608.0
                 })
                 .fold(0f32, |best, v| if v.abs() > best.abs() { v } else { best }),
-            _ => 0.0, // 未知格式写静音
+            _ => 0.0,
         };
         out.push(v);
     }
@@ -288,7 +288,6 @@ mod tests {
         ok[..4].copy_from_slice(&1.0f32.to_le_bytes());
         ok[4..].copy_from_slice(&(-0.5f32).to_le_bytes());
         assert_eq!(decode_block(&ok, 1, 2, 8, 3, 32), vec![1.0]);
-        // 未知格式写静音（width=0 提前返回同形状）
         assert_eq!(decode_block(&ok, 1, 2, 8, 0xFF, 8), vec![0.0]);
     }
 }

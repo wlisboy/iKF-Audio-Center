@@ -35,7 +35,6 @@ type modelFile struct {
 	}
 	GroupAlias map[string]string `toml:"group_alias"`
 
-	// S2：出厂表 42 + 初始化设备级 1
 	Factory    []modelKV `toml:"factory"`
 	InitDevice []modelKV `toml:"init_device"`
 
@@ -59,7 +58,6 @@ type modelNames struct {
 	Oem     []string `toml:"oem"`
 }
 
-// modelW [[writable]] 的一项：ep/name/t + 可选 lo/hi/choices。
 type modelW struct {
 	Ep      string `toml:"ep"`
 	Name    string `toml:"name"`
@@ -70,7 +68,6 @@ type modelW struct {
 	Notes   string `toml:"notes"`
 }
 
-// modelKV [[factory]] / [[init_device]] 的一项。
 type modelKV struct {
 	Ep    string `toml:"ep"`
 	Name  string `toml:"name"`
@@ -177,5 +174,4 @@ func mustLoadModel() *modelFile {
 	return &m
 }
 
-// modelData 包级初始化：Go 依赖分析保证先于下面四个集合求值。
 var modelData = mustLoadModel()

@@ -169,7 +169,7 @@ func roundTrip() {
 		_, before := drv.Read(c.name)
 		res := drv.Write(c.name, c.val)
 		_, after := drv.Read(c.name)
-		drv.Write(c.name, before) // 还原
+		drv.Write(c.name, before)
 		_, restored := drv.Read(c.name)
 		fmt.Printf("  %-18s %s → 写%v  ok=%v ret=%v 读回=%q 还原=%q\n",
 			c.name, before, c.val, res["ok"], res["ret"], after, restored)
@@ -215,7 +215,6 @@ func serveHTTP(addr string) {
 func serveAddrLoopback(addr string) string {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		// 裸端口写法（如 "18500"）；裸 IP（无端口）直接报错说清写法
 		s := strings.TrimSpace(addr)
 		if net.ParseIP(s) != nil {
 			log.Fatalf("--serve 缺少端口：%q（写法如 --serve 127.0.0.1:18500）", addr)
@@ -293,7 +292,7 @@ func playOnly(path string, secs float64, loop bool) {
 	fmt.Printf("正在播放 %s（%.0f 秒%s，走默认播放设备）\n",
 		path, secs, map[bool]string{true: "，循环", false: ""}[loop])
 	time.Sleep(time.Duration(secs * float64(time.Second)))
-	procPlaySound.Call(0, 0, 0) // NULL 停止播放
+	procPlaySound.Call(0, 0, 0)
 }
 
 // loopbackFFTTest 是**设备无关**的频谱正确性自检。
@@ -335,7 +334,7 @@ func loopbackFFTTest(dump bool) {
 		name  string
 		amp   float64
 		want  int
-		tieLo int // 0 表示不检查并列区间
+		tieLo int
 		tieHi int
 	}{
 		{"满幅 0 dB", 1.0, 255, 19, 21},
@@ -402,8 +401,6 @@ func loopbackFFTTest(dump bool) {
 	}
 }
 
-// synthSpectrum 把一段 bin 中心正弦灌进环形缓冲并跑到收敛，返回 512 字节。
-// 与 Chromium 侧 probe 的信号完全一致，是两条实现可比的前提。
 func synthSpectrum(rate int, amp float64) []byte {
 	l := NewLoopback()
 	l.rate, l.running = rate, true
@@ -414,7 +411,7 @@ func synthSpectrum(rate int, amp float64) []byte {
 	for i := 0; i < lbFFTSize; i++ {
 		l.ring[i] = float32(amp * math.Sin(2*math.Pi*937.5*float64(i)/float64(rate)))
 	}
-	for i := 0; i < 40; i++ { // 让平滑收敛
+	for i := 0; i < 40; i++ {
 		l.computeSpectrum()
 	}
 	out := make([]byte, len(l.bins))
@@ -514,14 +511,14 @@ func resolveLoopbackDevice(arg string) (string, string, error) {
 	if arg == "" {
 		return "", nameOf(defID), nil
 	}
-	for _, d := range list { // 先当完整 ID
+	for _, d := range list {
 		if v, _ := d["id"].(string); v == arg {
 			n, _ := d["name"].(string)
 			return arg, n, nil
 		}
 	}
 	low := strings.ToLower(arg)
-	for _, d := range list { // 再当名字子串
+	for _, d := range list {
 		n, _ := d["name"].(string)
 		if strings.Contains(strings.ToLower(n), low) {
 			id, _ := d["id"].(string)
@@ -642,8 +639,6 @@ func loopbackTest(secs float64, tone bool, wav string, devArg string) {
 	bandSum := make([]float64, len(lbBands))
 	bandMax := make([]int, len(lbBands))
 	globalMax := 0
-	// 峰值 bin 取「最响的那一帧」而不是最后一帧 —— 声音往往在采集窗口
-	// 中途就停了，最后一帧是静音，打出来永远是 #0 ≈ 0 Hz，白搭。
 	var best []byte
 	bestTop := -1
 	samples := 0
@@ -747,7 +742,6 @@ func loopbackTest(secs float64, tone bool, wav string, devArg string) {
 	lb.Stop()
 }
 
-// bar 把 0..255 画成 24 格条，纯文本环境下也能一眼看出形状。
 func bar(v float64) string {
 	n := int(v / 255 * 24)
 	if n < 0 {
@@ -771,7 +765,6 @@ func str(v interface{}) string {
 	return s
 }
 
-// ---------------------------------------------------------------- 小工具
 
 func f64(v interface{}) float64 {
 	switch t := v.(type) {
@@ -785,9 +778,6 @@ func f64(v interface{}) float64 {
 		return float64(t)
 	case int64:
 		return float64(t)
-	// 下面这几个是 Status/Start 里以窄整型放进去的
-	// （bits/tag/sub/mask 等）。漏掉会静默返回 0，
-	// 表现是「字段明明有值，自检打出来是 0」。
 	case uint16:
 		return float64(t)
 	case uint32:

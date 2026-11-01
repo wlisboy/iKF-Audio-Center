@@ -21,7 +21,6 @@ func TestListenStartOnSTAThread(t *testing.T) {
 	if !audioProbe() {
 		t.Skip("ikf_audio.dll 不可用")
 	}
-	// 模拟面板主线程：锁定 OS 线程并初始化为 STA（webview2 的真实状态）
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	if hr := windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED); hr != nil {

@@ -32,12 +32,9 @@ ROOT = os.path.dirname(HERE)
 SRC = os.path.join(ROOT, "tools", "原版面板控件目录.json")
 OUT = os.path.join(ROOT, "tools", "official_catalog.json")
 
-# 有交互意义的控件类型
 KEEP = {"Slider", "RadioButton", "CheckBox", "ComboBox", "ComboBoxItem",
         "Button", "TextBox", "RepeatButton", "ToggleButton", "SkinMenuItem"}
 
-# 页面分类。外壳类也**照收不误** —— 目标是「官方有什么就列什么」，
-# 由使用者在页面上自己判断哪些是功能、哪些是壳子，工具不替他筛掉。
 SHELL_PAGES = {
     "DialogMessageBox.cml", "DialogInfo.cml", "DialogInfo_DetailWindow.cml",
     "DialogInfo_Legal.cml", "Dialog_WelcomeMsg.cml", "SystemTrayLClick.cml",
@@ -60,7 +57,6 @@ def page_kind(pn):
     return "功能页"
 
 
-# 页面标题：优先用页面里第一个带文字标题控件
 TITLE_HINTS = (
     "ml_SpeakerEQ_Title", "ml_MicInVol_Title", "ml_Title",
 )
@@ -82,8 +78,6 @@ def main():
             ty = c.get("type", "")
             tx = (c.get("text") or "").strip()
             tk = (c.get("text_key") or "").strip().lower()
-            # 页面标题：优先取 text_key 以 _title 结尾的文本块（官方命名约定），
-            # 否则退回第一个有文字的文本块，最后才用文件名。
             if ty == "TextBlock" and tx and tx != "NULL":
                 if not title and tk.endswith("_title"):
                     title = tx
@@ -92,7 +86,6 @@ def main():
             if ty not in KEEP:
                 continue
             nm = (c.get("name") or "").strip()
-            # 没有名字也没有文字的，纯装饰
             if not nm and not tx:
                 continue
             mn = (c.get("min") or "").strip()
@@ -143,7 +136,6 @@ def inline_script():
     if not os.path.isfile(OUT):
         return ""
     txt = io.open(OUT, encoding="utf-8").read()
-    # 防止内容里出现 </ 提前闭合 script
     txt = txt.replace("</", "<\\/")
     return '<script type="application/json" id="__official">' + txt + '</script>'
 

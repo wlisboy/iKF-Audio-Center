@@ -37,7 +37,7 @@ type MicRecorder struct {
 	srcTag  string // 源编码（float32/…），诊断用
 	devName string // 实际打开的端点友好名（默认输出设备）
 
-	file    string // 最近一次（或正在进行的）WAV 全路径
+	file    string
 	seconds float64
 	size    int64
 
@@ -61,7 +61,6 @@ func (m *MicRecorder) Stop() map[string]interface{} {
 	return m.stopRust()
 }
 
-// Status 供 /api/recorder/status。
 func (m *MicRecorder) Status() map[string]interface{} {
 	return m.statusRust()
 }
@@ -192,7 +191,6 @@ func (m *MicRecorder) stopRust() map[string]interface{} {
 	m.running = false
 	m.mu.Unlock()
 	if h != 0 {
-		// close 内部 join 线程（含 finalize 补头）
 		audioDLL.NewProc("ikf_recorder_close").Call(h)
 	}
 	m.mu.Lock()
@@ -202,7 +200,6 @@ func (m *MicRecorder) stopRust() map[string]interface{} {
 		seconds = time.Since(m.startAt).Seconds()
 	}
 	m.mu.Unlock()
-	// size 以文件实况为准（DLL 侧 finalize 实算，记账可能略偏）
 	size := int64(0)
 	if f, err := os.Stat(file); err == nil {
 		size = f.Size() - 44

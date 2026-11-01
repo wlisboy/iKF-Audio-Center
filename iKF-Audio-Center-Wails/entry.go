@@ -35,11 +35,8 @@ type entryStatus = takeover.Status
 func exeFromCmd(s string) string { return takeover.ExeFromCmd(s) }
 func sameExe(a, b string) bool   { return takeover.SameExe(a, b) }
 
-// readEntryStatus 读两处入口并逐项判定。读操作不需要管理员。
 func readEntryStatus() entryStatus { return takeover.Read() }
 
-// entryFix 把两处入口改到本程序。非管理员时自动提权（弹一次 UAC）。
-// 返回 (改写项数, 错误)。与 --takeover 完全同一条路径，避免两套逻辑。
 func entryFix() (int, error) {
 	if n, err := takeover.Write(); err == nil {
 		return n, nil
@@ -50,7 +47,7 @@ func entryFix() (int, error) {
 	}
 	code, err := runElevated(self, "--takeover-admin")
 	if err != nil {
-		return 0, err // 用户点了 UAC「否」也走这里
+		return 0, err
 	}
 	if code != 0 {
 		return 0, fmt.Errorf("提权子进程退出码 %d", code)
@@ -58,8 +55,6 @@ func entryFix() (int, error) {
 	return 2, nil
 }
 
-// entryDelete 删除两处入口（托盘「删除开机入口」）。
-// 与 entryFix 对称：非管理员时自动提权。删除可逆 —— 「修复开机入口」恢复。
 func entryDelete() (int, error) {
 	if n, err := takeover.DeleteEntry(); err == nil {
 		return n, nil

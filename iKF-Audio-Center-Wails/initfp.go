@@ -66,10 +66,10 @@ type initFp struct {
 	Ver      int    `json:"ver"`
 	Endpoint string `json:"endpoint"` // GetExtraInfo（渲染端点）
 	Capture  string `json:"capture"`  // GetExtraInfo（采集端点，无麦时为空）
-	Hwid     string `json:"hwid"`     // GetDeviceID
-	Driver   string `json:"driver"`   // GetDriverVer
-	Model    string `json:"model"`    // GetDeviceFriendlyName
-	At       string `json:"at"`       // 记录时间，纯排障用
+	Hwid     string `json:"hwid"`
+	Driver   string `json:"driver"`
+	Model    string `json:"model"`
+	At       string `json:"at"`
 }
 
 // appdataStateDir 用户级状态目录（%APPDATA%\iKF Audio Center）。
@@ -98,12 +98,11 @@ func readInitFp() (initFp, bool) {
 		return initFp{}, false // 半截文件/手工改坏：当没有，重记基线
 	}
 	if fp.Ver != initFpVer {
-		return initFp{}, false // 结构升级：同样当没有，不猜旧字段
+		return initFp{}, false
 	}
 	return fp, true
 }
 
-// fpField 读一个只读查询项，读不到返回空串（重读一次抗已知抖动）。
 func fpField(d *Driver, ep, name string) string {
 	ret, v := d.ReadEp(ep, name)
 	if ret != 0 || strings.TrimSpace(v) == "" {
@@ -161,7 +160,7 @@ func initFpChanged(d *Driver) (bool, string) {
 	}
 	cur := initFpNow(d)
 	if !cur.known() {
-		return false, "" // 三个字段全读不到：判不了，宁可不动用户参数
+		return false, ""
 	}
 	old, ok := readInitFp()
 	if !ok {
@@ -239,7 +238,6 @@ func saveInitFp(d *Driver) error {
 	return os.Rename(tmp, initFpPath())
 }
 
-// initFpReport 给 --init-fp 命令用的人读报告（只读，不落盘）。
 func initFpReport(d *Driver) string {
 	var sb strings.Builder
 	sb.WriteString("安装指纹（只读，不写设备）\n")
@@ -280,7 +278,6 @@ func initFpReport(d *Driver) string {
 	return sb.String()
 }
 
-// initFpSummary 一行摘要，塞进 /api/device_info 让人能直接看到现状。
 func initFpSummary(d *Driver) map[string]interface{} {
 	cur := initFpNow(d)
 	old, ok := readInitFp()

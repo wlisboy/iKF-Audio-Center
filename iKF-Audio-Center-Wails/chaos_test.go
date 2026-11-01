@@ -58,7 +58,6 @@ func TestChaos00Baseline(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------- 01 版本串缓冲
 
 func TestChaos01VersionCaps(t *testing.T) {
 	chaosNeed(t)
@@ -68,7 +67,6 @@ func TestChaos01VersionCaps(t *testing.T) {
 	if n == 0 || n > 256 {
 		t.Fatalf("版本长度荒谬：%d", n)
 	}
-	// 满容量
 	buf := make([]byte, n+64)
 	r, _, _ := pr.Call(uintptr(unsafe.Pointer(&buf[0])), n)
 	chaosMark("version: cap=n → r=%d str=%q", r, string(buf[:n-1]))
@@ -86,7 +84,6 @@ func TestChaos01VersionCaps(t *testing.T) {
 			t.Fatalf("cap=%d 不足却写了缓冲（越界写风险）", cap)
 		}
 	}
-	// 谎报超大 cap（实际缓冲只有 n+64）
 	guard := make([]byte, n+64)
 	pr.Call(uintptr(unsafe.Pointer(&guard[0])), 0xFFFFFFFF)
 	chaosMark("version: cap 谎报 4G 未越界（实际只写 n 字节）")
@@ -156,7 +153,6 @@ func TestChaos03cCloseBadHandle(t *testing.T) {
 	chaosMark("close(bad) 返回（没崩）")
 }
 
-// ---------------------------------------------------------------- 04 释放后使用
 
 func TestChaos04StatusAfterClose(t *testing.T) {
 	chaosNeed(t)
@@ -202,7 +198,6 @@ func TestChaos06ListenAfterClose(t *testing.T) {
 	chaosMark("close 后 listen_status 返回 %d", r)
 }
 
-// ---------------------------------------------------------------- 07 设备枚举边界
 
 func TestChaos07DevicesCaps(t *testing.T) {
 	chaosNeed(t)
@@ -308,7 +303,6 @@ func TestChaos09ListenRace(t *testing.T) {
 	chaosMark("listen 并发 20s 存活")
 }
 
-// TestChaos10PureFuncs 纯函数边界：不碰设备，跑完即知。
 func TestChaos10PureFuncs(t *testing.T) {
 	vals := []interface{}{
 		nil, map[string]interface{}{"a": 1}, []interface{}{1, 2}, []byte{1},
@@ -320,7 +314,6 @@ func TestChaos10PureFuncs(t *testing.T) {
 		k := inferKind(v)
 		chaosMark("toFloat(%T)=%v,%v inferKind=%s", v, f, err, k)
 	}
-	// cstr 空缓冲 / 全非零
 	if got := cstr(nil); got != "" {
 		t.Fatalf("cstr(nil)=%q", got)
 	}

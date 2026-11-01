@@ -33,7 +33,7 @@ func ensureChannelTopology(d *Driver) (bool, string) {
 	}
 	ret, v := d.Read("Speaker_Channel_Setting")
 	if ret == 0 && v == "" {
-		ret, v = d.Read("Speaker_Channel_Setting") // 已知读抖动，重读一次
+		ret, v = d.Read("Speaker_Channel_Setting")
 	}
 	if ret == 0 && isStereo(v) {
 		return false, ""
@@ -99,7 +99,7 @@ func EnsureInitialState(d *Driver, full bool) map[string]interface{} {
 		log.Printf("[初始化] 声道拓扑：%s", msg)
 		time.Sleep(150 * time.Millisecond) // 给驱动一点时间把属性落稳
 	} else if msg != "" {
-		log.Printf("[初始化] 声道拓扑：%s", msg) // 没写成功也要留痕
+		log.Printf("[初始化] 声道拓扑：%s", msg)
 	}
 
 	/* 第三版：先问「驱动换过一茬没有」（initfp.go）。

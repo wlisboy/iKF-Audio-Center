@@ -74,8 +74,6 @@ const (
 	appName = "iKF Audio Center"
 	appVer  = "1.0.0"
 
-	// 设计稿画布固定 1280×800（16:10），HTML 内部做整体等比缩放，
-	// 所以窗口只需给一个合适的初始值；允许缩放，最小尺寸保证画布可读。
 	winW, winH       = 1280, 800
 	winMinW, winMinH = 960, 600
 )
@@ -240,7 +238,7 @@ func main() {
 	if ok := openWithRetry(); ok {
 		log.Printf("驱动已就绪：%s（%d 个设备端点）", drv.dll, drv.devCnt)
 		seedSceneDefaults() // 参数存储为空（驱动重装）→ 应用「默认」场景
-		go startParamWatch() // 外部音量/静音变化（系统音量键等）→ 通知主界面
+		go startParamWatch()
 	} else {
 		log.Printf("驱动未就绪：%s", drv.errMsg)
 	}
@@ -436,18 +434,8 @@ func main() {
 		Windows:          winOpts,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
-			// Handler 只在「内嵌资源里找不到同名文件」时被调用
-			// （GET 走 404 回落，非 GET 直接进来），所以 /api/* 天然命中这里，
-			// 而 `/` 仍由内嵌的 index.html 提供。前端与设计稿零改动。
 			Handler: &API{},
 		},
-		// 这三条日志刻意保留：出问题时（例如某些受限环境下 WebView2 的
-		// 沙箱助手进程起不来）靠它们能判断断点在哪一段 ——
-		// 窗口对象有没有建、WebView2 环境有没有建、HTML 有没有加载解析完。
-		//
-		// OnStartup 顺带起系统托盘；OnBeforeClose 把
-		//   「点 ✕」拦截成隐藏进托盘，只有托盘菜单「退出」才真退出 ——
-		//   与原面板 SystemTrayLClick/RClick 的常驻行为一致。
 		OnStartup: func(ctx context.Context) {
 			log.Println("[启动] 窗口对象已创建")
 			startTray(ctx)
@@ -457,7 +445,6 @@ func main() {
 			// 托盘菜单「修复/删除开机入口」用户主动点才提权（entry.go）。
 		},
 		OnDomReady: func(ctx context.Context) { log.Println("[启动] 界面已加载解析完成（OnDomReady）") },
-		// 返回 true = 拦截本次关闭。托盘「退出」已置 quitRequested 时放行。
 		OnBeforeClose: func(ctx context.Context) bool {
 			if quitWanted() {
 				return false
@@ -480,8 +467,6 @@ func main() {
 
 func hasArg(a string) bool { return argIndex(a) >= 0 }
 
-// knownFlags 全部已支持的命令行参数（入口族 + 诊断族 + 面板开关）。
-// 破坏性检测 P1-2：入口族分发结束后逐一比对，未识别的打回 2。
 var knownFlags = map[string]bool{
 	"--serve": true, "--self-test": true, "--selftest": true, "--roundtrip": true,
 	"--dump": true, "--play": true, "--secs": true, "--tone": true, "--wav": true,

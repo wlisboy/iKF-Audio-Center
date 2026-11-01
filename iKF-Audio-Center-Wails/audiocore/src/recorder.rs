@@ -105,7 +105,7 @@ pub fn wav_header(rate: i32, ch: i32, data_len: u32) -> [u8; 44] {
     h[8..12].copy_from_slice(b"WAVE");
     h[12..16].copy_from_slice(b"fmt ");
     h[16..20].copy_from_slice(&16u32.to_le_bytes());
-    h[20..22].copy_from_slice(&1u16.to_le_bytes()); // PCM
+    h[20..22].copy_from_slice(&1u16.to_le_bytes());
     h[22..24].copy_from_slice(&(ch as u16).to_le_bytes());
     h[24..28].copy_from_slice(&(rate as u32).to_le_bytes());
     h[28..32].copy_from_slice(&byte_rate.to_le_bytes());
@@ -138,7 +138,7 @@ pub fn downmix_to_pcm16(raw: &[u8], frames: usize, src_ch: usize, block_align: u
         (3, 32) | (1, 32) => 4,
         (1, 16) => 2,
         (1, 24) => 3,
-        _ => 0, // 未知格式：逐帧 match 本就返回 None
+        _ => 0,
     };
     if frames == 0 || block_align == 0 || width == 0 {
         return None;
@@ -173,7 +173,7 @@ pub fn downmix_to_pcm16(raw: &[u8], frames: usize, src_ch: usize, block_align: u
             _ => return None,
         };
         let v = clamp_i16((mono * 32767.0) as i32);
-        pcm.extend_from_slice(&v); // FL
+        pcm.extend_from_slice(&v);
         pcm.extend_from_slice(&v); // FR（立体声输出双写）
     }
     Some(pcm)
@@ -209,9 +209,8 @@ impl RecSession {
             if rate <= 0 || src_ch <= 0 || block_align <= 0 {
                 return Err(ERR_MIX_BAD.to_string());
             }
-            let wav_ch = 2; // 输出恒立体声
+            let wav_ch = 2;
 
-            // 建 WAV：头先占位，停止时 finalize 补写
             let mut out = std::fs::File::create(wav_path).map_err(|_| ERR_FILE.to_string())?;
             out.write_all(&wav_header(rate, wav_ch, 0)).map_err(|_| ERR_FILE.to_string())?;
             out.flush().map_err(|_| ERR_FILE.to_string())?;
@@ -270,7 +269,7 @@ impl RecSession {
     pub fn close(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(h) = self.th.take() {
-            let _ = h.join(); // 线程内 finalize
+            let _ = h.join();
         }
         self.state.running.store(false, Ordering::SeqCst);
     }
@@ -337,7 +336,7 @@ unsafe fn record_loop(
             if frames > 0 {
                 let f = frames as usize;
                 let pcm: Option<Vec<u8>> = if flags & AUDCLNT_SILENT != 0 || data.is_null() {
-                    Some(vec![0u8; f * 4]) // 静音包：2ch×2B
+                    Some(vec![0u8; f * 4])
                 } else {
                     let raw = std::slice::from_raw_parts(data, f * block_align);
                     downmix_to_pcm16(raw, f, src_ch as usize, block_align, tag, bits)
@@ -361,7 +360,6 @@ unsafe fn record_loop(
     drop(dev);
     CoTaskMemFree(Some(mix.cast()));
 
-    // finalize：按「当前偏移 − 44」实算 data 长度（不信任记账值，Go 同款）
     let data_len = out
         .seek(SeekFrom::Current(0))
         .map(|off| (off - 44) as u32)
@@ -370,7 +368,6 @@ unsafe fn record_loop(
     let _ = out.write_all(&wav_header(rate, wav_ch, data_len));
     let _ = out.flush();
     state.size.store(data_len as i64, Ordering::SeqCst);
-    // 秒数 = dataLen / (rate*ch*2)
     let secs = data_len as f64 / (rate * wav_ch * 2) as f64;
     if let Ok(mut e) = state.err.lock() {
         if broken {
@@ -439,8 +436,8 @@ mod tests {
         let amps = [1.0f32, -0.5, 0.25, 0.0];
         let mut raw = Vec::new();
         for a in &amps {
-            raw.extend_from_slice(&a.to_le_bytes()); // FL
-            raw.extend_from_slice(&a.to_le_bytes()); // FR
+            raw.extend_from_slice(&a.to_le_bytes());
+            raw.extend_from_slice(&a.to_le_bytes());
         }
         let pcm = downmix_to_pcm16(&raw, 4, 2, 8, 3, 32).expect("float32 应受支持");
         // 期望：满幅 32767（clamp 挡住 32767*1.0 截断溢出）、-16383、8191、0
@@ -468,7 +465,6 @@ mod tests {
         // frames*block_align ≤ raw.len 的旧校验会放行，逐帧读必越界。
         let raw = [0u8; 24];
         assert!(downmix_to_pcm16(&raw, 3, 8, 8, 3, 32).is_none());
-        // 未知格式保持 None
         assert!(downmix_to_pcm16(&raw, 3, 2, 8, 0xFF, 8).is_none());
     }
 

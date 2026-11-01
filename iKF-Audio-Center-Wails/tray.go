@@ -79,11 +79,10 @@ const (
 	mfSeparator    = 0x00000800
 	csHredraw      = 0x0002
 	csVredraw      = 0x0001
-	smCxSmIcon     = 49 // GetSystemMetrics：小图标宽（随 DPI）
-	smCySmIcon     = 50 // GetSystemMetrics：小图标高
+	smCxSmIcon     = 49
+	smCySmIcon     = 50
 )
 
-// 托盘菜单命令 ID
 const (
 	cmdShowHide = 1
 	cmdMute     = 2
@@ -110,9 +109,9 @@ const (
 	wmSetFont   = 0x0030
 	waInactive  = 0
 
-	tbGetPos   = 0x0400 // TBM_GETPOS  = WM_USER+0
-	tbSetPos   = 0x0405 // TBM_SETPOS  = WM_USER+5
-	tbSetRange = 0x0406 // TBM_SETRANGE = WM_USER+6
+	tbGetPos   = 0x0400
+	tbSetPos   = 0x0405
+	tbSetRange = 0x0406
 	swHide     = 0
 	swShow     = 5
 	iccBars    = 0x00000004
@@ -177,9 +176,9 @@ type notifyIconDataW struct {
 // ---- 包级状态 ----
 
 var (
-	appCtx        context.Context // OnStartup 注入的 Wails 上下文
-	quitRequested bool            // 「退出」菜单置位后 OnBeforeClose 才放行关窗
-	winShown      = true          // 主窗口当前可见性（托盘左键切换用）
+	appCtx        context.Context
+	quitRequested bool
+	winShown      = true
 	trayHWnd      uintptr         // 托盘消息窗口句柄
 )
 
@@ -191,10 +190,8 @@ func startTray(ctx context.Context) {
 	go trayLoop()
 }
 
-// quitWanted 由 main.go 的 OnBeforeClose 查询：true = 托盘点了退出，放行关窗。
 func quitWanted() bool { return quitRequested }
 
-// ---- 图标：把内嵌 .ico 落临时文件再用 LoadImage 读（自包含，无文件依赖）----
 
 func loadTrayIcon() uintptr {
 	user32 := syscall.NewLazyDLL("user32.dll")
@@ -212,7 +209,6 @@ func loadTrayIcon() uintptr {
 		return 0
 	}
 	tmp.Close()
-	// LoadImage 已把位图读进内存，临时文件立即可删
 	defer os.Remove(path)
 	pathPtr, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
@@ -252,7 +248,7 @@ func trayBalloon(title, text string) {
 		HWnd:        trayHWnd,
 		UID:         1,
 		UFlags:      nifInfo,
-		DwInfoFlags: 0, // NIIF_NONE
+		DwInfoFlags: 0,
 	}
 	copy(nid.SzInfo[:], utf16Of(text))
 	copy(nid.SzInfoTitle[:], utf16Of(title))
@@ -327,7 +323,6 @@ func notifyFrontend() {
 	wruntime.EventsEmit(appCtx, "tray:sync")
 }
 
-// toggleMute 静音切换：读当前值 → 写反值 → 气泡回执。
 func toggleMute() {
 	ret, val := drv.ReadEp(EpRender, "MuteControl")
 	if ret != 0 {
@@ -348,7 +343,6 @@ func toggleMute() {
 	}
 }
 
-// quitApp 真退出：置位 → 注销托盘图标 → Quit（OnBeforeClose 会放行）。
 func quitApp() {
 	quitRequested = true
 	if trayHWnd != 0 {
@@ -396,10 +390,10 @@ func showTrayMenu() {
 
 	var pt point
 	getCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
-	setForeground.Call(trayHWnd) // 前台化：点菜单外才会自动收起
+	setForeground.Call(trayHWnd)
 	cmd, _, _ := trackPopup.Call(hMenu, tpmRightButton|tpmReturnCMD,
 		uintptr(pt.X), uintptr(pt.Y), 0, trayHWnd, 0)
-	postMsg.Call(trayHWnd, wmNull, 0, 0) // 让菜单销毁（SDK 文档要求）
+	postMsg.Call(trayHWnd, wmNull, 0, 0)
 
 	switch cmd {
 	case cmdShowHide:
@@ -438,10 +432,9 @@ func showTrayMenu() {
 func trayWndProc(hWnd, msgID, wParam, lParam uintptr) uintptr {
 	switch msgID {
 	case wmTrayCallback:
-		// 旧版 NOTIFYICON 行为：wParam=图标 ID，lParam=鼠标事件
 		switch lParam & 0xFFFF {
 		case wmLButtonUp:
-			toggleWindow() // 音量弹窗已移除，左键 = 显示/隐藏主窗
+			toggleWindow()
 		case wmRButtonUp:
 			showTrayMenu()
 		}
@@ -453,8 +446,6 @@ func trayWndProc(hWnd, msgID, wParam, lParam uintptr) uintptr {
 	return defWindowProc(hWnd, msgID, wParam, lParam)
 }
 
-// defWindowProc 单独包一层：syscall.NewCallback 只允许有限的回调槽位，
-// DefWindowProcW 不需要回调，直接拿过程地址调用。
 func defWindowProc(hWnd, msgID, wParam, lParam uintptr) uintptr {
 	p := syscall.NewLazyDLL("user32.dll").NewProc("DefWindowProcW")
 	r, _, _ := p.Call(hWnd, msgID, wParam, lParam)
@@ -490,8 +481,6 @@ func trayLoop() {
 		return
 	}
 
-	// CreateWindowExW 全部 12 参：exStyle, 类名, 窗口名, style,
-	// X/Y/W/H, 父窗口, 菜单, 实例, 附加参 —— style=0 即隐藏窗口。
 	hWnd, _, _ := createWnd.Call(
 		0, uintptr(unsafe.Pointer(clsName)),
 		uintptr(unsafe.Pointer(winTitle)),
@@ -521,7 +510,7 @@ func trayLoop() {
 	var m msg
 	for {
 		r, _, _ := getMessage.Call(uintptr(unsafe.Pointer(&m)), 0, 0)
-		if r == 0 { // WM_QUIT
+		if r == 0 {
 			break
 		}
 		translate.Call(uintptr(unsafe.Pointer(&m)))

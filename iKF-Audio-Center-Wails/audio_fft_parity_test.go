@@ -41,7 +41,6 @@ func TestRustFFTParity(t *testing.T) {
 		want := synthSpectrum(48000, c.amp)
 		got := rustFFTBins(t, 48000, c.amp)
 		if !bytes.Equal(want, got) {
-			// 找出差异点给可读诊断
 			diff := 0
 			for i := range want {
 				if want[i] != got[i] {

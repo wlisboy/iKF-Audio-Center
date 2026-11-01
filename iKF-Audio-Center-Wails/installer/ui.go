@@ -59,7 +59,7 @@ var (
 	pFillRect              = user32.NewProc("FillRect")
 	pFrameRect             = user32.NewProc("FrameRect")
 	pDrawTextW             = user32.NewProc("DrawTextW")
-	pGetModuleHandleW      = kernel32.NewProc("GetModuleHandleW") // 在 kernel32，不是 user32
+	pGetModuleHandleW      = kernel32.NewProc("GetModuleHandleW")
 	pCreateSolidBrush      = gdi32.NewProc("CreateSolidBrush")
 	pCreatePen             = gdi32.NewProc("CreatePen")
 	pMoveToEx              = gdi32.NewProc("MoveToEx")
@@ -79,10 +79,9 @@ const (
 	wsCaption    = 0x00C00000
 	wsSysmenu    = 0x00080000
 	wsVisible    = 0x10000000
-	wsExDlgFrame = 0x00000001 // WS_EX_DLGMODALFRAME：细边框、无最大化
-	csVRedraw    = 0x0001     // ★类级重画标记：尺寸一变就整体失效客户区。
-	csHRedraw    = 0x0002     //   不加的话缩小窗口时系统 blit 保留旧位图，
-	//   切进度态后残留选择态画面 用户截图实锤）。
+	wsExDlgFrame = 0x00000001
+	csVRedraw    = 0x0001
+	csHRedraw    = 0x0002
 	swShow   = 5
 	pmRemove = 1
 
@@ -115,24 +114,22 @@ const (
 	psSolid        = 0
 	antialiasedQ   = 4
 	defaultCharset = 1
-	dwmDarkMode    = 20 // DWMWA_USE_IMMERSIVE_DARK_MODE（1903+ 之前是 19，两个都试）
+	dwmDarkMode    = 20
 )
 
-// 配色取自设计稿：--bg / --card / --accent / 前景灰阶
 const (
-	colBg     = 0x000D0B0B // #0B0B0D
-	colCard   = 0x001A1616 // #16161A 悬停底 / 次级按钮底
-	colTrack  = 0x00231E1E // #1E1E23 分隔线 / 进度槽
-	colBorder = 0x00312A2A // #2A2A31 描边
-	colBrand  = 0x001200E6 // #E60012
-	colTitle  = 0x00F4F2F2 // #F2F2F4
-	colBody   = 0x00A29A9A // #9A9AA2
-	colHint   = 0x00736B6B // #6B6B73
-	colDim    = 0x00453F3F // #3F3F45 不可用行
+	colBg     = 0x000D0B0B
+	colCard   = 0x001A1616
+	colTrack  = 0x00231E1E
+	colBorder = 0x00312A2A
+	colBrand  = 0x001200E6
+	colTitle  = 0x00F4F2F2
+	colBody   = 0x00A29A9A
+	colHint   = 0x00736B6B
+	colDim    = 0x00453F3F
 	colWhite  = 0x00FFFFFF
 )
 
-// 画笔/画刷下标
 const (
 	brBg = iota
 	brCard
@@ -143,12 +140,11 @@ const (
 	brCount
 )
 
-// 字体下标
 const (
-	fBig   = iota // 16/600 进度大标题
-	fTitle        // 15/600 选择态标题
+	fBig   = iota
+	fTitle
 	fBody         // 13/400 行标题 / 按钮
-	fHint         // 11/400 提示 / 状态 / 脚注
+	fHint
 	fCount
 )
 
@@ -156,10 +152,10 @@ const (
 // 精简：抛弃官方兼容思路，清单 5 行 → 4 行（去掉「撤销接管」，
 // 接管语义简化为「开机自启」一行），窗口 288 → 252。
 const (
-	lgW   = 360.0 // 320 → 360，行距与状态区一起放大
+	lgW   = 360.0
 	lgPad = 16.0
 
-	rowTop = 54.0 // 第一行清单的顶边
+	rowTop = 54.0
 	rowH   = 40.0 // 每行高（标题 + 提示两行）
 
 	// 进度态高度固定（paintProgress 的版面按这个高度排）。
@@ -185,19 +181,14 @@ func visibleRows(uninst bool) []int {
 	return []int{0, 1, 2, 3}
 }
 
-// statusY 状态区顶边（分隔线下）。
 func statusY(uninst bool) float64 {
 	return rowTop + float64(len(visibleRows(uninst)))*rowH + 14
 }
 
-// btnYOf 按钮区顶边。
 func btnYOf(uninst bool) float64 { return statusY(uninst) + 52 }
 
-// choiceH 选择态窗口逻辑高度。
 func choiceH(uninst bool) float64 { return btnYOf(uninst) + btnH + 14 }
 
-// uiResizeTo 按新的逻辑高度缩放窗口，保持**垂直中心**与水平位置。
-// 切模式/切相位时调用 —— 高度变化时窗口绕中心缩放，不会视觉上向上跳。
 func uiResizeTo(h float64) {
 	if uiHwnd == 0 {
 		return
@@ -210,9 +201,7 @@ func uiResizeTo(h float64) {
 	cw, ch := rc.right-rc.left, rc.bottom-rc.top
 	cy := (int(old.top) + int(old.bottom)) / 2
 	pSetWindowPos.Call(uintptr(uiHwnd), 0,
-		uintptr(int(old.left)), uintptr(cy-int(ch)/2), uintptr(cw), uintptr(ch), 0x4) // SWP_NOZORDER
-	// 缩小不触发整体失效（类标记之外的双保险）：切相态立刻全量重画一帧，
-	// 不留任何选择态残留位图。
+		uintptr(int(old.left)), uintptr(cy-int(ch)/2), uintptr(cw), uintptr(ch), 0x4)
 	pInvalidateRect.Call(uintptr(uiHwnd), 0, 0)
 }
 
@@ -237,23 +226,22 @@ type optRow struct {
 	req   bool
 }
 
-// optSel 是这次要对系统做的事。
 type optSel struct {
 	install    bool
 	restart    bool
 	uninstall  bool
 	takeover   bool // P5-3：装完把 Run\Cm108BSound + CLSID {125C480D} 指向主程序
-	untakeover bool // P5-3：反向操作，入口还原旧面板（与 takeover 互斥）
+	untakeover bool
 }
 
 type uiRunCfg struct {
-	state       *drvState                              // 选择态显示现状用（可空：开窗后由 probe 异步填充）
-	needChoice  bool                                   // false = 跳过选择态，直接进进度
-	presel      optSel                                 // 选择态初值 / 跳过选择态时的固定选择
-	labels      func(optSel) (title, sub, foot string) // 进度态文案随选择变
+	state       *drvState
+	needChoice  bool
+	presel      optSel
+	labels      func(optSel) (title, sub, foot string)
 	work        func(optSel) (string, bool)
-	probe       func() *drvState // 开窗后异步探测（state 为 nil 时启用）
-	autoConfirm time.Duration    // >0 时选择态停这么久后自动确认（--demo 用）
+	probe       func() *drvState
+	autoConfirm time.Duration
 }
 
 type uiOut struct {
@@ -305,8 +293,8 @@ var (
 
 	uiMu                   sync.Mutex
 	uiHwnd                 syscall.Handle
-	uiPhase                int32 // phaseChoice / phaseProgress
-	uiUninst               bool  // 卸载模式（清单互斥状态）
+	uiPhase                int32
+	uiUninst               bool
 	uiRestart              = true
 	uiTakeover             bool // 接管（仅安装模式可点，与撤销互斥）
 	uiUntake               bool // 撤销接管
@@ -320,7 +308,7 @@ var (
 	uiMouseX int32
 	uiMouseY int32
 
-	uiConfirmed bool // 用户点了主按钮（只在选择态有效）
+	uiConfirmed bool
 	uiCancelled bool
 
 	uiBrushes  [brCount]syscall.Handle
@@ -345,7 +333,7 @@ func initDPI() {
 	pSetProcessDPIAware.Call()
 	hdc, _, _ := pGetDC.Call(0)
 	if hdc != 0 {
-		if v, _, _ := pGetDeviceCaps.Call(hdc, 88 /*LOGPIXELSY*/); v > 0 {
+		if v, _, _ := pGetDeviceCaps.Call(hdc, 88 ); v > 0 {
 			dpiScale = float64(v) / 96.0
 		}
 		pReleaseDC.Call(0, hdc)
@@ -377,7 +365,6 @@ func rowAt(x, y int32, uninst bool) int {
 	return -1
 }
 
-// btnAt 返回鼠标下的按钮：0 无 / 1 次按钮（取消） / 2 主按钮（安装·卸载）。
 func btnAt(x, y int32, uninst bool) int {
 	bY := btnYOf(uninst)
 	if y < px(bY) || y > px(bY+btnH) {
@@ -407,11 +394,11 @@ func toggleRow(i int) {
 		if uiUninst {
 			uiUninst, uiRestart = false, true
 		}
-	case 1: // 重启设备
+	case 1:
 		if !uiUninst {
 			uiRestart = !uiRestart
 		}
-	case 2: // 卸载：与上面各行互斥
+	case 2:
 		if uiUninst {
 			uiUninst, uiRestart = false, true
 		} else {
@@ -427,13 +414,11 @@ func toggleRow(i int) {
 func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 	switch msg {
 	case wmEraseBkgnd:
-		return 1 // 全在 WM_PAINT 里画，不要系统先刷一遍白底
+		return 1
 	case wmPaint:
 		paint(hwnd)
 		return 0
 	case wmPrintClient:
-		// DWM / PrintWindow 索要整幅内容时不画就会把残留位图交出去
-		//（用户截图里那种「选择态清单叠着进度文字」由此而来）。
 		hdc, _, _ := pGetDC.Call(hwnd)
 		if hdc != 0 {
 			paintInto(hwnd, hdc)
@@ -441,11 +426,6 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		}
 		return 0
 	case wmTimer:
-		// ★ 界面闪烁修复 ：
-		//   1. 选择态是**完全静态**的 —— 不失效任何区域，一颗像素都不重画
-		//      （原实现选择态也 40 次/秒整窗重画，这就是闪烁）。
-		//   2. 进度态只失效进度条那一小条：marquee 亮条在这里滚，其余文字
-		//      与清单不动。BeginPaint 会把绘制裁剪到失效区，整窗重画消失。
 		uiMu.Lock()
 		if uiPhase != phaseProgress {
 			uiMu.Unlock()
@@ -504,7 +484,7 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		default:
 			if r := rowAt(x, y, uiUninst); r >= 0 && rowLive(r) {
 				toggleRow(r)
-				uiResizeTo(choiceH(uiUninst)) // 卸载/安装切换 → 行数变化 → 窗口高度跟随
+				uiResizeTo(choiceH(uiUninst))
 				pInvalidateRect.Call(hwnd, 0, 0)
 			}
 		}
@@ -545,7 +525,6 @@ func paint(hwnd uintptr) {
 	paintInto(hwnd, hdc)
 }
 
-// paintInto 画完整一帧客户区（含底色），WM_PAINT 与 WM_PRINTCLIENT 共用。
 func paintInto(hwnd, hdc uintptr) {
 	var rc rectT
 	pGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
@@ -582,7 +561,7 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 		var on, off, lock bool
 		switch i {
 		case 0:
-			on, lock = true, true // 必需：永远勾着，点不动
+			on, lock = true, true
 		case 1:
 			on, off = !uninst && restart, uninst
 		case 2:
@@ -593,7 +572,6 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 		if hotRow == int32(i) {
 			fill(hdc, px(lgPad-6), px(y-6), px(lgW-lgPad+6), px(y+rowH-8), uiBrushes[brCard])
 		}
-		// 复选方框。锁定态灰底暗勾（一眼是「固定的」）；普通勾选品牌红。
 		cbX, cbY := px(lgPad), px(y+4)
 		cbR, cbB := px(lgPad+13), px(y+17)
 		if on {
@@ -621,7 +599,6 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 		put(hdc, r.hint, lgPad+24, y+18, 240, 16, 11, 400, hc, uiFonts[fHint],
 			dtLeft|dtVCenter|dtSingleLine)
 		if r.req {
-			// 「必需」徽标：底色块 + 居中文字，比裸灰字更像状态标签
 			bx, by := px(lgW-lgPad-46), px(y)
 			fill(hdc, bx, by, px(lgW-lgPad), px(y+18), uiBrushes[brTrack])
 			put(hdc, "必需", float64(bx)/dpiScale, float64(by)/dpiScale, 46, 18, 10, 400,
@@ -629,7 +606,6 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 		}
 	}
 
-	// 状态区：两行 label:value 从单行长句拆开，不再挤一行）
 	stY := statusY(uninst)
 	hr(hdc, stY-10, colTrack)
 	lib, dev := "检测中…", "检测中…"
@@ -651,7 +627,6 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 	put(hdc, dev, lgPad+70, stY+19, lgW-lgPad*2-70, 18, 11, 400, colBody, uiFonts[fHint],
 		dtLeft|dtVCenter|dtSingleLine)
 
-	// 按钮：右下角，取消在前、主按钮在后
 	bY := btnYOf(uninst)
 	cx, cy := px(lgW-lgPad-2*btnW-8), px(bY)
 	cw, chh := px(btnW), px(btnH)
@@ -675,8 +650,6 @@ func paintChoice(hdc uintptr, uninst, restart, takeover bool, hotRow, hotBtn int
 }
 
 func paintProgress(hdc uintptr, title, sub, foot string, pos, trackW float64) {
-	// 纵向版面（与 lgBarY 同批调过，上下留白 ~52/58 基本对称）：
-	// title 52..76 · sub 82..126 · bar 138..142 · foot 156..200
 	put(hdc, title, 24, 52, lgW-48, 24, 16, 600, colTitle, uiFonts[fBig],
 		dtLeft|dtVCenter|dtSingleLine)
 	put(hdc, sub, 24, 82, lgW-48, 44, 13, 400, colBody, uiFonts[fBody], dtLeft|dtWordBreak)
@@ -703,8 +676,6 @@ func paintProgress(hdc uintptr, title, sub, foot string, pos, trackW float64) {
 	put(hdc, foot, 24, 156, lgW-48, 44, 11, 400, colHint, uiFonts[fHint], dtLeft|dtWordBreak)
 }
 
-// statusLine 是选择态底部那行现状。风格：极简 + 官方语气，
-// 不显示发布名（oemNN.inf），连接状态统一「耳机已连接 / 耳机未连接」句式。
 func statusLine(s *drvState) string {
 	if s == nil {
 		return "正在检测…"
@@ -904,7 +875,7 @@ func uiRun(cfg uiRunCfg) uiOut {
 				uiPhase = phaseProgress
 				uiHotRow, uiHotBtn = -1, 0
 				uiMu.Unlock()
-				uiResizeTo(lgProgressH) // 进度态版面按 258 高排，切回去
+				uiResizeTo(lgProgressH)
 				workStart = time.Now()
 				go func() {
 					// 闪退不留痕的修复：work 里的任何 panic 不再让窗口无声
@@ -1011,14 +982,12 @@ func attachConsole() {
 	if fi, err := os.Stdout.Stat(); err == nil && fi.Mode()&os.ModeCharDevice == 0 {
 		return
 	}
-	kernel32.NewProc("AttachConsole").Call(^uintptr(0)) // (DWORD)-1
+	kernel32.NewProc("AttachConsole").Call(^uintptr(0))
 	if f, err := os.OpenFile("CONOUT$", os.O_WRONLY, 0); err == nil {
 		os.Stdout = f
 	}
 }
 
-// darkenTitleBar 把标题栏也刷成深色，跟客户区接得上。
-// 只在 Win10 1903+ 有效，失败无所谓（就是根浅色标题栏）。
 func darkenTitleBar(hwnd uintptr) {
 	var on int32 = 1
 	if r, _, _ := pDwmSetWindowAttribute.Call(hwnd, dwmDarkMode,

@@ -64,14 +64,14 @@ func acquireSingleInstance() bool {
 	h, _, err := kernel32.NewProc("CreateMutexW").Call(
 		0, 0, uintptr(unsafe.Pointer(&name[0])))
 	if h == 0 {
-		return true // 拿不到互斥体就别拦用户 —— 宁可冒险也不假死
+		return true
 	}
 	return err != syscall.ERROR_ALREADY_EXISTS
 }
 
 func main() {
 	if len(os.Args) > 1 {
-		attachConsole() // 从终端跑诊断时能看见输出；双击（无参数）不接
+		attachConsole()
 	}
 
 	if hasOpt("--demo") {
@@ -81,7 +81,6 @@ func main() {
 		return
 	}
 
-	// --status 只读，任何时候都不提权 —— 主程序与脚本靠它判断现状
 	if has("--status") {
 		s := probe()
 		printStatus(s)
@@ -93,14 +92,9 @@ func main() {
 
 	dry := has("--dry-run")
 
-	// 提权排在最前，早于任何系统查询与界面动作：双击之后应当立刻看到 UAC，
-	// 而不是对着一个「没反应」的图标等一秒多才开始问权限。
 	if !dry && !windows.GetCurrentProcessToken().IsElevated() {
 		code := elevate()
-		// 稳定性修复：UAC 点「否」原来是无声退出（退出码 1223），
-		// 看起来就是「双击没反应」。给一句明确的回执。
 		if code == 1223 {
-			// 短句 + 官方语气，去掉括号里的长解释
 			msgBox("操作已取消，未做任何改动\n\n"+
 				"如需继续，请重新运行本程序", "iKF-驱动管理", mbOK|mbIconInfo)
 		}
@@ -137,7 +131,6 @@ func main() {
 			s.infPath, s.hwid, s.published, s.deviceID)
 	}
 
-	// 带参数 = 静默：不问、不建窗，直接把活干完，靠退出码说话
 	if action != "" {
 		sel := optSel{install: true, restart: true}
 		if action == "uninstall" {
@@ -152,8 +145,6 @@ func main() {
 			sel.takeover, sel.untakeover = false, true
 		}
 		detail, ok := runAction(s, dry, sel)
-		// 提权后的子进程往往没有可用的 stdout，Println 会静默失败 ——
-		// 那正是最需要看到原因的时候。写不出去就退回界面提示，别把原因吞了。
 		if _, err := fmt.Println(detail); err != nil {
 			fl := uint32(mbOK | mbIconInfo)
 			if !ok {
@@ -183,8 +174,6 @@ func main() {
 		return
 	}
 
-	// 完成弹窗按固定四行/单行版式，尾部无句号。
-	// 卸载成功不再追加「现在可以打开…」——卸载语境里这句没有意义。
 	done := ""
 	if !out.sel.uninstall {
 		done = "\n\n现在可以打开 iKF Audio Center"
@@ -199,16 +188,11 @@ func main() {
 	msgBox(out.detail+done, "iKF 驱动管理", mbOK|mbIconInfo)
 }
 
-// progressLabels 是进度态的文案，随选择变 —— 装和卸是两套说法。
-// 文案精简、官方语气 —— 一句说清正在做什么，
-// 一句说清要等多久；不再出现「发布项」「绑定到耳机上」这类内部措辞。
 func progressLabels(sel optSel) (string, string, string) {
 	if sel.uninstall {
 		return "正在卸载驱动组件", "正在移除中…",
 			"此过程通常需要几秒，请勿关闭窗口。"
 	}
-	// 副标只说「正在做什么」，不展开细节；安装全程
-	// 不提「开机自启」——要不要自启由清单勾选决定（失败只落日志）。
 	sub := "正在写入中…"
 	return "正在安装驱动组件", sub,
 		"此过程约需 10–30 秒，请勿关闭窗口。"
@@ -264,9 +248,6 @@ func runAction(s *drvState, dry bool, sel optSel) (string, bool) {
 	return detail, ok
 }
 
-// demoRun 只跑界面，自己动手前先看看长什么样。不发一个改动系统的调用 ——
-// probe 是纯读（enum-drivers / enum-devices），只为把底部那行现状填出来。
-// --demo=<秒> 可以改选择态的停留时长（截图对时用）。
 func demoRun() {
 	hold := 3 * time.Second
 	for _, a := range os.Args[1:] {
@@ -280,7 +261,7 @@ func demoRun() {
 		needChoice:  true,
 		presel:      optSel{install: true, restart: true, takeover: true},
 		labels:      progressLabels,
-		probe:       probe, // 与真实界面同款：开窗后异步探测
+		probe:       probe,
 		autoConfirm: hold,
 		work: func(optSel) (string, bool) {
 			time.Sleep(2500 * time.Millisecond)
@@ -369,7 +350,7 @@ func elevate() int {
 
 	var sei shellExecInfoW
 	sei.cbSize = uint32(unsafe.Sizeof(sei))
-	sei.fMask = 0x00000040 // SEE_MASK_NOCLOSEPROCESS
+	sei.fMask = 0x00000040
 	sei.lpVerb = windows.StringToUTF16Ptr("runas")
 	sei.lpFile = windows.StringToUTF16Ptr(exe)
 	sei.lpDirectory = windows.StringToUTF16Ptr(filepath.Dir(exe))
@@ -379,7 +360,7 @@ func elevate() int {
 	}
 
 	if r, _, _ := pShellExecuteExW.Call(uintptr(unsafe.Pointer(&sei))); r == 0 {
-		return 1223 // 用户在 UAC 上点了「否」，静默退出
+		return 1223
 	}
 	if sei.hProcess == 0 {
 		return 0
@@ -422,7 +403,6 @@ func has(a string) bool {
 	return false
 }
 
-// hasOpt 判定开关：既认裸开关（--demo），也认带值形式（--demo=90）。
 func hasOpt(name string) bool {
 	for _, v := range os.Args[1:] {
 		if v == name || strings.HasPrefix(v, name+"=") {

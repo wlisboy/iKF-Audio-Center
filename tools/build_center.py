@@ -25,7 +25,6 @@ DESIGN = os.path.join(ROOT, "design", "audio-center.html")
 # propnames.json 退役 —— 构建不再注入 __GENERIC__/__OEM__。
 OUT = os.path.join(ROOT, "iKF-Audio-Center.py")
 
-# 内联 favicon：避免浏览器自动请求 /favicon.ico 产生 404
 FAVICON = (
     '<link rel="icon" href="data:image/svg+xml,'
     "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"

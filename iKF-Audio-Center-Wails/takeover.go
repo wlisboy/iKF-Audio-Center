@@ -22,8 +22,6 @@ import (
 	"ikfaudiocenter/internal/takeover"
 )
 
-// runTakeover 是 `--takeover` 的落点（非管理员态）：先试直写，失败则
-// 提权重跑自己。返回进程退出码。
 func runTakeover() int {
 	fmt.Println("入口接管：Run\\Cm108BSound + CLSID {125C480D} → 本程序")
 	if _, err := takeover.Write(); err == nil {
@@ -38,7 +36,6 @@ func runTakeover() int {
 	fmt.Println("需要管理员权限，弹出 UAC……（取消则不做任何改动）")
 	code, err := runElevated(self, "--takeover-admin")
 	if err != nil {
-		// 用户点了 UAC「否」也走这里（拒绝不是错误，如实退出即可）
 		fmt.Println("未提权，接管未执行：", err)
 		return 1
 	}
@@ -59,7 +56,6 @@ func runTakeoverAdmin() int {
 	return 0
 }
 
-// runTakeoverUndo 是 `--takeover-undo` 的落点：先试直写，失败提权重跑。
 func runTakeoverUndo() int {
 	fmt.Println("回滚入口：Run\\Cm108BSound + CLSID {125C480D} → 旧面板")
 	if _, err := takeover.UndoWrite(); err == nil {
@@ -85,7 +81,6 @@ func runTakeoverUndo() int {
 	return 0
 }
 
-// runTakeoverUndoAdmin 是 `--takeover-undo-admin`（提权子进程）的落点。
 func runTakeoverUndoAdmin() int {
 	if _, err := takeover.UndoWrite(); err != nil {
 		return 3
@@ -121,7 +116,6 @@ func runEntryDelete() int {
 	return 0
 }
 
-// runEntryDeleteAdmin 是 `--entry-delete-admin`（提权子进程）的落点。
 func runEntryDeleteAdmin() int {
 	if _, err := takeover.DeleteEntry(); err != nil {
 		return 3
