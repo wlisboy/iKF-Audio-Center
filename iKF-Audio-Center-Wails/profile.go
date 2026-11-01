@@ -672,6 +672,19 @@ func (d *Driver) profilePath(name string) (string, string, bool) {
 
 var reBadName = regexp.MustCompile(`[\\/:*?"<>|]`)
 
+// profileSaveConflicts 内置场景名单：与用户自建档同存会顶掉播种档
+// （EnsureSeedScenes 只补缺，同名内置档被覆盖后不会重建）。破坏性测试
+// 实测：恶意 save 一个「EQ_Slider1」就能让场景墙多出第 9 张卡。
+func profileSaveConflicts(name string) bool {
+	switch name {
+	case "EQ_Slider1", "EQ_Slider2", "EQ_Slider3", "EQ_Slider4", "EQ_Slider5",
+		"EQ_Slider6", "EQ_Slider7", "EQ_Slider8", "EQ_Slider9", "EQ_Slider10",
+		"UserDefine", "UserDefineFormwork":
+		return true
+	}
+	return false
+}
+
 // reservedSceneName 系统保留的场景名（健壮性审计 #2， ：
 // 「预设」= FactoryDefault.xml 保留字（既有口径）；「默认」= 一键还原基线，
 // 被覆盖后 EnsureSeedScenes 的幂等检查（项数够就不重建）不会自愈 ——
@@ -706,6 +719,10 @@ func (d *Driver) ProfileSave(name, desc string) map[string]interface{} {
 	if reservedSceneName(name) {
 		return map[string]interface{}{"ok": false, "ret": -1,
 			"error": fmt.Sprintf("「%s」是系统保留的场景名，不能覆盖", name)}
+	}
+	if profileSaveConflicts(name) {
+		return map[string]interface{}{"ok": false, "ret": -1,
+			"error": fmt.Sprintf("「%s」与内置场景资源同名，不能使用", name)}
 	}
 
 	var snap []snapRow
@@ -1082,6 +1099,10 @@ func (d *Driver) ProfileRename(oldName, newName string) map[string]interface{} {
 	if reservedSceneName(newName) {
 		return map[string]interface{}{"ok": false, "ret": -1,
 			"error": fmt.Sprintf("「%s」是系统保留的场景名，不能占用", newName)}
+	}
+	if profileSaveConflicts(newName) {
+		return map[string]interface{}{"ok": false, "ret": -1,
+			"error": fmt.Sprintf("「%s」与内置场景资源同名，不能使用", newName)}
 	}
 	if newName == oldName {
 		return map[string]interface{}{"ok": true, "ret": 0,
