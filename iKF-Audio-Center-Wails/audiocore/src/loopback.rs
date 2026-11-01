@@ -20,7 +20,7 @@ use windows::core::{GUID, Interface as _, PCWSTR};
 use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::Media::Audio::{
     IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+    WAVEFORMATEX, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
     DEVICE_STATE_ACTIVE, EDataFlow, ERole,
 };
 use windows::Win32::System::Com::{
@@ -36,7 +36,7 @@ pub const RING_LEN: usize = crate::spectrum::RING_LEN;
 pub const FFT_SIZE: usize = crate::spectrum::FFT_SIZE;
 pub const BINS: usize = crate::spectrum::BINS;
 
-const CLSID_MMDeviceEnumerator: GUID =
+const CLSID_MMDEVICE_ENUMERATOR: GUID =
     GUID::from_u128(0xBCDE0395_E52F_467C_8E3D_C4579291692E);
 
 // 与 Go 版错误文案逐字对齐（前端/闸直接匹配这些串）。
@@ -136,7 +136,7 @@ impl LoopbackSession {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
             let en: IMMDeviceEnumerator =
-                CoCreateInstance(&CLSID_MMDeviceEnumerator, None, CLSCTX_ALL)
+                CoCreateInstance(&CLSID_MMDEVICE_ENUMERATOR, None, CLSCTX_ALL)
                     .map_err(|_| ERR_ENUMERATOR.to_string())?;
 
             let dev: IMMDevice = match endpoint.filter(|s| !s.is_empty()) {
@@ -424,7 +424,7 @@ pub fn list_render_endpoints() -> Result<Vec<(String, String, bool)>, String> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         let en: IMMDeviceEnumerator =
-            CoCreateInstance(&CLSID_MMDeviceEnumerator, None, CLSCTX_ALL)
+            CoCreateInstance(&CLSID_MMDEVICE_ENUMERATOR, None, CLSCTX_ALL)
                 .map_err(|_| ERR_ENUMERATOR.to_string())?;
         let coll: IMMDeviceCollection = en
             .EnumAudioEndpoints(EDataFlow(E_RENDER), DEVICE_STATE_ACTIVE)

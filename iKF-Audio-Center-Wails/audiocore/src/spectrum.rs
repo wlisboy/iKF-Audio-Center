@@ -200,19 +200,6 @@ pub fn downmix(ch: usize) -> (usize, f32) {
     }
 }
 
-/// 一帧内跨声道选绝对值最大的样本（保符号）。
-#[inline]
-fn frame_max_abs<'a, I: Iterator<Item = &'a [u8]>>(samples: I) -> f32 {
-    let mut best = 0f32;
-    for b in samples {
-        let v = f32::from_le_bytes([b[0], b[1], b[2], b[3]]);
-        if v.abs() > best.abs() {
-            best = v;
-        }
-    }
-    best
-}
-
 /// 交错多声道块 → 单声道 f32 序列。四种格式 + 未知格式写静音，与 Go pushFrames 一致。
 pub fn decode_block(raw: &[u8], frames: usize, ch: usize, block_align: usize, tag: u16, bits: u16) -> Vec<f32> {
     let (take, _inv) = downmix(ch);

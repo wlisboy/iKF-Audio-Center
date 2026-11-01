@@ -8,20 +8,20 @@
 //! WAV 全路径由调用方传入 —— DLL 不碰注册表与用户目录。
 
 use std::io::{Seek, SeekFrom, Write};
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use windows::core::{GUID, Interface as _, PCWSTR};
 use windows::Win32::Media::Audio::{
     IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceEnumerator,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+    WAVEFORMATEX, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
 };
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
 
-const CLSID_MMDeviceEnumerator: GUID =
+const CLSID_MMDEVICE_ENUMERATOR: GUID =
     GUID::from_u128(0xBCDE0395_E52F_467C_8E3D_C4579291692E);
 
 // 与 Go recorder.go 错误文案逐字对齐。
@@ -185,7 +185,7 @@ impl RecSession {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
             let en: IMMDeviceEnumerator =
-                CoCreateInstance(&CLSID_MMDeviceEnumerator, None, CLSCTX_ALL)
+                CoCreateInstance(&CLSID_MMDEVICE_ENUMERATOR, None, CLSCTX_ALL)
                     .map_err(|_| ERR_ENUMERATOR.to_string())?;
             let dev: IMMDevice = en
                 .GetDefaultAudioEndpoint(windows::Win32::Media::Audio::EDataFlow(0), windows::Win32::Media::Audio::ERole(0))
@@ -285,7 +285,7 @@ impl Drop for RecSession {
 /// 采集 + 写盘主循环。结尾 finalize 补 WAV 头。
 unsafe fn record_loop(
     h: RecHandles,
-    path: String,
+    _path: String,
     rate: i32,
     wav_ch: i32,
     src_ch: i32,
@@ -391,7 +391,7 @@ fn set_err(state: &Arc<RecState>, msg: &str) {
 unsafe fn device_name(dev: &IMMDevice) -> String {
     use windows::Win32::Foundation::PROPERTYKEY;
     use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
-    use windows::Win32::System::Com::{STGM, STGM_READ};
+    use windows::Win32::System::Com::STGM_READ;
     use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
     const PKEY: PROPERTYKEY = PROPERTYKEY {
         fmtid: GUID::from_u128(0xa45c254e_df1c_4efd_8020_67d146a850e0),

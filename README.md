@@ -10,18 +10,7 @@ iKF Audio Center 是一个面向 iKF 耳机（C-Media 方案）的 Windows 桌�
 
 ## 部分页面预览
 
-<table>
-  <tr>
-    <td width="33%"><img src="design/screenshots/audio-controls.png" alt="声音设置页面" width="100%"></td>
-    <td width="33%"><img src="design/screenshots/equalizer.png" alt="均衡器页面" width="100%"></td>
-    <td width="33%"><img src="design/screenshots/microphone.png" alt="麦克风页面" width="100%"></td>
-  </tr>
-  <tr>
-    <td align="center">声音设置</td>
-    <td align="center">均衡器</td>
-    <td align="center">麦克风</td>
-  </tr>
-</table>
+界面按 [design/audio-center.html](design/audio-center.html) 设计稿实现，浏览器直接打开即可预览全部页面。
 
 ## 功能
 
@@ -47,9 +36,10 @@ iKF Audio Center 是一个面向 iKF 耳机（C-Media 方案）的 Windows 桌�
 ```bash
 git clone https://github.com/wlisboy/iKF-Audio-Center.git
 cd iKF-Audio-Center
-build.bat            # 一键：构建前端 → cargo(DLL) → go build → 便携包
-build.bat -fast      # 跳过便携包打包
+build.bat            # 一键便携包：Rust DLL 与前端并行构建 → go build → 打包
 ```
+
+Rust 工具链（cargo）缺失时自动降级为 Go 音频路径，构建不会失败。
 
 手工分步：
 

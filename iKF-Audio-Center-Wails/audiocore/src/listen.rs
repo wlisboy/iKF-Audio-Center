@@ -18,7 +18,7 @@ use std::time::Duration;
 use windows::core::{GUID, Interface as _};
 use windows::Win32::Media::Audio::{
     IAudioCaptureClient, IAudioClient, IAudioRenderClient, IMMDevice, IMMDeviceEnumerator,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, AUDCLNT_SHAREMODE_SHARED, DEVICE_STATE_ACTIVE,
+    WAVEFORMATEX, AUDCLNT_SHAREMODE_SHARED,
 };
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED,
@@ -26,7 +26,7 @@ use windows::Win32::System::Com::{
 
 use windows::Win32::Foundation::WAIT_OBJECT_0;
 
-const CLSID_MMDeviceEnumerator: GUID =
+const CLSID_MMDEVICE_ENUMERATOR: GUID =
     GUID::from_u128(0xBCDE0395_E52F_467C_8E3D_C4579291692E);
 
 // 与 Go listen.go 错误文案逐字对齐。
@@ -117,7 +117,7 @@ impl ListenSession {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 eprintln!("[ls] 1 cocreate");
             let en: IMMDeviceEnumerator =
-                CoCreateInstance(&CLSID_MMDeviceEnumerator, None, CLSCTX_ALL)
+                CoCreateInstance(&CLSID_MMDEVICE_ENUMERATOR, None, CLSCTX_ALL)
                     .map_err(|_| ERR_ENUMERATOR.to_string())?;
 
 eprintln!("[ls] 2 enum ok");
@@ -248,7 +248,7 @@ unsafe fn parse_tag(mix: *mut WAVEFORMATEX) -> (i32, i32, i32, i32) {
 unsafe fn device_name(dev: &IMMDevice) -> String {
     use windows::Win32::Foundation::PROPERTYKEY;
     use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
-    use windows::Win32::System::Com::{STGM, STGM_READ};
+    use windows::Win32::System::Com::STGM_READ;
     use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
     const PKEY: PROPERTYKEY = PROPERTYKEY {
         fmtid: GUID::from_u128(0xa45c254e_df1c_4efd_8020_67d146a850e0),
